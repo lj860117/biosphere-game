@@ -871,13 +871,13 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
   color:var(--dim);letter-spacing:1px;margin-bottom:6px;
 }
 .core-upgrade-reqs{
-  display:flex;flex-direction:column;gap:3px;margin-bottom:8px;
+  display:flex;flex-wrap:wrap;gap:4px 8px;margin-bottom:8px;
 }
 .core-req-item{
-  display:flex;align-items:center;gap:6px;
-  font-size:0.65em;font-weight:600;
-  padding:2px 6px;border-radius:3px;
-  background:rgba(255,255,255,0.015);
+  display:inline-flex;align-items:center;gap:4px;
+  font-size:0.62em;font-weight:600;
+  padding:2px 8px;border-radius:10px;
+  background:rgba(255,255,255,0.03);white-space:nowrap;
 }
 .core-req-item.met{color:var(--green)}
 .core-req-item.met::before{content:'✓';font-weight:900;font-size:0.9em}
@@ -1507,7 +1507,7 @@ body::after{
     </div>
     <div class="title-box">
       <h1>BIOSPHERE</h1>
-      <div class="sub">微生物帝国</div>
+      <div class="sub">微生物帝国 <span style="margin-left:6px;font-size:0.85em;color:#5a6a80;letter-spacing:0">by 雷江 · 未经授权传播必究</span></div>
     </div>
     <div class="spacer"></div>
     <div class="phase-badge" id="phaseBadge" style="color:var(--green);border-color:var(--green)30">阶段 1 · 采集</div>
