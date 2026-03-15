@@ -578,6 +578,13 @@ const BLDS = {
     cost:{ glucose:25, energy:20 }, prod:{ dna:0.4 }, cons:{ glucose:2, energy:1.5 },
     color:'#a855f7', bg:'bg-purple', emoji:'🔬', tier:1,
   },
+  energyBuffer: {
+    n:'能量缓冲池', phase:1,
+    d:'存储溢出能量再释放',
+    ratio:'0.6🟢 → 1.8⚡/s',
+    cost:{ glucose:30, energy:15 }, prod:{ energy:1.8 }, cons:{ glucose:0.6 },
+    color:'#fb923c', bg:'bg-orange', emoji:'🪫', tier:1,
+  },
 
   // Phase 2 — 代谢
   nitrogenFixer: {
@@ -601,6 +608,20 @@ const BLDS = {
     cost:{ protein:20, energy:30 }, prod:{ dna:0.8 }, cons:{ protein:0.5, energy:1 },
     color:'#a855f7', bg:'bg-purple', emoji:'🏭', tier:2, techReq:'basicMetab',
   },
+  aminoSynth: {
+    n:'氨基酸合成仪', phase:2,
+    d:'氮源+葡萄糖→蛋白质（旁路）',
+    ratio:'0.5🔵 + 0.8🟢 → 0.45🧪/s',
+    cost:{ nitrogen:15, glucose:20 }, prod:{ protein:0.45 }, cons:{ nitrogen:0.5, glucose:0.8 },
+    color:'#f472b6', bg:'bg-pink', emoji:'🧬', tier:2, techReq:'basicMetab',
+  },
+  ribosomeCluster: {
+    n:'核糖体集群', phase:2,
+    d:'蛋白质+DNA→高效DNA',
+    ratio:'0.3🧪 + 0.5⚡ → 0.6🧬 + 0.1🟢/s',
+    cost:{ protein:25, dna:8 }, prod:{ dna:0.6, glucose:0.1 }, cons:{ protein:0.3, energy:0.5 },
+    color:'#c084fc', bg:'bg-purple', emoji:'🫧', tier:2, techReq:'basicMetab',
+  },
 
   // Phase 3 — 物流
   biofilmReactor: {
@@ -617,6 +638,20 @@ const BLDS = {
     cost:{ biomass:12, energy:25 }, prod:{}, cons:{},
     color:'#4a6080', bg:'bg-gray', emoji:'🕸️', tier:3, isBoost:true, boostVal:0.10,
   },
+  sporeSower: {
+    n:'孢子播种器', phase:3,
+    d:'生物质→远距传播增殖',
+    ratio:'0.4🧱 + 0.5⚡ → 0.3🧬 + 0.5🔵/s',
+    cost:{ biomass:18, energy:30 }, prod:{ dna:0.3, nitrogen:0.5 }, cons:{ biomass:0.4, energy:0.5 },
+    color:'#34d399', bg:'bg-teal', emoji:'🍄', tier:3, techReq:'biofilmTech',
+  },
+  metabolicLoop: {
+    n:'代谢回路', phase:3,
+    d:'循环再利用提升效率',
+    ratio:'全局产出 +8%，消耗-5%',
+    cost:{ biomass:20, protein:15 }, prod:{}, cons:{},
+    color:'#06b6d4', bg:'bg-teal', emoji:'♻️', tier:3, isBoost:true, boostVal:0.08, consReduce:0.05, techReq:'biofilmTech',
+  },
 
   // Phase 4 — 自动化
   qsController: {
@@ -625,6 +660,20 @@ const BLDS = {
     ratio:'2⚡ → 0.8📡/s',
     cost:{ protein:40, dna:20, energy:40 }, prod:{ qs:0.8 }, cons:{ energy:2 },
     color:'#eab308', bg:'bg-yellow', emoji:'🗼', tier:4, techReq:'quorumSensing',
+  },
+  nanoAssembler: {
+    n:'纳米组装线', phase:4,
+    d:'QS控制精密组装',
+    ratio:'0.3📡 + 1.5⚡ → 1.2🧱 + 0.4🧪/s',
+    cost:{ qs:8, protein:30, dna:25 }, prod:{ biomass:1.2, protein:0.4 }, cons:{ qs:0.3, energy:1.5 },
+    color:'#a3e635', bg:'bg-yellow', emoji:'🔩', tier:4, techReq:'quorumSensing',
+  },
+  pheromoneStation: {
+    n:'信息素广播站', phase:4,
+    d:'蛋白质→QS（辅助路线）',
+    ratio:'0.6🧪 + 0.5⚡ → 0.5📡/s',
+    cost:{ protein:35, biomass:15 }, prod:{ qs:0.5 }, cons:{ protein:0.6, energy:0.5 },
+    color:'#facc15', bg:'bg-yellow', emoji:'📢', tier:4, techReq:'quorumSensing',
   },
 
   // Phase 5 — 奇观
@@ -731,6 +780,13 @@ const SVG = {
   transport:`<svg viewBox="0 0 64 64" fill="none"><rect x="8" y="8" width="48" height="48" rx="3" fill="#0a0e18" stroke="#4a6080" stroke-width="1"/><rect x="4" y="26" width="56" height="12" rx="2" fill="#4a6080" opacity="0.08" stroke="#4a6080" stroke-width="0.8"/><rect x="6" y="28" width="8" height="8" rx="1" fill="#06d6a0" opacity="0.2"><animate attributeName="x" values="6;48;6" dur="2s" repeatCount="indefinite"/></rect><circle cx="32" cy="32" r="6" fill="#0a0e18" stroke="#4a6080" stroke-width="1"/><circle cx="32" cy="32" r="2.5" fill="#4a6080" opacity="0.3"/></svg>`,
   qsController:`<svg viewBox="0 0 64 64" fill="none"><rect x="10" y="12" width="44" height="40" rx="3" fill="#151505" stroke="#eab308" stroke-width="1.5"/><circle cx="32" cy="28" r="4" fill="#eab308" opacity="0.4"><animate attributeName="r" values="3;5;3" dur="2s" repeatCount="indefinite"/></circle><circle cx="32" cy="28" r="10" fill="none" stroke="#eab308" stroke-width="0.8" opacity="0.15"><animate attributeName="r" values="8;14;8" dur="2s" repeatCount="indefinite"/></circle><text x="32" y="44" text-anchor="middle" fill="#eab308" font-size="7" opacity="0.5">QS</text></svg>`,
   microDyson:`<svg viewBox="0 0 64 64" fill="none"><circle cx="32" cy="32" r="20" fill="none" stroke="#a855f7" stroke-width="1" opacity="0.3"/><circle cx="32" cy="32" r="7" fill="#fbbf24" opacity="0.15"/><circle cx="32" cy="32" r="3.5" fill="#fbbf24" opacity="0.4"><animate attributeName="r" values="3;5;3" dur="2s" repeatCount="indefinite"/></circle><ellipse cx="32" cy="32" rx="20" ry="7" fill="none" stroke="#a855f7" stroke-width="1.2" opacity="0.5" transform="rotate(25,32,32)"/><ellipse cx="32" cy="32" rx="20" ry="7" fill="none" stroke="#84cc16" stroke-width="0.8" opacity="0.3" transform="rotate(-25,32,32)"/></svg>`,
+  energyBuffer:`<svg viewBox="0 0 64 64" fill="none"><rect x="14" y="16" width="36" height="34" rx="4" fill="#1a0f05" stroke="#fb923c" stroke-width="1.5"/><rect x="20" y="22" width="24" height="6" rx="2" fill="#fb923c" opacity="0.1" stroke="#fb923c" stroke-width="0.8"/><rect x="20" y="22" width="16" height="6" rx="2" fill="#fb923c" opacity="0.3"><animate attributeName="width" values="6;24;6" dur="3s" repeatCount="indefinite"/></rect><rect x="20" y="32" width="24" height="6" rx="2" fill="#fb923c" opacity="0.1" stroke="#fb923c" stroke-width="0.8"/><rect x="20" y="32" width="12" height="6" rx="2" fill="#fb923c" opacity="0.25"><animate attributeName="width" values="12;24;12" dur="4s" repeatCount="indefinite"/></rect><path d="M30 42l2 0-1 4 2 0-4 6 1-4-2 0z" fill="#fb923c" opacity="0.5"/></svg>`,
+  aminoSynth:`<svg viewBox="0 0 64 64" fill="none"><rect x="10" y="12" width="44" height="40" rx="3" fill="#1a0a16" stroke="#f472b6" stroke-width="1.5"/><circle cx="24" cy="26" r="5" fill="none" stroke="#3b82f6" stroke-width="0.8" opacity="0.5"/><text x="24" y="29" text-anchor="middle" fill="#3b82f6" font-size="6" opacity="0.5">N</text><circle cx="40" cy="26" r="5" fill="none" stroke="#22c55e" stroke-width="0.8" opacity="0.5"/><text x="40" y="29" text-anchor="middle" fill="#22c55e" font-size="6" opacity="0.5">C</text><path d="M26 32 L32 38 L38 32" fill="none" stroke="#f472b6" stroke-width="1.2" opacity="0.6"/><circle cx="32" cy="40" r="4" fill="#f472b6" opacity="0.2"><animate attributeName="r" values="3;5;3" dur="2s" repeatCount="indefinite"/></circle></svg>`,
+  ribosomeCluster:`<svg viewBox="0 0 64 64" fill="none"><rect x="10" y="12" width="44" height="40" rx="3" fill="#0f0520" stroke="#c084fc" stroke-width="1.5"/><circle cx="24" cy="28" r="6" fill="#c084fc" opacity="0.08" stroke="#c084fc" stroke-width="0.8"/><circle cx="24" cy="28" r="2.5" fill="#c084fc" opacity="0.3"/><circle cx="38" cy="28" r="6" fill="#c084fc" opacity="0.08" stroke="#c084fc" stroke-width="0.8"/><circle cx="38" cy="28" r="2.5" fill="#c084fc" opacity="0.3"/><circle cx="31" cy="38" r="5" fill="#c084fc" opacity="0.06" stroke="#c084fc" stroke-width="0.8"/><circle cx="31" cy="38" r="2" fill="#c084fc" opacity="0.4"><animate attributeName="opacity" values="0.2;0.6;0.2" dur="1.8s" repeatCount="indefinite"/></circle></svg>`,
+  sporeSower:`<svg viewBox="0 0 64 64" fill="none"><rect x="10" y="12" width="44" height="40" rx="3" fill="#051510" stroke="#34d399" stroke-width="1.5"/><circle cx="32" cy="30" r="8" fill="#34d399" opacity="0.06" stroke="#34d399" stroke-width="0.8"/><circle cx="32" cy="30" r="3" fill="#34d399" opacity="0.3"/><circle cx="20" cy="22" r="2" fill="#34d399" opacity="0.4"><animate attributeName="cy" values="22;18;22" dur="2s" repeatCount="indefinite"/></circle><circle cx="44" cy="24" r="1.5" fill="#34d399" opacity="0.3"><animate attributeName="cy" values="24;19;24" dur="2.5s" repeatCount="indefinite"/></circle><circle cx="26" cy="42" r="1.8" fill="#34d399" opacity="0.35"><animate attributeName="cy" values="42;37;42" dur="1.8s" repeatCount="indefinite"/></circle><path d="M30 30 L22 22M34 30 L42 24M31 33 L26 42" fill="none" stroke="#34d399" stroke-width="0.6" opacity="0.3"/></svg>`,
+  metabolicLoop:`<svg viewBox="0 0 64 64" fill="none"><rect x="10" y="12" width="44" height="40" rx="3" fill="#051218" stroke="#06b6d4" stroke-width="1.5"/><circle cx="32" cy="32" r="12" fill="none" stroke="#06b6d4" stroke-width="1.2" opacity="0.3"/><path d="M32 20 A12 12 0 0 1 44 32" fill="none" stroke="#06b6d4" stroke-width="1.5" opacity="0.6"><animateTransform attributeName="transform" type="rotate" from="0 32 32" to="360 32 32" dur="4s" repeatCount="indefinite"/></path><path d="M38 28l2 4-4 0z" fill="#06b6d4" opacity="0.5"><animateTransform attributeName="transform" type="rotate" from="0 32 32" to="360 32 32" dur="4s" repeatCount="indefinite"/></path></svg>`,
+  nanoAssembler:`<svg viewBox="0 0 64 64" fill="none"><rect x="10" y="12" width="44" height="40" rx="3" fill="#0a1208" stroke="#a3e635" stroke-width="1.5"/><rect x="18" y="22" width="10" height="10" rx="1" fill="none" stroke="#a3e635" stroke-width="0.8" opacity="0.5"/><rect x="36" y="22" width="10" height="10" rx="1" fill="none" stroke="#a3e635" stroke-width="0.8" opacity="0.5"/><rect x="27" y="36" width="10" height="10" rx="1" fill="#a3e635" opacity="0.1" stroke="#a3e635" stroke-width="0.8"/><circle cx="32" cy="41" r="2" fill="#a3e635" opacity="0.5"><animate attributeName="r" values="1.5;3;1.5" dur="2s" repeatCount="indefinite"/></circle><path d="M28 27 L22 27M46 27 L40 27M32 36 L32 33" fill="none" stroke="#a3e635" stroke-width="0.8" opacity="0.4"/></svg>`,
+  pheromoneStation:`<svg viewBox="0 0 64 64" fill="none"><rect x="10" y="12" width="44" height="40" rx="3" fill="#151208" stroke="#facc15" stroke-width="1.5"/><circle cx="32" cy="28" r="5" fill="#facc15" opacity="0.15" stroke="#facc15" stroke-width="1"/><path d="M26 28 A8 8 0 0 0 22 36" fill="none" stroke="#facc15" stroke-width="0.8" opacity="0.3"><animate attributeName="opacity" values="0.1;0.5;0.1" dur="2s" repeatCount="indefinite"/></path><path d="M38 28 A8 8 0 0 1 42 36" fill="none" stroke="#facc15" stroke-width="0.8" opacity="0.3"><animate attributeName="opacity" values="0.1;0.5;0.1" dur="2s" begin="0.5s" repeatCount="indefinite"/></path><text x="32" y="44" text-anchor="middle" fill="#facc15" font-size="7" opacity="0.4">📢</text></svg>`,
 };
 
 // ===== ACHIEVEMENTS =====
@@ -930,17 +986,26 @@ const PRESTIGE = {
     const buildMult = Math.floor(state.stats.totalBuilt / 5);
     return Math.floor((achieveCount * 2 + phaseMult * 3 + evoMult * 2 + buildMult) * (state.wonderComplete ? 3 : 1));
   },
-  // 转生加成
+  // 转生加成 — 分层解锁，鼓励多次转生
   bonuses: [
+    // --- 第一轮 (5~20) 基础加速 ---
     { cost:5,  n:'初始资金+', d:'初始葡萄糖+50 能量+40', fn:(s)=>{s.res.glucose+=50;s.res.energy+=40} },
     { cost:10, n:'效率基因Ⅰ', d:'初始效率+10%', fn:(s)=>{s.gEff+=0.1} },
     { cost:15, n:'快速进化', d:'进化速度+50%', fn:(s)=>{s._evoSpeedMult=(s._evoSpeedMult||1)+0.5} },
     { cost:20, n:'效率基因Ⅱ', d:'初始效率+20%', fn:(s)=>{s.gEff+=0.2} },
+    // --- 第二轮 (25~50) 战略优势 ---
+    { cost:25, n:'科研捷径', d:'所有科技研发时间-30%', fn:(s)=>{s._techTimeMult=(s._techTimeMult||1)*0.7} },
     { cost:30, n:'高级起步', d:'初始带简易提取器+1', fn:(s)=>{
       for(let i=0;i<s.grid.length;i++){if(!s.grid[i]){s.grid[i]={type:'simpleExtractor'};break;}}
     }},
+    { cost:35, n:'氮源储备', d:'初始氮源+30，蛋白质+15', fn:(s)=>{s.res.nitrogen=(s.res.nitrogen||0)+30;s.res.protein=(s.res.protein||0)+15} },
     { cost:50, n:'资源倍增', d:'所有产出×1.5', fn:(s)=>{s._prodMult=(s._prodMult||1)*1.5} },
-    { cost:80, n:'终极基因', d:'初始效率+50% + 进化速度×2', fn:(s)=>{s.gEff+=0.5;s._evoSpeedMult=(s._evoSpeedMult||1)*2} },
+    // --- 第三轮 (60~120) 转生独享 ---
+    { cost:60, n:'核心扩容', d:'帝国核心供给上限+2', fn:(s)=>{s._coreBonus=(s._coreBonus||0)+2} },
+    { cost:75, n:'双倍经验', d:'进化效率奖励翻倍', fn:(s)=>{s._evoBoostMult=(s._evoBoostMult||1)*2} },
+    { cost:90, n:'传送带大师', d:'传送带效率+50%', fn:(s)=>{s._beltBonus=(s._beltBonus||0)+0.5} },
+    { cost:100, n:'造价折扣', d:'所有建筑造价-20%', fn:(s)=>{s._costDiscount=(s._costDiscount||0)+0.2} },
+    { cost:120, n:'终极基因', d:'初始效率+50% + 进化速度×2', fn:(s)=>{s.gEff+=0.5;s._evoSpeedMult=(s._evoSpeedMult||1)*2} },
   ],
 };
 
@@ -990,6 +1055,10 @@ const G = {
   prestigeBonuses: [], // indices of purchased bonuses
   _evoSpeedMult: 1,
   _prodMult: 1,
+  _techTimeMult: 1,
+  _coreBonus: 0,
+  _beltBonus: 0,
+  _costDiscount: 0,
   // Choice event
   pendingChoice: null,
 
@@ -1737,7 +1806,7 @@ const G = {
   // === 更新核心供给UI ===
   updateCoreSupplyUI() {
     const cc = CORE_COLONY[this.phase] || CORE_COLONY[1];
-    const maxC = cc.maxCollectors || 2;
+    const maxC = (cc.maxCollectors || 2) + (this._coreBonus || 0);
     const used = this._coreSupplyUsed || 0;
     const active = Math.min(used, maxC);
     const overload = used > maxC;
@@ -2181,7 +2250,7 @@ const G = {
             rateStr = `<br><span style="color:${bd.color}">✦ 运行中</span>`;
           } else if (!bd.isWonder) {
             const coreConfig = CORE_COLONY[this.phase] || CORE_COLONY[1];
-            const maxC = coreConfig.maxCollectors || 2;
+            const maxC = (coreConfig.maxCollectors || 2) + (this._coreBonus || 0);
             if (bd.corePowered) {
               let seq = 0;
               for (let ci = 0; ci <= idx; ci++) {
@@ -2326,7 +2395,7 @@ const G = {
   // 更新格子内的警告标签（产出速率已移至 hover tooltip）
   updateCellRates() {
     const coreConfig = CORE_COLONY[this.phase] || CORE_COLONY[1];
-    const maxC = coreConfig.maxCollectors || 2;
+    const maxC = (coreConfig.maxCollectors || 2) + (this._coreBonus || 0);
     let collectorSeq = 0;
 
     this.grid.forEach((g, idx) => {
@@ -3387,6 +3456,15 @@ const G = {
 
     const score = this.calcScore();
     const { rank } = this._scoreRank(score);
+    // 生成游戏状态指纹用于服务端校验
+    const techDone = Object.values(this.techs).filter(t => t.done).length;
+    const achieveCount = Object.keys(this.achievements).length;
+    const challengeCount = Object.keys(this.completedChallenges).length;
+    const bldCount = this.totalBuildings();
+    // 校验签名：混合多个游戏状态值生成 hash，使得不篡改全部数据就无法伪造分数
+    const sigPayload = `${this._playerId}:${score}:${this.phase}:${this.eL}:${bldCount}:${techDone}:${achieveCount}:${challengeCount}:${this.wonderComplete?1:0}:${Math.floor(this.stats.onlineTime)}:bio2026`;
+    const sig = await this._hashStr(sigPayload);
+
     const data = {
       player_id: this._playerId,
       name: this._playerName,
@@ -3394,19 +3472,32 @@ const G = {
       rank: rank,
       phase: this.phase,
       evo_lv: this.eL,
-      buildings: this.totalBuildings(),
-      techs: Object.values(this.techs).filter(t => t.done).length,
-      achievements: Object.keys(this.achievements).length,
-      challenges: Object.keys(this.completedChallenges).length,
+      buildings: bldCount,
+      techs: techDone,
+      achievements: achieveCount,
+      challenges: challengeCount,
       wonder: this.wonderComplete,
+      online_time: Math.floor(this.stats.onlineTime),
+      score_sig: sig,
       updated_at: new Date().toISOString()
     };
 
     try {
       // upsert: 有则更新，无则插入（基于 player_id 唯一约束）
-      const { error } = await window.supa
+      // 先尝试带签名字段（需要 Supabase 表有 score_sig/online_time 列）
+      let error;
+      ({ error } = await window.supa
         .from('leaderboard')
-        .upsert(data, { onConflict: 'player_id' });
+        .upsert(data, { onConflict: 'player_id' }));
+
+      // 如果新列不存在，回退到不含新字段的提交
+      if (error && (error.code === '42703' || error.message?.includes('does not exist'))) {
+        delete data.score_sig;
+        delete data.online_time;
+        ({ error } = await window.supa
+          .from('leaderboard')
+          .upsert(data, { onConflict: 'player_id' }));
+      }
 
       if (error) throw error;
       this.log('📤 分数已提交到排行榜', 's');
@@ -3417,6 +3508,20 @@ const G = {
     } catch (err) {
       console.error('Supabase submit error:', err);
       this.showCursorTooltip('提交失败，请检查网络');
+    }
+  },
+
+  // 字符串SHA-256哈希（用于分数签名防篡改）
+  async _hashStr(str) {
+    try {
+      const buf = new TextEncoder().encode(str);
+      const hash = await crypto.subtle.digest('SHA-256', buf);
+      return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2,'0')).join('').slice(0,16);
+    } catch(e) {
+      // fallback: simple hash
+      let h = 0;
+      for (let i = 0; i < str.length; i++) { h = ((h << 5) - h + str.charCodeAt(i)) | 0; }
+      return Math.abs(h).toString(16).padStart(8,'0');
     }
   },
 
@@ -3614,6 +3719,9 @@ const G = {
   _suggLoaded: false,
   _suggCache: [],
   _suggLastFetch: 0,
+  _suggLastSubmit: 0,   // 上次提交时间（限流用）
+  _suggDailyCount: 0,   // 今日提交数
+  _suggDailyDate: '',    // 今日日期标记
 
   toggleSuggestionBar() {
     const bar = document.getElementById('suggestionBar');
@@ -3633,6 +3741,23 @@ const G = {
     if (!text) { this.showCursorTooltip('请输入建议内容'); return; }
     if (text.length > 200) { this.showCursorTooltip('建议内容不能超过200字'); return; }
 
+    // === 频率限制 ===
+    const now = Date.now();
+    // 30秒冷却
+    const cooldown = 30000;
+    if (now - this._suggLastSubmit < cooldown) {
+      const wait = Math.ceil((cooldown - (now - this._suggLastSubmit)) / 1000);
+      this.showCursorTooltip(`请等待 ${wait} 秒后再提交`);
+      return;
+    }
+    // 每日上限10条
+    const today = new Date().toDateString();
+    if (this._suggDailyDate !== today) { this._suggDailyDate = today; this._suggDailyCount = 0; }
+    if (this._suggDailyCount >= 10) {
+      this.showCursorTooltip('今日建议已达上限（10条/天）');
+      return;
+    }
+
     if (!window.supaReady || !window.supa) {
       this.showCursorTooltip('服务未连接，无法提交');
       return;
@@ -3651,6 +3776,8 @@ const G = {
       return;
     }
 
+    this._suggLastSubmit = now;
+    this._suggDailyCount++;
     input.value = '';
     this.log('💡 建议已提交，感谢反馈！', 's');
     this.showCursorTooltip('建议已提交 ✓');
@@ -3738,9 +3865,10 @@ const G = {
   scaledCost(key) {
     const bd = BLDS[key];
     const n = this.bldCount(key);
+    const discount = 1 - Math.min(this._costDiscount || 0, 0.5); // 最多减50%
     const scaled = {};
     for (let k in bd.cost) {
-      scaled[k] = Math.ceil(bd.cost[k] * Math.pow(COST_SCALE, n));
+      scaled[k] = Math.ceil(bd.cost[k] * Math.pow(COST_SCALE, n) * discount);
     }
     return scaled;
   },
@@ -3752,7 +3880,7 @@ const G = {
 
     // 核心供给上限：帝国核心能供给多少台碳源采集器
     const coreConfig = CORE_COLONY[this.phase] || CORE_COLONY[1];
-    const maxCollectors = coreConfig.maxCollectors || 2;
+    const maxCollectors = (coreConfig.maxCollectors || 2) + (this._coreBonus || 0);
 
     // 先统计碳源采集器数量和索引
     const collectorIndices = [];
@@ -3766,12 +3894,17 @@ const G = {
     this._coreSupplyActive = activeCollectors;
 
     let totalTransport = 0;
+    let totalConsReduce = 0; // 代谢回路的消耗减少
     let collectorCount = 0;
     this.grid.forEach((g, idx) => {
       if (!g) return;
       const bd = BLDS[g.type];
       if (!bd) return;
-      if (bd.isBoost) { totalTransport++; return; }
+      if (bd.isBoost) {
+        totalTransport++;
+        if (bd.consReduce) totalConsReduce += bd.consReduce; // 代谢回路减耗
+        return;
+      }
 
       // 碳源采集器受核心供给上限限制
       if (bd.corePowered) {
@@ -3804,6 +3937,8 @@ const G = {
     this.lEff = 1 + totalTransport * transportRate;
     for (let k in r) {
       if (r[k] > 0) r[k] *= this.lEff;
+      // 代谢回路减少消耗
+      if (r[k] < 0 && totalConsReduce > 0) r[k] *= (1 - Math.min(totalConsReduce, 0.3));
     }
 
     // QS boost — 基于QS产出速率而非存量，需要维持QS塔运转
@@ -3837,7 +3972,7 @@ const G = {
   tickResearch() {
     if (!this.rTech) return;
     const t = TECHS[this.rTech];
-    this.rProg += 1;  // 在 spd 循环内已被调用 spd 次，每次 +1 即可
+    this.rProg += 1 * (this._techTimeMult ? (1 / this._techTimeMult) : 1);  // 转生加成加速研究
     const pct = Math.min(this.rProg / t.time * 100, 100);
     const fill = document.getElementById('techFill-' + this.rTech);
     if (fill) fill.style.width = pct + '%';
@@ -6562,7 +6697,8 @@ const G = {
       // 没有传送带：如果建筑需要输入资源，则停产
       return needsInput ? 0 : 1;
     }
-    return totalEff / beltCount;
+    const baseMult = totalEff / beltCount;
+    return baseMult * (1 + (this._beltBonus || 0)); // 转生加成加成传送带效率
   },
 
   showBeltUpgradePopup(beltKey) {
