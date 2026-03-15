@@ -50,6 +50,18 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 }
 .lb-btn:hover{background:rgba(251,191,36,0.2)}
 
+/* Mini leaderboard top 3 */
+.mini-lb-row{
+  display:flex;align-items:center;gap:5px;padding:3px 5px;border-radius:3px;
+  transition:background 0.15s;font-size:0.68em;
+}
+.mini-lb-row:hover{background:rgba(255,255,255,0.03)}
+.mini-lb-row.mini-me{background:rgba(6,214,160,0.06);border:1px solid rgba(6,214,160,0.12)}
+.mini-lb-medal{width:18px;text-align:center;font-size:1.05em;flex-shrink:0}
+.mini-lb-name{flex:1;font-weight:600;color:var(--bright);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:0.92em}
+.mini-lb-score{font-family:'Share Tech Mono',monospace;font-weight:700;color:#fbbf24;min-width:40px;text-align:right;font-size:0.9em}
+.mini-lb-grade{font-family:'Orbitron',monospace;font-size:0.7em;font-weight:700;padding:1px 4px;border-radius:2px;min-width:24px;text-align:center}
+
 /* === LAYOUT === */
 .app{display:flex;flex-direction:column;height:100vh}
 
@@ -1619,8 +1631,17 @@ body::after{
           <div class="stat-row" title="物流效率 = 仓储加成 × 传送带平均效率"><span class="stat-label">🚚 物流效率</span><span class="stat-value" id="statLog">100%</span></div>
           <div class="stat-row" id="rowQS" style="display:none"><span class="stat-label">📡 QS信号</span><span class="stat-value" id="statQS">0</span></div>
           <div class="stat-row" id="scoreRow" style="border-top:1px solid rgba(255,255,255,0.06);padding-top:6px;margin-top:3px;font-size:0.85em;cursor:default;position:relative" oncontextmenu="event.preventDefault();G.showRatingTooltip(event)"><span class="stat-label" style="font-size:1.05em;font-weight:600">🏆 总分数</span><span style="display:flex;align-items:center;gap:8px"><span class="stat-value" id="statScore" style="color:#fbbf24;font-weight:800;font-size:1.25em;letter-spacing:0.5px">0</span><span id="statRank" style="font-size:0.75em;font-weight:700;padding:2px 7px;border-radius:3px;background:rgba(251,191,36,0.1);border:1px solid rgba(251,191,36,0.2);color:#fbbf24;font-family:'Orbitron',monospace;letter-spacing:1px">E</span></span></div>
+          <!-- Mini Leaderboard Top 3 -->
+          <div id="miniLeaderboard" style="margin-top:6px;padding-top:6px;border-top:1px solid rgba(255,255,255,0.06)">
+            <div style="font-size:0.65em;color:var(--dim);letter-spacing:1px;margin-bottom:4px;display:flex;align-items:center;gap:4px">
+              <span style="color:#fbbf24">👑</span> TOP 3
+            </div>
+            <div id="miniLbList" style="display:flex;flex-direction:column;gap:2px">
+              <div style="text-align:center;color:var(--dim);font-size:0.62em;padding:4px 0">加载中...</div>
+            </div>
+          </div>
           <div class="stat-row" style="justify-content:center;padding-top:4px">
-            <button onclick="G.showLeaderboard()" class="lb-btn" style="width:100%">🏆 排行榜</button>
+            <button onclick="G.showLeaderboard()" class="lb-btn" style="width:100%">🏆 查看完整排行榜</button>
           </div>
         </div>
       </div>

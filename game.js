@@ -1008,6 +1008,11 @@ const G = {
     this.startLoop();
     this.animLoop();
     this._initResponsive();
+
+    // 初始加载迷你排行榜 (延迟 2 秒等 Supabase 就绪)
+    setTimeout(() => this.refreshMiniLeaderboard(), 2000);
+    // 每 60 秒自动刷新迷你排行榜
+    setInterval(() => this.refreshMiniLeaderboard(), 60000);
     this._initTouchEvents();
     this.log('▸ 系统在线 — 微生物帝国启动', 's');
     this.log('▸ 起始资源: 50🟢葡萄糖 + 35⚡能量', 'ev');
@@ -3286,6 +3291,8 @@ const G = {
   _playerName: null,
   _lbCache: null,
   _lbLastFetch: 0,
+  _miniLbCache: null,
+  _miniLbLastFetch: 0,
 
   // 初始化玩家 ID 和昵称
   _initPlayer() {
@@ -3376,6 +3383,8 @@ const G = {
       this.log('📤 分数已提交到排行榜', 's');
       this.showCursorTooltip('分数已同步！');
       this._lbLastFetch = 0;
+      this._miniLbLastFetch = 0; // 刷新迷你排行榜
+      this.refreshMiniLeaderboard();
     } catch (err) {
       console.error('Supabase submit error:', err);
       this.showCursorTooltip('提交失败，请检查网络');
@@ -3438,6 +3447,11 @@ const G = {
       this._lbCache = entries;
       this._lbLastFetch = Date.now();
       this._renderLeaderboard(entries);
+      // 同步更新迷你排行榜
+      const top3 = entries.slice(0, 3).map(e => ({ id: e.id, name: e.name, score: e.score, rank: e.rank }));
+      this._miniLbCache = top3;
+      this._miniLbLastFetch = Date.now();
+      this._renderMiniLeaderboard(top3);
     } catch (err) {
       console.error('Supabase read error:', err);
       listEl.innerHTML = '<div style="text-align:center;color:var(--red);padding:20px 0">加载失败，请检查网络</div>';
@@ -3490,6 +3504,73 @@ const G = {
           </div>
         </div>`;
     }
+
+    listEl.innerHTML = html;
+  },
+
+  // === 迷你排行榜 (Top 3) — 显示在右侧面板总分数下方 ===
+  async refreshMiniLeaderboard() {
+    const listEl = document.getElementById('miniLbList');
+    if (!listEl) return;
+
+    // 30秒内不重复请求
+    if (this._miniLbCache && Date.now() - this._miniLbLastFetch < 30000) {
+      this._renderMiniLeaderboard(this._miniLbCache);
+      return;
+    }
+
+    if (!window.supaReady || !window.supa) {
+      listEl.innerHTML = '<div style="text-align:center;color:var(--dim);font-size:0.6em;padding:4px 0">服务未连接</div>';
+      return;
+    }
+
+    try {
+      const { data, error } = await window.supa
+        .from('leaderboard')
+        .select('player_id, name, score, rank')
+        .order('score', { ascending: false })
+        .limit(3);
+
+      if (error) throw error;
+
+      const entries = (data || []).map(r => ({
+        id: r.player_id,
+        name: r.name,
+        score: r.score,
+        rank: r.rank,
+      }));
+      this._miniLbCache = entries;
+      this._miniLbLastFetch = Date.now();
+      this._renderMiniLeaderboard(entries);
+    } catch (err) {
+      console.error('Mini leaderboard error:', err);
+      listEl.innerHTML = '<div style="text-align:center;color:var(--dim);font-size:0.6em;padding:4px 0">加载失败</div>';
+    }
+  },
+
+  _renderMiniLeaderboard(entries) {
+    const listEl = document.getElementById('miniLbList');
+    if (!listEl) return;
+
+    if (!entries || entries.length === 0) {
+      listEl.innerHTML = '<div style="text-align:center;color:var(--dim);font-size:0.62em;padding:4px 0">暂无数据</div>';
+      return;
+    }
+
+    const myId = this._playerId;
+    const medals = ['🥇', '🥈', '🥉'];
+
+    let html = '';
+    entries.forEach((e, i) => {
+      const isMe = e.id === myId;
+      const { color: rankColor } = this._scoreRank(e.score);
+      html += `<div class="mini-lb-row ${isMe ? 'mini-me' : ''}">
+        <div class="mini-lb-medal">${medals[i]}</div>
+        <div class="mini-lb-name" ${isMe ? 'style="color:var(--cyan)"' : ''}>${this._escHtml(e.name || '???')}${isMe ? '<span style="font-size:0.8em;color:var(--cyan)"> (我)</span>' : ''}</div>
+        <div class="mini-lb-score" style="color:${rankColor}">${(e.score || 0).toLocaleString()}</div>
+        <div class="mini-lb-grade" style="color:${rankColor};background:${rankColor}15;border:1px solid ${rankColor}30">${e.rank || 'E'}</div>
+      </div>`;
+    });
 
     listEl.innerHTML = html;
   },
