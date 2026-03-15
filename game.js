@@ -1790,8 +1790,8 @@ const G = {
   // 格子最小像素（低于此值就减少格子数）和最大像素（高于此值就增加格子数）
   _minCellPx: 68,
   _maxCellPx: 92,
-  _minCols: 8, _maxCols: 24,
-  _minRows: 6, _maxRows: 18,
+  _minCols: 6, _maxCols: 18,
+  _minRows: 4, _maxRows: 14,
 
   _calcGridLayout() {
     const dishView = document.querySelector('.dish-view');
