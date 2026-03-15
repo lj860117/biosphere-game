@@ -1002,6 +1002,7 @@ const G = {
     for (let k in TECHS) this.techs[k] = { done:false };
 
     this.load();           // 先加载存档（恢复 grid 数据和 gridSize）
+    this._initPlayer();    // 初始化玩家 ID 和昵称
     this.buildUI();        // 再渲染 UI（renderGrid 会基于正确的数据）
     this.calcOfflineEarnings();
     this.startLoop();
@@ -1262,7 +1263,8 @@ const G = {
   _popupIds: [
     'resetPopup', 'choicePopup', 'offlinePopup',
     'upgradePopup', 'beltUpgradePopup', 'recyclePopup',
-    'bldTypeSelector', 'beltTypeSelector', 'eventPopup'
+    'bldTypeSelector', 'beltTypeSelector', 'eventPopup',
+    'leaderboardPopup', 'nicknamePopup'
   ],
 
   _showBackdrop() {
@@ -3277,6 +3279,225 @@ const G = {
       // 降级方案：用弹窗显示
       prompt('复制下方文字分享给朋友：', card);
     });
+  },
+
+  // ===== LEADERBOARD SYSTEM (Supabase) =====
+  _playerId: null,
+  _playerName: null,
+  _lbCache: null,
+  _lbLastFetch: 0,
+
+  // 初始化玩家 ID 和昵称
+  _initPlayer() {
+    let pid = localStorage.getItem('bioPlayerId');
+    if (!pid) {
+      pid = 'p_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8);
+      localStorage.setItem('bioPlayerId', pid);
+    }
+    this._playerId = pid;
+    this._playerName = localStorage.getItem('bioPlayerName') || null;
+
+    if (!this._playerName) {
+      setTimeout(() => this.showNicknamePopup(), 3000);
+    }
+  },
+
+  // === 昵称弹窗 ===
+  showNicknamePopup() {
+    const pop = document.getElementById('nicknamePopup');
+    if (!pop) return;
+    const input = document.getElementById('nicknameInput');
+    if (input) input.value = this._playerName || '';
+    pop.classList.add('show');
+    this._showBackdrop();
+    if (input) setTimeout(() => input.focus(), 100);
+  },
+
+  confirmNickname() {
+    const input = document.getElementById('nicknameInput');
+    const name = (input?.value || '').trim();
+    if (name.length < 2 || name.length > 12) {
+      this.showCursorTooltip('昵称需要 2-12 个字符');
+      return;
+    }
+    this._playerName = name;
+    localStorage.setItem('bioPlayerName', name);
+    this.closeNickname();
+    this.log(`🧬 昵称设置为: ${name}`, 's');
+    this.showCursorTooltip(`昵称已设为「${name}」`);
+    this.submitScore();
+  },
+
+  closeNickname() {
+    document.getElementById('nicknamePopup')?.classList.remove('show');
+    this._hideBackdrop();
+  },
+
+  editNickname() {
+    this.closeLeaderboard();
+    setTimeout(() => this.showNicknamePopup(), 200);
+  },
+
+  // === 提交分数到 Supabase ===
+  async submitScore() {
+    if (!window.supaReady || !window.supa) {
+      this.showCursorTooltip('排行榜服务未连接');
+      return;
+    }
+    if (!this._playerName) {
+      this.showNicknamePopup();
+      return;
+    }
+
+    const score = this.calcScore();
+    const { rank } = this._scoreRank(score);
+    const data = {
+      player_id: this._playerId,
+      name: this._playerName,
+      score: score,
+      rank: rank,
+      phase: this.phase,
+      evo_lv: this.eL,
+      buildings: this.totalBuildings(),
+      techs: Object.values(this.techs).filter(t => t.done).length,
+      achievements: Object.keys(this.achievements).length,
+      challenges: Object.keys(this.completedChallenges).length,
+      wonder: this.wonderComplete,
+      updated_at: new Date().toISOString()
+    };
+
+    try {
+      // upsert: 有则更新，无则插入（基于 player_id 唯一约束）
+      const { error } = await window.supa
+        .from('leaderboard')
+        .upsert(data, { onConflict: 'player_id' });
+
+      if (error) throw error;
+      this.log('📤 分数已提交到排行榜', 's');
+      this.showCursorTooltip('分数已同步！');
+      this._lbLastFetch = 0;
+    } catch (err) {
+      console.error('Supabase submit error:', err);
+      this.showCursorTooltip('提交失败，请检查网络');
+    }
+  },
+
+  // 自动提交（save 时静默同步，节流 5 分钟一次）
+  _lastAutoSubmit: 0,
+  _autoSubmitScore() {
+    if (!window.supaReady || !window.supa || !this._playerName) return;
+    const now = Date.now();
+    if (now - this._lastAutoSubmit < 300000) return;
+    this._lastAutoSubmit = now;
+    this.submitScore();
+  },
+
+  // === 排行榜 UI ===
+  showLeaderboard() {
+    const pop = document.getElementById('leaderboardPopup');
+    if (!pop) return;
+    pop.classList.add('show');
+    this._showBackdrop();
+    this.refreshLeaderboard();
+  },
+
+  closeLeaderboard() {
+    document.getElementById('leaderboardPopup')?.classList.remove('show');
+    this._hideBackdrop();
+  },
+
+  async refreshLeaderboard() {
+    const listEl = document.getElementById('leaderboardList');
+    if (!listEl) return;
+
+    if (!window.supaReady || !window.supa) {
+      listEl.innerHTML = '<div style="text-align:center;color:var(--orange);padding:20px 0">⚠ 排行榜服务未连接<br><span style="font-size:0.85em;color:var(--dim)">需要配置 Supabase</span></div>';
+      return;
+    }
+
+    listEl.innerHTML = '<div style="text-align:center;color:var(--dim);padding:20px 0">加载中...</div>';
+
+    try {
+      const { data, error } = await window.supa
+        .from('leaderboard')
+        .select('player_id, name, score, rank, phase, buildings, wonder')
+        .order('score', { ascending: false })
+        .limit(20);
+
+      if (error) throw error;
+
+      const entries = (data || []).map(r => ({
+        id: r.player_id,
+        name: r.name,
+        score: r.score,
+        rank: r.rank,
+        phase: r.phase,
+        buildings: r.buildings,
+        wonder: r.wonder
+      }));
+      this._lbCache = entries;
+      this._lbLastFetch = Date.now();
+      this._renderLeaderboard(entries);
+    } catch (err) {
+      console.error('Supabase read error:', err);
+      listEl.innerHTML = '<div style="text-align:center;color:var(--red);padding:20px 0">加载失败，请检查网络</div>';
+    }
+  },
+
+  _renderLeaderboard(entries) {
+    const listEl = document.getElementById('leaderboardList');
+    if (!listEl) return;
+
+    if (entries.length === 0) {
+      listEl.innerHTML = '<div style="text-align:center;color:var(--dim);padding:20px 0">还没有人上榜，你来当第一名！</div>';
+      return;
+    }
+
+    const myId = this._playerId;
+
+    let html = '';
+    entries.forEach((e, i) => {
+      const isMe = e.id === myId;
+      const rankNum = i + 1;
+      const medal = rankNum <= 3 ? ['🥇','🥈','🥉'][i] : `<span style="color:var(--dim)">${rankNum}</span>`;
+      const { color: rankColor } = this._scoreRank(e.score);
+      const phaseStr = `P${e.phase || 1}`;
+      const bldStr = `${e.buildings || 0}🏗`;
+      const detailBits = [phaseStr, bldStr];
+      if (e.wonder) detailBits.push('☀️');
+
+      html += `
+        <div class="lb-row ${isMe ? 'lb-me' : ''}">
+          <div class="lb-rank">${medal}</div>
+          <div class="lb-name" ${isMe ? 'style="color:var(--cyan)"' : ''}>${this._escHtml(e.name || '???')}${isMe ? ' <span style="font-size:0.8em;color:var(--cyan)">(我)</span>' : ''}</div>
+          <div class="lb-score" style="color:${rankColor}">${(e.score || 0).toLocaleString()}</div>
+          <div class="lb-grade" style="color:${rankColor};background:${rankColor}15;border:1px solid ${rankColor}30">${e.rank || 'E'}</div>
+          <div class="lb-detail">${detailBits.join(' ')}</div>
+        </div>`;
+    });
+
+    if (myId && !entries.find(e => e.id === myId) && this._playerName) {
+      const myScore = this.calcScore();
+      const { rank, color: myColor } = this._scoreRank(myScore);
+      html += `
+        <div style="border-top:1px solid rgba(255,255,255,0.06);margin-top:6px;padding-top:6px">
+          <div class="lb-row lb-me">
+            <div class="lb-rank"><span style="color:var(--dim)">—</span></div>
+            <div class="lb-name" style="color:var(--cyan)">${this._escHtml(this._playerName)} <span style="font-size:0.8em">(我)</span></div>
+            <div class="lb-score" style="color:${myColor}">${myScore.toLocaleString()}</div>
+            <div class="lb-grade" style="color:${myColor};background:${myColor}15;border:1px solid ${myColor}30">${rank}</div>
+            <div class="lb-detail">P${this.phase} ${this.totalBuildings()}🏗${this.wonderComplete ? ' ☀️' : ''}</div>
+          </div>
+        </div>`;
+    }
+
+    listEl.innerHTML = html;
+  },
+
+  _escHtml(s) {
+    const d = document.createElement('div');
+    d.textContent = s;
+    return d.innerHTML;
   },
 
   // ===== UTILITY =====
@@ -5544,6 +5765,8 @@ const G = {
       };
       localStorage.setItem('bioSphereV3', JSON.stringify(s));
       if (!silent) this.log('▸ 已保存', 's');
+      // 静默同步排行榜（节流 5 分钟一次）
+      if (silent) this._autoSubmitScore();
       // 视觉反馈：闪烁保存指示器
       const indicator = document.getElementById('saveIndicator');
       if (indicator) {
