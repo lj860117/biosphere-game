@@ -3491,7 +3491,7 @@ const G = {
         .upsert(data, { onConflict: 'player_id' }));
 
       // 如果新列不存在，回退到不含新字段的提交
-      if (error && (error.code === '42703' || error.message?.includes('does not exist'))) {
+      if (error && (error.code === '42703' || error.code === 'PGRST204' || error.message?.includes('could not find') || error.message?.includes('does not exist'))) {
         delete data.score_sig;
         delete data.online_time;
         ({ error } = await window.supa
