@@ -946,7 +946,7 @@ const PRESTIGE = {
 
 // ===== GAME STATE =====
 const G = {
-  res:{}, rates:{}, grid:[], gridSize:8,
+  res:{}, rates:{}, grid:[], gridSize:8, gridCols:8, gridRows:8,
   pop:0, gEff:1, lEff:1, qsLv:0,
   eL:1, eP:0,
   phase:1, sel:null, paused:false, spd:1, rt:0,
@@ -998,7 +998,7 @@ const G = {
     for (let k in RES) this.res[k] = 0;
     this.res.glucose = 50; this.res.energy = 35;
     for (let k in RES) this.rates[k] = 0;
-    this.grid = new Array(this.gridSize * this.gridSize).fill(null);
+    this.grid = new Array(this.gridCols * this.gridRows).fill(null);
     for (let k in TECHS) this.techs[k] = { done:false };
 
     this.load();           // 先加载存档（恢复 grid 数据和 gridSize）
@@ -1131,17 +1131,18 @@ const G = {
     };
     mql.addEventListener('change', handleChange);
 
-    // 窗口 resize 时重新计算格子大小（可能导致 gridSize 变化）
+    // 窗口 resize 时重新计算格子大小（可能导致 gridCols/gridRows 变化）
     let resizeTimer = null;
     window.addEventListener('resize', () => {
       clearTimeout(resizeTimer);
       resizeTimer = setTimeout(() => {
         const gridEl = document.getElementById('grid');
         if (!gridEl) return;
-        const oldSize = this.gridSize;
+        const oldCols = this.gridCols;
+        const oldRows = this.gridRows;
         const layout = this._calcGridLayout();
-        if (this.gridSize !== oldSize) {
-          // gridSize 变了，需要完整重渲染
+        if (this.gridCols !== oldCols || this.gridRows !== oldRows) {
+          // 网格尺寸变了，需要完整重渲染
           this.renderGrid();
           this.save(true);
         } else if (layout.cellSize) {
@@ -1781,13 +1782,13 @@ const G = {
   // === Grid ===
   // 理想格子像素大小（可微调）
   _idealCellSize: 65,
-  _minGridSize: 8,   // 最小网格不小于 8×8
-  _maxGridSize: 16,  // 最大网格不超过 16×16
+  _minCols: 8, _maxCols: 20,   // 列数范围
+  _minRows: 6, _maxRows: 16,   // 行数范围
 
   _calcGridLayout() {
     const dishView = document.querySelector('.dish-view');
     const gridEl = document.getElementById('grid');
-    if (!dishView) return { cellSize: null, cols: this.gridSize };
+    if (!dishView) return { cellSize: null, cols: this.gridCols };
     const vw = dishView.clientWidth;
     const vh = dishView.clientHeight;
     const cs = gridEl ? getComputedStyle(gridEl) : null;
@@ -1795,42 +1796,44 @@ const G = {
     const padT = cs ? parseFloat(cs.paddingTop) || 10 : 10;
     const padL = cs ? parseFloat(cs.paddingLeft) || 10 : 10;
 
-    // 按理想格子大小，反算宽/高方向能放多少个
+    // 按理想格子大小，分别反算宽/高方向能放多少个
     const ideal = this._idealCellSize;
     const fitCols = Math.floor((vw - padL * 2 + gap) / (ideal + gap));
     const fitRows = Math.floor((vh - padT * 2 + gap) / (ideal + gap));
-    // 取宽高中较小值（正方形网格），限制在 min ~ max 之间
-    const newSize = Math.max(this._minGridSize, Math.min(this._maxGridSize, Math.min(fitCols, fitRows)));
+    // 列数和行数分别 clamp 到各自范围
+    const newCols = Math.max(this._minCols, Math.min(this._maxCols, fitCols));
+    const newRows = Math.max(this._minRows, Math.min(this._maxRows, fitRows));
 
-    // 如果 gridSize 发生了变化，扩展/收缩网格数组
-    if (newSize !== this.gridSize) {
-      this._resizeGrid(newSize);
+    // 如果列数或行数变了，扩展/收缩网格数组
+    if (newCols !== this.gridCols || newRows !== this.gridRows) {
+      this._resizeGrid(newCols, newRows);
     }
 
-    const cols = this.gridSize;
-    const rows = this.gridSize;
-    // 按实际 gridSize 计算最终格子像素大小（取宽高较小值保证正方形）
+    const cols = this.gridCols;
+    const rows = this.gridRows;
+    // 按实际格数计算最终格子像素大小（取宽高较小值保证正方形格子）
     const cellW = Math.floor((vw - padL * 2 - gap * (cols - 1)) / cols);
     const cellH = Math.floor((vh - padT * 2 - gap * (rows - 1)) / rows);
     const cellSize = Math.max(40, Math.min(cellW, cellH));
     return { cellSize, cols };
   },
 
-  /* 动态调整网格大小，保留原有建筑位置 */
-  _resizeGrid(newSize) {
-    const oldSize = this.gridSize;
+  /* 动态调整网格大小（支持非正方形），保留原有建筑位置 */
+  _resizeGrid(newCols, newRows) {
+    const oldCols = this.gridCols;
+    const oldRows = this.gridRows;
     const oldGrid = this.grid;
-    const newLen = newSize * newSize;
+    const newLen = newCols * newRows;
     const newGrid = new Array(newLen).fill(null);
     const newLevels = {};
 
     // 把旧建筑按 (row, col) 映射到新网格
     for (let i = 0; i < oldGrid.length; i++) {
       if (!oldGrid[i]) continue;
-      const r = Math.floor(i / oldSize);
-      const c = i % oldSize;
-      if (r < newSize && c < newSize) {
-        const ni = r * newSize + c;
+      const r = Math.floor(i / oldCols);
+      const c = i % oldCols;
+      if (r < newRows && c < newCols) {
+        const ni = r * newCols + c;
         newGrid[ni] = oldGrid[i];
         if (this.buildingLevels[i] !== undefined) {
           newLevels[ni] = this.buildingLevels[i];
@@ -1839,49 +1842,30 @@ const G = {
     }
 
     // 迁移传送带的 key (索引对)
-    const newBeltLevels = {};
-    for (const [key, lv] of Object.entries(this.beltLevels || {})) {
-      const [a, b] = key.split('-').map(Number);
-      const ar = Math.floor(a / oldSize), ac = a % oldSize;
-      const br = Math.floor(b / oldSize), bc = b % oldSize;
-      if (ar < newSize && ac < newSize && br < newSize && bc < newSize) {
-        const na = ar * newSize + ac;
-        const nb = br * newSize + bc;
-        const nk = Math.min(na, nb) + '-' + Math.max(na, nb);
-        newBeltLevels[nk] = lv;
+    const migrateBeltMap = (map) => {
+      const result = {};
+      for (const [key, v] of Object.entries(map || {})) {
+        const [a, b] = key.split('-').map(Number);
+        const ar = Math.floor(a / oldCols), ac = a % oldCols;
+        const br = Math.floor(b / oldCols), bc = b % oldCols;
+        if (ar < newRows && ac < newCols && br < newRows && bc < newCols) {
+          const na = ar * newCols + ac;
+          const nb = br * newCols + bc;
+          const nk = Math.min(na, nb) + '-' + Math.max(na, nb);
+          result[nk] = v;
+        }
       }
-    }
-    const newManualBelts = {};
-    for (const [key, v] of Object.entries(this.manualBelts || {})) {
-      const [a, b] = key.split('-').map(Number);
-      const ar = Math.floor(a / oldSize), ac = a % oldSize;
-      const br = Math.floor(b / oldSize), bc = b % oldSize;
-      if (ar < newSize && ac < newSize && br < newSize && bc < newSize) {
-        const na = ar * newSize + ac;
-        const nb = br * newSize + bc;
-        const nk = Math.min(na, nb) + '-' + Math.max(na, nb);
-        newManualBelts[nk] = v;
-      }
-    }
-    const newRemovedBelts = {};
-    for (const [key, v] of Object.entries(this.removedBelts || {})) {
-      const [a, b] = key.split('-').map(Number);
-      const ar = Math.floor(a / oldSize), ac = a % oldSize;
-      const br = Math.floor(b / oldSize), bc = b % oldSize;
-      if (ar < newSize && ac < newSize && br < newSize && bc < newSize) {
-        const na = ar * newSize + ac;
-        const nb = br * newSize + bc;
-        const nk = Math.min(na, nb) + '-' + Math.max(na, nb);
-        newRemovedBelts[nk] = v;
-      }
-    }
+      return result;
+    };
 
-    this.gridSize = newSize;
+    this.gridCols = newCols;
+    this.gridRows = newRows;
+    this.gridSize = newCols;  // 保持 gridSize 指向列数，兼容旧代码中的 idx↔坐标转换
     this.grid = newGrid;
     this.buildingLevels = newLevels;
-    this.beltLevels = newBeltLevels;
-    this.manualBelts = newManualBelts;
-    this.removedBelts = newRemovedBelts;
+    this.beltLevels = migrateBeltMap(this.beltLevels);
+    this.manualBelts = migrateBeltMap(this.manualBelts);
+    this.removedBelts = migrateBeltMap(this.removedBelts);
     this._chainsDirty = true;
   },
 
@@ -1893,14 +1877,14 @@ const G = {
       gridEl.style.gridTemplateColumns = `repeat(${layout.cols}, ${layout.cellSize}px)`;
       gridEl.style.gridAutoRows = `${layout.cellSize}px`;
     } else {
-      gridEl.style.gridTemplateColumns = `repeat(${this.gridSize}, 1fr)`;
+      gridEl.style.gridTemplateColumns = `repeat(${this.gridCols}, 1fr)`;
     }
     gridEl.innerHTML = '';
 
     // 预计算每种建筑类型的序号映射: idx → seq number (1-based)
     const seqCounters = {};
     const seqMap = {};
-    for (let i = 0; i < this.gridSize * this.gridSize; i++) {
+    for (let i = 0; i < this.gridCols * this.gridRows; i++) {
       if (this.grid[i] && this.grid[i].type && BLDS[this.grid[i].type]) {
         const t = this.grid[i].type;
         if (!seqCounters[t]) seqCounters[t] = 0;
@@ -1909,7 +1893,7 @@ const G = {
       }
     }
 
-    for (let i = 0; i < this.gridSize * this.gridSize; i++) {
+    for (let i = 0; i < this.gridCols * this.gridRows; i++) {
       const cell = document.createElement('div');
       cell.className = 'cell';
       cell.dataset.i = i;
@@ -2530,7 +2514,7 @@ const G = {
 
     const SZ = this.gridSize;
     this._selectedCells = new Set();
-    for (let i = 0; i < SZ * SZ; i++) {
+    for (let i = 0; i < this.grid.length; i++) {
       const cell = gridEl.children[i];
       if (!cell) continue;
       const cr = cell.getBoundingClientRect();
@@ -3980,10 +3964,11 @@ const G = {
         const pRect = bgCanvas.parentElement.getBoundingClientRect();
         const offX = gRect.left - pRect.left;
         const offY = gRect.top - pRect.top;
-        const SZ = this.gridSize;
+        const SZ = this.gridSize;  // cols
+        const ROWS = this.gridRows;
 
         // 遍历相邻格子对，在间隙画通道底纹
-        for (let r = 0; r < SZ; r++) {
+        for (let r = 0; r < ROWS; r++) {
           for (let c = 0; c < SZ; c++) {
             const idx = r * SZ + c;
             const cell = gridEl.children[idx];
@@ -4015,7 +4000,7 @@ const G = {
             }
 
             // 垂直间隙（下方）
-            if (r < SZ - 1) {
+            if (r < ROWS - 1) {
               const gapY = cy + ch;
               const gapH = 10;
               bgCtx.fillStyle = 'rgba(8,14,26,0.4)';
@@ -5497,7 +5482,7 @@ const G = {
   save(silent) {
     try {
       const s = {
-        res: this.res, grid: this.grid, gridSize: this.gridSize, techs: this.techs,
+        res: this.res, grid: this.grid, gridSize: this.gridSize, gridCols: this.gridCols, gridRows: this.gridRows, techs: this.techs,
         pop: this.pop, gEff: this.gEff, eL: this.eL, eP: this.eP,
         phase: this.phase, rt: this.rt, rTech: this.rTech, rProg: this.rProg,
         wBuild: this.wBuild, wProg: this.wProg, wonderComplete: this.wonderComplete,
@@ -5541,13 +5526,16 @@ const G = {
       const s = JSON.parse(d);
       Object.assign(this.res, s.res || {});
 
-      // 恢复存档时的 gridSize（默认 8 兼容旧存档）
-      const savedGridSize = s.gridSize || Math.round(Math.sqrt((s.grid || []).length)) || 8;
+      // 恢复存档时的网格尺寸（兼容旧版正方形存档）
+      const savedCols = s.gridCols || s.gridSize || Math.round(Math.sqrt((s.grid || []).length)) || 8;
+      const savedRows = s.gridRows || s.gridSize || Math.round(Math.sqrt((s.grid || []).length)) || 8;
       const savedGrid = s.grid || [];
-      const savedLen = savedGridSize * savedGridSize;
+      const savedLen = savedCols * savedRows;
 
-      // 先把 gridSize 设为存档值，加载建筑到对应位置
-      this.gridSize = savedGridSize;
+      // 先设为存档尺寸，加载建筑到对应位置
+      this.gridCols = savedCols;
+      this.gridRows = savedRows;
+      this.gridSize = savedCols;
       this.grid = new Array(savedLen).fill(null);
 
       if (savedGrid.length === savedLen) {
@@ -5555,12 +5543,12 @@ const G = {
         this.grid = savedGrid;
       } else if (savedGrid.length > 0) {
         // 旧存档迁移（尺寸不匹配时按行列映射）
-        const oldSize = Math.round(Math.sqrt(savedGrid.length));
+        const oldCols = s.gridCols || Math.round(Math.sqrt(savedGrid.length));
         const newLevels = {};
         for (let oi = 0; oi < savedGrid.length; oi++) {
           if (!savedGrid[oi]) continue;
-          const or = Math.floor(oi / oldSize), oc = oi % oldSize;
-          const ni = or * this.gridSize + oc;
+          const or = Math.floor(oi / oldCols), oc = oi % oldCols;
+          const ni = or * this.gridCols + oc;
           if (ni < savedLen) {
             this.grid[ni] = savedGrid[oi];
             if (s.buildingLevels && s.buildingLevels[oi]) {
@@ -5611,16 +5599,16 @@ const G = {
       if (s._qsCapBonus) this._qsCapBonus = s._qsCapBonus;
       if (s._evoBoostMult) this._evoBoostMult = s._evoBoostMult;
       // 旧存档迁移：如果网格尺寸发生变化，传送带key中的索引也需要更新
-      if (savedGrid.length !== expectedLen && savedGrid.length > 0) {
-        const oldSize = Math.round(Math.sqrt(savedGrid.length));
+      if (savedGrid.length !== savedLen && savedGrid.length > 0) {
+        const migOldCols = s.gridCols || Math.round(Math.sqrt(savedGrid.length));
         const newBeltLevels = {};
         for (const [key, lv] of Object.entries(this.beltLevels)) {
           const [a, b] = key.split('-').map(Number);
-          const ar = Math.floor(a / oldSize), ac = a % oldSize;
-          const br = Math.floor(b / oldSize), bc = b % oldSize;
-          const na = ar * this.gridSize + ac;
-          const nb = br * this.gridSize + bc;
-          if (na < expectedLen && nb < expectedLen) {
+          const ar = Math.floor(a / migOldCols), ac = a % migOldCols;
+          const br = Math.floor(b / migOldCols), bc = b % migOldCols;
+          const na = ar * this.gridCols + ac;
+          const nb = br * this.gridCols + bc;
+          if (na < savedLen && nb < savedLen) {
             const nk = Math.min(na, nb) + '-' + Math.max(na, nb);
             newBeltLevels[nk] = lv;
           }
