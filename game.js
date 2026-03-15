@@ -6724,9 +6724,10 @@ const G = {
   // 计算建筑的传送带加成
   // 规则：
   //   - 如果建筑在 FLOW_MAP 中作为 to 端（即需要输入资源），
-  //     必须有对应的传送带连接才能生产；没有传送带 → 产出为 0
+  //     必须有 **合法的** 传送带连接（对端建筑是 FLOW_MAP 中该资源的 from 端）才能生产
+  //   - 两个相同建筑互连、或不在 FLOW_MAP 供给关系中的传送带不算有效连接
   //   - 如果建筑不需要输入（纯采集建筑如碳源采集器），不受影响
-  //   - 有传送带时，产出受传送带平均效率影响
+  //   - 有合法传送带时，产出受传送带平均效率影响
   getBeltMultiplierForBuilding(idx) {
     const g = this.grid[idx];
     if (!g) return 1;
@@ -6737,24 +6738,40 @@ const G = {
     // 检查此建筑是否是某个FLOW的接收端（需要输入）
     const needsInput = FLOW_MAP.some(f => f.to === type);
     
-    // 查找所有连接到此建筑的传送带（fi或ti指向此格子都算）
+    // 查找所有连接到此建筑的传送带，但只计算合法供给关系的传送带
     let totalEff = 0;
-    let beltCount = 0;
+    let validBeltCount = 0;
     const belts = this._activeBelts || [];
     
     for (const belt of belts) {
-      if (belt.ti === idx || belt.fi === idx) {
-        const key = Math.min(belt.fi, belt.ti) + '-' + Math.max(belt.fi, belt.ti);
-        totalEff += this.getBeltEfficiency(key);
-        beltCount++;
-      }
+      if (belt.ti !== idx && belt.fi !== idx) continue;
+      
+      // 找到传送带对面建筑的类型
+      const otherIdx = belt.fi === idx ? belt.ti : belt.fi;
+      const otherG = this.grid[otherIdx];
+      if (!otherG) continue;
+      const otherType = otherG.type;
+      
+      // 检查是否存在合法的 FLOW_MAP 供给关系：
+      // 对面建筑是 from 端，当前建筑是 to 端（对面给我供货）
+      // 或者当前建筑是 from 端，对面是 to 端（我给对面供货，也算有效连接）
+      const isValidFlow = FLOW_MAP.some(f =>
+        (f.from === otherType && f.to === type) ||
+        (f.from === type && f.to === otherType)
+      );
+      
+      if (!isValidFlow) continue; // 不在供给关系中，跳过
+      
+      const key = Math.min(belt.fi, belt.ti) + '-' + Math.max(belt.fi, belt.ti);
+      totalEff += this.getBeltEfficiency(key);
+      validBeltCount++;
     }
     
-    if (beltCount === 0) {
-      // 没有传送带：如果建筑需要输入资源，则停产
+    if (validBeltCount === 0) {
+      // 没有合法传送带：如果建筑需要输入资源，则停产
       return needsInput ? 0 : 1;
     }
-    const baseMult = totalEff / beltCount;
+    const baseMult = totalEff / validBeltCount;
     return baseMult * (1 + (this._beltBonus || 0)); // 转生加成加成传送带效率
   },
 
