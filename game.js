@@ -2458,9 +2458,23 @@ const G = {
         if (badgeEl) badgeEl.style.display = isBlocked ? 'block' : 'none';
       }
     });
-  },
 
-  // ===== SELECTION =====
+    // 更新传送带连接按钮：有阻塞建筑时变红
+    const beltBtn = document.getElementById('beltConnectBtn');
+    if (beltBtn) {
+      const hasBlocked = document.querySelector('.cell.cell-blocked') !== null;
+      beltBtn.classList.toggle('has-blocked', hasBlocked);
+      const iconEl = beltBtn.querySelector('.belt-connect-icon');
+      const descEl = beltBtn.querySelector('.belt-connect-desc');
+      if (hasBlocked) {
+        if (iconEl) iconEl.textContent = '⚠️';
+        if (descEl) descEl.textContent = '有建筑缺少传送带，资源阻塞中！';
+      } else {
+        if (iconEl) iconEl.textContent = '🔗';
+        if (descEl) descEl.textContent = '选择两个建筑，手动建立资源通道';
+      }
+    }
+  },
   selectBuilding(key) {
     // 如果在传送带连接模式中，退出
     if (this._beltConnectMode) this.cancelBeltConnect();

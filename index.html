@@ -392,6 +392,21 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 .belt-connect-text{display:flex;flex-direction:column;gap:1px}
 .belt-connect-name{font-weight:700;font-size:0.75em;color:#f97316}
 .belt-connect-desc{font-size:0.65em;color:var(--dim)}
+/* 有建筑阻塞时传送带按钮变红 */
+.belt-connect-action-btn.has-blocked{
+  border-color:rgba(239,68,68,0.6);border-style:solid;
+  background:linear-gradient(135deg,rgba(239,68,68,0.10),rgba(239,68,68,0.04));
+  animation:beltBlockedPulse 1.8s ease-in-out infinite;
+}
+.belt-connect-action-btn.has-blocked .belt-connect-icon{
+  filter:drop-shadow(0 0 5px rgba(239,68,68,0.5));
+}
+.belt-connect-action-btn.has-blocked .belt-connect-name{color:#ef4444}
+.belt-connect-action-btn.has-blocked .belt-connect-desc{color:#fca5a5}
+@keyframes beltBlockedPulse{
+  0%,100%{border-color:rgba(239,68,68,0.4);box-shadow:0 0 4px rgba(239,68,68,0.08)}
+  50%{border-color:rgba(239,68,68,0.8);box-shadow:0 0 14px rgba(239,68,68,0.2)}
+}
 
 /* Box selection rectangle */
 .box-select-rect{
@@ -2209,7 +2224,7 @@ body::after{
   window.supa = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
   window.supaReady = true;
 </script>
-<script src="game.js?v=20260316i"></script>
+<script src="game.js?v=20260316j"></script>
 <!-- Nickname Popup -->
 <div class="nickname-popup" id="nicknamePopup">
   <div style="font-family:'Orbitron',monospace;font-size:0.85em;color:var(--cyan);letter-spacing:2px;margin-bottom:10px">🧬 设置昵称</div>
