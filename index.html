@@ -148,12 +148,48 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 .res-card.hidden{display:none}
 .res-icon{font-size:1.2em;line-height:1}
 .res-name{font-size:0.7em;color:var(--dim);margin-top:1px}
-.res-val{font-family:'Orbitron',monospace;font-size:0.85em;font-weight:700;color:var(--bright)}
+.res-val{font-family:'Orbitron',monospace;font-size:0.85em;font-weight:700;color:var(--bright);
+  text-shadow:0 1px 2px rgba(0,0,0,0.6)}
 .res-rate{font-family:'Share Tech Mono',monospace;font-size:0.7em;color:var(--dim)}
 .res-rate.pos{color:var(--green)}
 .res-rate.neg{color:var(--red)}
 .res-flash{position:absolute;inset:0;opacity:0;transition:opacity 0.25s;border-radius:4px;pointer-events:none}
 .res-flash.on{opacity:1}
+
+/* 核心三大资源突出显示：葡萄糖、ATP、DNA */
+.res-card.res-core{
+  border-color:rgba(255,255,255,0.08);
+  background:rgba(12,22,38,0.9);
+  padding:10px 8px;
+}
+.res-card.res-core .res-val{
+  font-size:1.1em;font-weight:900;letter-spacing:0.5px;
+}
+.res-card.res-core .res-icon{font-size:1.4em}
+.res-card.res-core .res-name{font-size:0.72em;font-weight:600}
+.res-card.res-core .res-rate{font-size:0.62em;margin-top:2px}
+/* 各核心资源的独特发光色 */
+.res-card.res-core[data-res="glucose"]{
+  border-color:rgba(34,197,94,0.2);
+  box-shadow:0 0 10px rgba(34,197,94,0.06);
+}
+.res-card.res-core[data-res="glucose"] .res-val{
+  color:#4ade80;text-shadow:0 0 8px rgba(34,197,94,0.3),0 1px 2px rgba(0,0,0,0.6);
+}
+.res-card.res-core[data-res="energy"]{
+  border-color:rgba(249,115,22,0.2);
+  box-shadow:0 0 10px rgba(249,115,22,0.06);
+}
+.res-card.res-core[data-res="energy"] .res-val{
+  color:#fb923c;text-shadow:0 0 8px rgba(249,115,22,0.3),0 1px 2px rgba(0,0,0,0.6);
+}
+.res-card.res-core[data-res="dna"]{
+  border-color:rgba(168,85,247,0.2);
+  box-shadow:0 0 10px rgba(168,85,247,0.06);
+}
+.res-card.res-core[data-res="dna"] .res-val{
+  color:#c084fc;text-shadow:0 0 8px rgba(168,85,247,0.3),0 1px 2px rgba(0,0,0,0.6);
+}
 
 /* Section */
 .section{margin-bottom:12px}
@@ -162,6 +198,92 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
   letter-spacing:2px;text-transform:uppercase;margin-bottom:6px;
   padding-bottom:3px;border-bottom:1px solid #0e1a2a;
   display:flex;align-items:center;gap:6px;
+}
+
+/* Section collapse/expand */
+.sec-toggle{
+  margin-left:auto;background:none;border:none;color:var(--dim);cursor:pointer;
+  font-size:1.1em;line-height:1;padding:0 2px;transition:transform 0.2s;
+  font-family:monospace;
+}
+.sec-toggle:hover{color:var(--bright)}
+.section.collapsed .sec-body{display:none}
+.section.collapsed .sec-toggle{transform:rotate(-90deg)}
+
+/* Locked sections — hidden until unlocked */
+.sec-locked{display:none!important}
+.sec-locked.unlocked{display:block!important}
+
+/* Unlock flash animation */
+@keyframes secUnlockFlash{
+  0%{opacity:0;transform:translateY(6px)}
+  100%{opacity:1;transform:translateY(0)}
+}
+.sec-unlock-anim{animation:secUnlockFlash 0.4s ease-out}
+
+/* === 强引导: 建造按钮灰色呼吸高亮 === */
+.action-btn.guide-highlight{
+  border-color:rgba(180,195,215,0.4)!important;
+  box-shadow:0 0 6px rgba(180,195,215,0.12),inset 0 0 3px rgba(180,195,215,0.03);
+  animation:guideBtnPulse 2.2s ease-in-out infinite;
+  position:relative;
+}
+@keyframes guideBtnPulse{
+  0%,100%{border-color:rgba(140,160,185,0.18);box-shadow:0 0 4px rgba(160,175,195,0.06),inset 0 0 2px rgba(160,175,195,0.02)}
+  50%{border-color:rgba(200,215,235,0.55);box-shadow:0 0 14px rgba(200,215,235,0.22),inset 0 0 6px rgba(200,215,235,0.05)}
+}
+/* 箭头指引 */
+.action-btn.guide-highlight::after{
+  content:'◀ 点这里';position:absolute;right:-58px;top:50%;transform:translateY(-50%);
+  font-size:0.55em;color:rgba(185,200,220,0.7);font-weight:700;font-family:'Rajdhani',sans-serif;
+  white-space:nowrap;animation:guideArrowBounce 1s ease-in-out infinite;
+  pointer-events:none;
+}
+@keyframes guideArrowBounce{
+  0%,100%{transform:translateY(-50%) translateX(0)}
+  50%{transform:translateY(-50%) translateX(-4px)}
+}
+/* guide tooltip 悬浮提示 */
+.guide-tooltip{
+  position:absolute;left:0;right:0;bottom:calc(100% + 6px);
+  background:rgba(160,175,195,0.08);border:1px solid rgba(160,175,195,0.18);
+  border-radius:4px;padding:4px 8px;font-size:0.6em;color:rgba(185,200,220,0.75);
+  font-weight:600;text-align:center;pointer-events:none;
+  animation:fadeIn 0.3s;z-index:5;
+}
+
+/* === 引导步骤拆分: 当前步骤 vs 后续步骤 === */
+.guide-step-item{
+  display:flex;align-items:flex-start;gap:6px;padding:3px 4px;border-radius:3px;
+  font-size:0.68em;font-weight:600;transition:all 0.2s;
+}
+.guide-step-item.step-current{
+  color:rgba(200,215,235,0.85);background:rgba(160,175,195,0.06);
+  border-left:2px solid rgba(185,200,220,0.4);padding-left:6px;
+}
+.guide-step-item.step-done{color:var(--green);opacity:0.6;text-decoration:line-through}
+.guide-step-item.step-future{color:#3a5070;opacity:0.5;font-size:0.62em}
+.guide-step-item .step-idx{
+  min-width:16px;height:16px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  font-size:0.75em;font-family:'Orbitron',monospace;flex-shrink:0;
+}
+.step-current .step-idx{background:rgba(160,175,195,0.12);color:rgba(200,215,235,0.8);border:1px solid rgba(185,200,220,0.35)}
+.step-done .step-idx{background:rgba(6,214,160,0.1);color:var(--green)}
+.step-future .step-idx{background:rgba(255,255,255,0.03);color:#3a5070}
+
+/* === 任务完成飘字 === */
+.unlock-float{
+  position:fixed;left:50%;top:40%;transform:translate(-50%,-50%);
+  font-family:'Orbitron',monospace;font-size:1.1em;font-weight:700;
+  color:#06d6a0;text-shadow:0 0 15px rgba(6,214,160,0.6),0 0 30px rgba(6,214,160,0.2);
+  pointer-events:none;z-index:25000;white-space:nowrap;
+  animation:unlockFloatUp 2s ease-out forwards;
+}
+@keyframes unlockFloatUp{
+  0%{opacity:0;transform:translate(-50%,-50%) scale(0.7)}
+  15%{opacity:1;transform:translate(-50%,-50%) scale(1.1)}
+  30%{transform:translate(-50%,-50%) scale(1)}
+  100%{opacity:0;transform:translate(-50%,-80%) scale(0.95)}
 }
 .section-title .hint{font-family:'Rajdhani',sans-serif;color:var(--dim);letter-spacing:0;text-transform:none;font-weight:400}
 
@@ -353,7 +475,18 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 .prog-fill{height:100%;transition:width 0.3s;border-radius:2px}
 
 /* === CENTER: PETRI DISH === */
-.center{flex:1;display:flex;flex-direction:column;position:relative;overflow:hidden}
+.center{
+  flex:1;display:flex;flex-direction:column;position:relative;overflow:hidden;
+  /* 荧光绿渐变外边框 — 核心操作区视觉聚焦 */
+  border:2px solid rgba(6,214,160,0.35);
+  border-radius:6px;margin:2px;
+  box-shadow:0 0 18px rgba(6,214,160,0.08),inset 0 0 30px rgba(6,214,160,0.03);
+  animation:dishBorderGlow 4s ease-in-out infinite;
+}
+@keyframes dishBorderGlow{
+  0%,100%{border-color:rgba(6,214,160,0.25);box-shadow:0 0 12px rgba(6,214,160,0.05),inset 0 0 20px rgba(6,214,160,0.02)}
+  50%{border-color:rgba(6,214,160,0.5);box-shadow:0 0 24px rgba(6,214,160,0.12),inset 0 0 40px rgba(6,214,160,0.05)}
+}
 .dish-header{
   display:flex;justify-content:space-between;align-items:center;
   padding:6px 12px;border-bottom:1px solid var(--bdr);
@@ -377,14 +510,26 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 }
 .cell{
   aspect-ratio:1;
-  background:rgba(8,14,24,0.6);border:1px solid #0e1828;border-radius:3px;
+  background:rgba(8,14,24,0.6);border:1px solid rgba(30,50,70,0.35);border-radius:3px;
   cursor:pointer;display:flex;align-items:center;justify-content:center;
   position:relative;overflow:hidden;transition:all 0.15s;
   box-shadow:0 0 4px rgba(0,0,0,0.3);
 }
-.cell:hover{background:rgba(6,214,160,0.03);border-color:#1a3a4a}
+.cell:hover{background:rgba(6,214,160,0.03);border-color:rgba(40,70,90,0.5)}
 .cell.occupied{cursor:default;border-width:1.5px}
 .cell.occupied:hover{border-width:2px}
+/* 选中格子 — 橙色高亮边框 + 轻微缩放 */
+.cell.cell-selected{
+  border-color:var(--orange)!important;border-width:2px!important;
+  box-shadow:0 0 12px rgba(249,115,22,0.35),inset 0 0 8px rgba(249,115,22,0.1)!important;
+  transform:scale(1.04);
+  z-index:6;
+  animation:cellSelectPulse 1.5s ease-in-out infinite;
+}
+@keyframes cellSelectPulse{
+  0%,100%{box-shadow:0 0 8px rgba(249,115,22,0.25),inset 0 0 6px rgba(249,115,22,0.06)}
+  50%{box-shadow:0 0 16px rgba(249,115,22,0.45),inset 0 0 10px rgba(249,115,22,0.12)}
+}
 
 /* 主题色左侧竖条 */
 .cell-stripe{
@@ -501,23 +646,27 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 
 /* Guide / Next Goal */
 .guide-box{
-  background:linear-gradient(135deg,rgba(6,214,160,0.04),rgba(6,214,160,0.01));
-  border:1px solid rgba(6,214,160,0.2);border-radius:6px;padding:10px;margin-bottom:8px;
+  background:linear-gradient(135deg,rgba(160,175,195,0.03),rgba(160,175,195,0.01));
+  border:1px solid rgba(160,175,195,0.15);border-radius:6px;padding:10px;margin-bottom:8px;
   position:relative;
 }
-.guide-title{font-family:'Orbitron',monospace;font-size:0.7em;color:var(--cyan);letter-spacing:1px;margin-bottom:4px}
+.guide-title{font-family:'Orbitron',monospace;font-size:0.7em;color:rgba(185,200,220,0.75);letter-spacing:1px;margin-bottom:4px}
 .guide-text{font-size:0.75em;color:#8ab0d0;line-height:1.4}
 .guide-step{
   display:flex;align-items:center;gap:6px;padding:4px 0;font-size:0.72em;
-  border-bottom:1px solid rgba(6,214,160,0.06);
+  border-bottom:1px solid rgba(160,175,195,0.06);
 }
 .guide-step.done{color:var(--green);text-decoration:line-through;opacity:0.5}
-.guide-step.current{color:var(--cyan);font-weight:700}
+.guide-step.current{color:rgba(200,215,235,0.85);font-weight:700}
 .guide-step.future{color:var(--dim)}
 .step-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;border:1px solid}
 .step-dot.done{background:var(--green);border-color:var(--green)}
-.step-dot.current{background:var(--cyan);border-color:var(--cyan);animation:pulse 1.5s infinite}
+.step-dot.current{background:rgba(185,200,220,0.5);border-color:rgba(185,200,220,0.5);animation:guideStepDotPulse 2s ease-in-out infinite}
 .step-dot.future{border-color:var(--dim)}
+@keyframes guideStepDotPulse{
+  0%,100%{opacity:0.35;transform:scale(0.9)}
+  50%{opacity:1;transform:scale(1.15)}
+}
 
 /* Evolution */
 .evo-box{
@@ -565,11 +714,16 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 }
 .evo-btn:hover:not(:disabled){background:rgba(100,30,150,0.2);border-color:#8040c0;color:#d0a0f0}
 .evo-btn:disabled{opacity:0.2;cursor:not-allowed}
-/* 可进化时按钮也有高亮 */
+/* 可进化时按钮也有高亮 — 紫色主题 */
 .evo-box.can-evolve .evo-btn:not(:disabled){
-  border-color:#8040c0;color:#d0a0f0;
-  background:linear-gradient(135deg,rgba(120,40,180,0.2),rgba(60,15,90,0.2));
+  border-color:#8040c0!important;color:#d0a0f0!important;
+  background:linear-gradient(135deg,rgba(120,40,180,0.25),rgba(60,15,90,0.25))!important;
   animation:evoBtnPulse 1.5s ease-in-out infinite;
+}
+.evo-box.can-evolve .evo-btn:hover:not(:disabled){
+  background:linear-gradient(135deg,rgba(140,50,200,0.35),rgba(80,20,120,0.3))!important;
+  box-shadow:0 0 20px rgba(168,85,247,0.35),0 0 40px rgba(168,85,247,0.12)!important;
+  transform:scale(1.03);
 }
 @keyframes evoBtnPulse{
   0%,100%{box-shadow:0 0 4px rgba(168,85,247,0.15)}
@@ -968,7 +1122,77 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
   100%{transform:scale(1) rotate(0)}
 }
 
-/* Scanline overlay */
+/* ===== BUTTON VISUAL HIERARCHY ===== */
+/* 关键操作按钮 — 橙色填充 + 白色文字 + 悬停放大光晕 */
+.evo-btn:not(:disabled),
+.core-upgrade-btn.ready,
+.core-supply-status-tag.full{
+  text-shadow:0 1px 3px rgba(0,0,0,0.5);
+}
+.evo-btn:not(:disabled){
+  background:linear-gradient(135deg,rgba(249,115,22,0.2),rgba(200,80,10,0.15))!important;
+  border-color:var(--orange)!important;color:#fff!important;
+  font-weight:800;letter-spacing:1.5px;
+  transition:all 0.25s cubic-bezier(.4,0,.2,1);
+}
+.evo-btn:hover:not(:disabled){
+  transform:scale(1.03);
+  box-shadow:0 0 20px rgba(249,115,22,0.35),0 0 40px rgba(249,115,22,0.12)!important;
+  background:linear-gradient(135deg,rgba(249,115,22,0.35),rgba(200,80,10,0.25))!important;
+}
+.core-upgrade-btn.ready{
+  background:linear-gradient(135deg,rgba(249,115,22,0.18),rgba(6,214,160,0.12))!important;
+  border-color:var(--orange)!important;color:#fff!important;
+  transition:all 0.25s cubic-bezier(.4,0,.2,1);
+}
+.core-upgrade-btn.ready:hover{
+  transform:scale(1.03);
+  box-shadow:0 0 20px rgba(249,115,22,0.3),0 0 40px rgba(249,115,22,0.1)!important;
+}
+/* 次要按钮 — 描边样式 + 半透明背景 */
+.lb-btn,
+.challenge-skip,
+.recycle-no,
+.reset-no{
+  background:rgba(20,32,60,0.3)!important;
+  border:1px solid rgba(100,130,160,0.25)!important;
+  color:var(--dim)!important;
+  font-weight:600;
+  transition:all 0.2s;
+}
+.lb-btn:hover,
+.challenge-skip:hover,
+.recycle-no:hover,
+.reset-no:hover{
+  background:rgba(20,32,60,0.5)!important;
+  border-color:rgba(100,130,160,0.4)!important;
+  color:var(--text)!important;
+}
+
+/* ===== KEY TEXT READABILITY — 1px 黑色外描边 ===== */
+.res-val,.stat-value,.evo-lv,.core-colony-title,.core-phase-tag,
+.core-supply-value,.guide-title,.challenge-name,.achieve-name{
+  text-shadow:0 1px 2px rgba(0,0,0,0.6),0 0 1px rgba(0,0,0,0.4);
+}
+.section-title{
+  text-shadow:0 1px 1px rgba(0,0,0,0.5);
+}
+
+/* ===== 传送带端口方向颜色区分 ===== */
+/* 输入端口 — 绿色系 */
+.cell-ports.in .cell-port{
+  border-color:rgba(34,197,94,0.6);
+  background:rgba(34,197,94,0.12);
+  color:#22c55e;
+}
+/* 输出端口 — 橙色系 */
+.cell-ports.out .cell-port{
+  border-color:rgba(249,115,22,0.6);
+  background:rgba(249,115,22,0.12);
+  color:#f97316;
+}
+
+
 body::after{
   content:'';position:fixed;inset:0;z-index:99999;pointer-events:none;
   background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.012) 2px,rgba(0,0,0,0.012) 4px);
@@ -1383,7 +1607,7 @@ body::after{
     background:var(--panel);border:none;
   }
   .sidebar.mobile-active,.right-panel.mobile-active{display:block}
-  .center{flex:1;min-height:0;display:flex;flex-direction:column}
+  .center{flex:1;min-height:0;display:flex;flex-direction:column;border:1px solid rgba(6,214,160,0.2);margin:0;border-radius:0}
   .center.mobile-hidden{display:none}
 
   /* 培养皿 header 简化 */
@@ -1612,43 +1836,48 @@ body::after{
     <!-- RIGHT PANEL -->
     <div class="right-panel">
       <!-- Guide / Next Goal -->
-      <div class="section">
-        <div class="section-title">🎯 目标</div>
-        <div class="guide-box" id="guideBox">
-          <div class="guide-title">下一步</div>
-          <div class="guide-text" id="guideText">建造一个「碳源采集器」来收集葡萄糖</div>
-          <div id="guideSteps" style="margin-top:6px"></div>
-        </div>
-      </div>
-
-      <!-- Colony Status -->
-      <div class="section">
-        <div class="section-title">菌落状态</div>
-        <div class="stat-card" id="colonyStatCard">
-          <div class="stat-row"><span class="stat-label">🦠 细菌种群</span><span class="stat-value" id="statPop">0</span></div>
-          <div class="stat-row" id="rowPopFood" style="display:none"><span class="stat-label">&nbsp;&nbsp;🍽️ 食物消耗</span><span class="stat-value" id="statPopFood" style="font-size:0.9em;color:var(--orange)">0🟢/s</span></div>
-          <div class="stat-row"><span class="stat-label">⚡ 工作效率</span><span class="stat-value" id="statEff">100%</span></div>
-          <div class="stat-row" title="物流效率 = 仓储加成 × 传送带平均效率"><span class="stat-label">🚚 物流效率</span><span class="stat-value" id="statLog">100%</span></div>
-          <div class="stat-row" id="rowQS" style="display:none"><span class="stat-label">📡 QS信号</span><span class="stat-value" id="statQS">0</span></div>
-          <div class="stat-row" id="scoreRow" style="border-top:1px solid rgba(255,255,255,0.06);padding-top:6px;margin-top:3px;font-size:0.85em;cursor:default;position:relative" oncontextmenu="event.preventDefault();G.showRatingTooltip(event)"><span class="stat-label" style="font-size:1.05em;font-weight:600">🏆 总分数</span><span style="display:flex;align-items:center;gap:8px"><span class="stat-value" id="statScore" style="color:#fbbf24;font-weight:800;font-size:1.25em;letter-spacing:0.5px">0</span><span id="statRank" style="font-size:0.75em;font-weight:700;padding:2px 7px;border-radius:3px;background:rgba(251,191,36,0.1);border:1px solid rgba(251,191,36,0.2);color:#fbbf24;font-family:'Orbitron',monospace;letter-spacing:1px">E</span></span></div>
-          <!-- Mini Leaderboard Top 3 -->
-          <div id="miniLeaderboard" style="margin-top:6px;padding-top:6px;border-top:1px solid rgba(255,255,255,0.06)">
-            <div style="font-size:0.65em;color:var(--dim);letter-spacing:1px;margin-bottom:4px;display:flex;align-items:center;gap:4px">
-              <span style="color:#fbbf24">👑</span> TOP 3
-            </div>
-            <div id="miniLbList" style="display:flex;flex-direction:column;gap:2px">
-              <div style="text-align:center;color:var(--dim);font-size:0.62em;padding:4px 0">加载中...</div>
-            </div>
-          </div>
-          <div class="stat-row" style="justify-content:center;padding-top:4px">
-            <button onclick="G.showLeaderboard()" class="lb-btn" style="width:100%">🏆 查看完整排行榜</button>
+      <div class="section" id="secGoal">
+        <div class="section-title">🎯 目标 <button class="sec-toggle" onclick="G.toggleSection('secGoal')">▾</button></div>
+        <div class="sec-body">
+          <div class="guide-box" id="guideBox">
+            <div class="guide-title">下一步</div>
+            <div class="guide-text" id="guideText">建造一个「碳源采集器」来收集葡萄糖</div>
+            <div id="guideSteps" style="margin-top:6px"></div>
           </div>
         </div>
       </div>
 
-      <!-- Evolution (always visible) -->
-      <div class="section" id="evoSection">
-        <div class="section-title">进化</div>
+      <!-- Colony Status (locked until first building) -->
+      <div class="section sec-locked" id="secColony">
+        <div class="section-title">菌落状态 <button class="sec-toggle" onclick="G.toggleSection('secColony')">▾</button></div>
+        <div class="sec-body">
+          <div class="stat-card" id="colonyStatCard">
+            <div class="stat-row"><span class="stat-label">🦠 细菌种群</span><span class="stat-value" id="statPop">0</span></div>
+            <div class="stat-row" id="rowPopFood" style="display:none"><span class="stat-label">&nbsp;&nbsp;🍽️ 食物消耗</span><span class="stat-value" id="statPopFood" style="font-size:0.9em;color:var(--orange)">0🟢/s</span></div>
+            <div class="stat-row"><span class="stat-label">⚡ 工作效率</span><span class="stat-value" id="statEff">100%</span></div>
+            <div class="stat-row" title="物流效率 = 仓储加成 × 传送带平均效率"><span class="stat-label">🚚 物流效率</span><span class="stat-value" id="statLog">100%</span></div>
+            <div class="stat-row" id="rowQS" style="display:none"><span class="stat-label">📡 QS信号</span><span class="stat-value" id="statQS">0</span></div>
+            <div class="stat-row" id="scoreRow" style="border-top:1px solid rgba(255,255,255,0.06);padding-top:6px;margin-top:3px;font-size:0.85em;cursor:default;position:relative" oncontextmenu="event.preventDefault();G.showRatingTooltip(event)"><span class="stat-label" style="font-size:1.05em;font-weight:600">🏆 总分数</span><span style="display:flex;align-items:center;gap:8px"><span class="stat-value" id="statScore" style="color:#fbbf24;font-weight:800;font-size:1.25em;letter-spacing:0.5px">0</span><span id="statRank" style="font-size:0.75em;font-weight:700;padding:2px 7px;border-radius:3px;background:rgba(251,191,36,0.1);border:1px solid rgba(251,191,36,0.2);color:#fbbf24;font-family:'Orbitron',monospace;letter-spacing:1px">E</span></span></div>
+            <!-- Mini Leaderboard Top 3 (locked until evoLv >= 2) -->
+            <div id="miniLeaderboard" class="sec-locked" style="margin-top:6px;padding-top:6px;border-top:1px solid rgba(255,255,255,0.06)">
+              <div style="font-size:0.65em;color:var(--dim);letter-spacing:1px;margin-bottom:4px;display:flex;align-items:center;gap:4px">
+                <span style="color:#fbbf24">👑</span> TOP 3
+              </div>
+              <div id="miniLbList" style="display:flex;flex-direction:column;gap:2px">
+                <div style="text-align:center;color:var(--dim);font-size:0.62em;padding:4px 0">加载中...</div>
+              </div>
+            </div>
+            <div id="lbBtnWrap" class="stat-row sec-locked" style="justify-content:center;padding-top:4px">
+              <button onclick="G.showLeaderboard()" class="lb-btn" style="width:100%">🏆 查看完整排行榜</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Evolution (locked until evoLv >= 2) -->
+      <div class="section sec-locked" id="evoSection">
+        <div class="section-title">进化 <button class="sec-toggle" onclick="G.toggleSection('evoSection')">▾</button></div>
+        <div class="sec-body">
         <div class="evo-box">
           <div class="evo-header">
             <span style="font-size:0.7em;color:var(--dim)">进化等级</span>
@@ -1659,6 +1888,7 @@ body::after{
           <div style="font-size:0.65em;color:var(--dim);margin-bottom:4px" id="evoResStatus"></div>
           <button class="evo-btn" id="evoBtn" onclick="G.evolve()" disabled>进化 ▸</button>
         </div>
+        </div>
       </div>
 
       <!-- Production Chains -->
@@ -1668,15 +1898,19 @@ body::after{
       </div>
 
       <!-- Stats -->
-      <div class="section">
-        <div class="section-title">📊 统计</div>
-        <div class="stat-card" id="statsContent"></div>
+      <div class="section" id="secStats">
+        <div class="section-title">📊 统计 <button class="sec-toggle" onclick="G.toggleSection('secStats')">▾</button></div>
+        <div class="sec-body">
+          <div class="stat-card" id="statsContent"></div>
+        </div>
       </div>
 
       <!-- Log -->
-      <div class="section">
-        <div class="section-title">日志</div>
-        <div class="log-box" id="logBox"></div>
+      <div class="section" id="secLog">
+        <div class="section-title">日志 <button class="sec-toggle" onclick="G.toggleSection('secLog')">▾</button></div>
+        <div class="sec-body">
+          <div class="log-box" id="logBox"></div>
+        </div>
       </div>
     </div>
   </div>
@@ -1853,7 +2087,7 @@ body::after{
   window.supa = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
   window.supaReady = true;
 </script>
-<script src="game.js?v=20260316b"></script>
+<script src="game.js?v=20260316e"></script>
 <!-- Nickname Popup -->
 <div class="nickname-popup" id="nicknamePopup">
   <div style="font-family:'Orbitron',monospace;font-size:0.85em;color:var(--cyan);letter-spacing:2px;margin-bottom:10px">🧬 设置昵称</div>

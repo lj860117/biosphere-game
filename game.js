@@ -1003,7 +1003,10 @@ const G = {
 
     this.load();           // 先加载存档（恢复 grid 数据和 gridSize）
     this._initPlayer();    // 初始化玩家 ID 和昵称
+    this._restoreSectionStates(); // 恢复折叠状态
     this.buildUI();        // 再渲染 UI（renderGrid 会基于正确的数据）
+    this.updateSectionUnlocks(); // 初始解锁检查（不触发飘字）
+    this._gameReady = true;      // 标记游戏就绪（之后的解锁才触发飘字）
     this.calcOfflineEarnings();
     this.startLoop();
     this.animLoop();
@@ -1392,10 +1395,12 @@ const G = {
   renderResources() {
     const grid = document.getElementById('resGrid');
     grid.innerHTML = '';
+    const coreKeys = new Set(['glucose', 'energy', 'dna']);
     for (let k in RES) {
       const r = RES[k];
       const card = document.createElement('div');
       card.className = 'res-card';
+      if (coreKeys.has(k)) { card.classList.add('res-core'); card.dataset.res = k; }
       card.id = 'res-' + k;
       if (r.phase > this.phase) card.classList.add('hidden');
       card.innerHTML = `
@@ -2761,8 +2766,24 @@ const G = {
     }
     if (this.paused) { this.log('游戏已暂停', 'w'); SFX.buildFail(); return; }
     if (!this.sel) {
-      // 没选中建筑时，点击已有建筑不提示（拖拽手势）
-      if (!this.grid[idx]) this.log('请先从左侧选择建筑', 'w');
+      // 没选中建筑时，点击已有建筑 → 高亮选中反馈
+      if (this.grid[idx]) {
+        // 清除旧选中
+        document.querySelectorAll('.cell.cell-selected').forEach(c => c.classList.remove('cell-selected'));
+        const cell = document.querySelector(`.cell[data-i="${idx}"]`);
+        if (cell) {
+          cell.classList.add('cell-selected');
+          this._focusedCellIdx = idx;
+          // 3秒后自动取消高亮
+          clearTimeout(this._cellSelTimer);
+          this._cellSelTimer = setTimeout(() => {
+            cell.classList.remove('cell-selected');
+            this._focusedCellIdx = null;
+          }, 3000);
+        }
+      } else {
+        this.log('请先从左侧选择建筑', 'w');
+      }
       return;
     }
 
@@ -2844,6 +2865,12 @@ const G = {
     this.stats.totalBuilt++;
     this.buildBurst(idx);
     this.addCombo();
+
+    // 引导任务完成反馈：如果建造的建筑正好是引导目标
+    if (this._prevGuideKey === this.sel) {
+      const score = this.calcScore();
+      this.showUnlockFloat(`✓ ${bd.n} 完成！  +${score.toLocaleString()} 分`);
+    }
   },
 
   // ===== RECYCLE =====
@@ -3969,13 +3996,15 @@ const G = {
   // ===== GUIDE =====
   updateGuide() {
     const steps = GUIDE[this.phase] || [];
+    let currentIdx = -1;
     let guideText = '';
     let guideIcon = '🎯';
 
-    for (const step of steps) {
-      if (step.check(this)) {
-        guideText = step.text;
-        guideIcon = step.icon;
+    for (let i = 0; i < steps.length; i++) {
+      if (steps[i].check(this)) {
+        currentIdx = i;
+        guideText = steps[i].text;
+        guideIcon = steps[i].icon;
         break;
       }
     }
@@ -3995,18 +4024,48 @@ const G = {
 
     document.getElementById('guideText').textContent = guideText;
 
+    // === 渲染步骤列表：已完成 / 当前 / 后续 ===
     const stepsEl = document.getElementById('guideSteps');
     stepsEl.innerHTML = '';
+
+    // 阶段内步骤拆分
+    if (steps.length > 0) {
+      steps.forEach((step, i) => {
+        const isDone = i < currentIdx;
+        const isCurrent = i === currentIdx;
+        const isFuture = i > currentIdx && currentIdx >= 0;
+        // 跳过那些非建造类的「等待」步骤在 future 中
+        if (isFuture && currentIdx >= 0) {
+          // 只显示后续2步，避免剧透太多
+          if (i > currentIdx + 2) return;
+        }
+
+        const item = document.createElement('div');
+        item.className = 'guide-step-item ' + (isDone ? 'step-done' : isCurrent ? 'step-current' : 'step-future');
+
+        const shortText = step.text.replace(/[—(（].*$/, '').trim();
+        item.innerHTML = `<span class="step-idx">${isDone ? '✓' : (i + 1)}</span>
+          <span>${step.icon} ${isFuture ? '???' : shortText}</span>`;
+        stepsEl.appendChild(item);
+      });
+    }
+
+    // 阶段进度条（底部）
+    const phaseBar = document.createElement('div');
+    phaseBar.style.cssText = 'display:flex;gap:3px;margin-top:6px;padding-top:5px;border-top:1px solid rgba(255,255,255,0.04)';
     PHASES.forEach(p => {
-      const step = document.createElement('div');
+      const dot = document.createElement('div');
       const isDone = p.id < this.phase;
       const isCurrent = p.id === this.phase;
-      const isFuture = p.id > this.phase;
-      step.className = 'guide-step' + (isDone ? ' done' : '') + (isCurrent ? ' current' : '') + (isFuture ? ' future' : '');
-      step.innerHTML = `<div class="step-dot ${isDone?'done':isCurrent?'current':'future'}"></div>
+      dot.className = 'guide-step' + (isDone ? ' done' : '') + (isCurrent ? ' current' : ' future');
+      dot.innerHTML = `<div class="step-dot ${isDone?'done':isCurrent?'current':'future'}"></div>
         <span>${p.icon} ${p.name}</span>`;
-      stepsEl.appendChild(step);
+      phaseBar.appendChild(dot);
     });
+    stepsEl.appendChild(phaseBar);
+
+    // 更新建造按钮高亮
+    this.updateGuideHighlight();
   },
 
   // ===== MAIN LOOP =====
@@ -4285,7 +4344,7 @@ const G = {
     const drawBg = () => {
       bgCtx.fillStyle = 'rgba(5,8,16,0.95)';
       bgCtx.fillRect(0, 0, bgCanvas.width, bgCanvas.height);
-      bgCtx.strokeStyle = 'rgba(20,40,60,0.12)';
+      bgCtx.strokeStyle = 'rgba(60,90,120,0.08)';
       bgCtx.lineWidth = 0.5;
       for (let x = 0; x < bgCanvas.width; x += 40) {
         bgCtx.beginPath(); bgCtx.moveTo(x,0); bgCtx.lineTo(x,bgCanvas.height); bgCtx.stroke();
@@ -4683,39 +4742,39 @@ const G = {
           drawLPath(); ctx.stroke();
         }
 
-        // -- 7) 起点端子（输入口） --
+        // -- 7) 起点端子（输入口） — 绿色(输入方向) --
         const termSz = trackW / 2 + 1;
         const firstSeg = segments[0];
         const fux = (firstSeg[2]-firstSeg[0]), fuy = (firstSeg[3]-firstSeg[1]);
         const fuLen = Math.sqrt(fux*fux+fuy*fuy);
         if (fuLen > 1) {
           const fnx = -fuy/fuLen, fny = fux/fuLen;
-          // 输入口方块
-          ctx.fillStyle = 'rgba(25,40,60,0.9)';
+          // 输入口方块 — 绿色系
+          ctx.fillStyle = 'rgba(15,35,25,0.9)';
           ctx.fillRect(sx - termSz, sy - termSz, termSz*2, termSz*2);
-          ctx.strokeStyle = mainColor + '60';
+          ctx.strokeStyle = 'rgba(34,197,94,0.65)';
           ctx.lineWidth = 1;
           ctx.strokeRect(sx - termSz, sy - termSz, termSz*2, termSz*2);
-          // 入口标识线
-          ctx.fillStyle = mainColor + '40';
+          // 入口标识线 — 绿色
+          ctx.fillStyle = 'rgba(34,197,94,0.35)';
           ctx.fillRect(sx - termSz + 1, sy - termSz + 1, termSz*2 - 2, 2);
         }
 
-        // -- 8) 终点端子（输出口 + 箭头） --
+        // -- 8) 终点端子（输出口 + 箭头） — 橙色(输出方向) --
         const lastSeg = segments[segments.length - 1];
         const arrDx = lastSeg[2] - lastSeg[0], arrDy = lastSeg[3] - lastSeg[1];
         const arrLen = Math.sqrt(arrDx*arrDx + arrDy*arrDy);
         if (arrLen > 1) {
           const adxn = arrDx/arrLen, adyn = arrDy/arrLen;
-          // 输出口方块
-          ctx.fillStyle = 'rgba(25,40,60,0.9)';
+          // 输出口方块 — 橙色系
+          ctx.fillStyle = 'rgba(40,25,12,0.9)';
           ctx.fillRect(ex - termSz, ey - termSz, termSz*2, termSz*2);
-          ctx.strokeStyle = mainColor + '60';
+          ctx.strokeStyle = 'rgba(249,115,22,0.65)';
           ctx.lineWidth = 1;
           ctx.strokeRect(ex - termSz, ey - termSz, termSz*2, termSz*2);
-          // 输出方向箭头
+          // 输出方向箭头 — 橙色
           const triSz = 5;
-          ctx.fillStyle = mainColor + '70';
+          ctx.fillStyle = 'rgba(249,115,22,0.75)';
           ctx.beginPath();
           ctx.moveTo(ex + adxn*(termSz+triSz), ey + adyn*(termSz+triSz));
           ctx.lineTo(ex + adyn*triSz*0.7 + adxn*termSz, ey - adxn*triSz*0.7 + adyn*termSz);
@@ -5468,7 +5527,143 @@ const G = {
     this.updateCoreUpgradeUI();
     this.updateChains();
     this.updateBeltUpgradeBtn();
+    this.updateSectionUnlocks();
     this.updateRedDots();
+  },
+
+  // ===== SECTION TOGGLE (折叠/展开) =====
+  toggleSection(secId) {
+    const sec = document.getElementById(secId);
+    if (!sec) return;
+    sec.classList.toggle('collapsed');
+    SFX.click();
+    // 记住折叠状态
+    try {
+      const state = JSON.parse(localStorage.getItem('bioSphereSecState') || '{}');
+      state[secId] = sec.classList.contains('collapsed');
+      localStorage.setItem('bioSphereSecState', JSON.stringify(state));
+    } catch(e) {}
+  },
+
+  _restoreSectionStates() {
+    try {
+      const state = JSON.parse(localStorage.getItem('bioSphereSecState') || '{}');
+      for (const [id, collapsed] of Object.entries(state)) {
+        const sec = document.getElementById(id);
+        if (sec && collapsed) sec.classList.add('collapsed');
+      }
+    } catch(e) {}
+  },
+
+  // ===== SECTION UNLOCK (分步解锁) =====
+  _unlocked: {},
+
+  updateSectionUnlocks() {
+    const hasBuilding = this.totalBuildings() > 0;
+    const evoLv2 = this.eL >= 2;
+
+    // 1. 菌落状态：建造第一个建筑后解锁
+    this._unlockSection('secColony', hasBuilding, '🔓 菌落状态 已解锁');
+
+    // 2. 排行榜 + 迷你排行榜：进化 >= Lv.2
+    this._unlockEl('miniLeaderboard', evoLv2);
+    this._unlockEl('lbBtnWrap', evoLv2);
+
+    // 3. 进化详情：进化 >= Lv.2 或者已经研究过纯培养技术
+    const showEvo = evoLv2 || (this.techs.pureCulture && this.techs.pureCulture.done);
+    this._unlockSection('evoSection', showEvo, '🧬 进化面板 已解锁');
+  },
+
+  _unlockSection(id, condition, msg) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (condition) {
+      if (!el.classList.contains('unlocked')) {
+        el.classList.add('unlocked', 'sec-unlock-anim');
+        if (!this._unlocked[id]) {
+          this._unlocked[id] = true;
+          // 只在首次解锁时飘字 + 音效（不在加载时）
+          if (this._gameReady) {
+            this.showUnlockFloat(msg);
+            SFX.achieve();
+          }
+        }
+      }
+    }
+  },
+
+  _unlockEl(id, condition) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (condition) {
+      el.classList.add('unlocked');
+    }
+  },
+
+  // === 解锁飘字 ===
+  showUnlockFloat(text) {
+    const el = document.createElement('div');
+    el.className = 'unlock-float';
+    el.textContent = text;
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 2200);
+  },
+
+  // ===== GUIDE ENHANCEMENT (强引导) =====
+  _prevGuideKey: null,  // 追踪上一次的引导建筑 key
+
+  // 从引导文本解析需要建造的建筑 key
+  _guideTargetBuilding() {
+    const steps = GUIDE[this.phase] || [];
+    for (const step of steps) {
+      if (step.check(this)) {
+        // 匹配「建造」类引导
+        const m = step.text.match(/建造「(.+?)」/);
+        if (m) {
+          const name = m[1];
+          for (const key in BLDS) {
+            if (BLDS[key].n === name) return key;
+          }
+        }
+        return null;
+      }
+    }
+    return null;
+  },
+
+  // 高亮对应的建造按钮
+  updateGuideHighlight() {
+    const targetKey = this._guideTargetBuilding();
+
+    // 清除旧高亮
+    document.querySelectorAll('.action-btn.guide-highlight').forEach(btn => {
+      btn.classList.remove('guide-highlight');
+      const tip = btn.querySelector('.guide-tooltip');
+      if (tip) tip.remove();
+    });
+
+    if (!targetKey) { this._prevGuideKey = null; return; }
+
+    // 新目标出现时的完成反馈
+    if (this._prevGuideKey && this._prevGuideKey !== targetKey && this._gameReady) {
+      this.showUnlockFloat('✓ 完成！继续下一步');
+      SFX.reward();
+    }
+    this._prevGuideKey = targetKey;
+
+    // 高亮目标建造按钮
+    const btn = document.querySelector(`.action-btn[data-b="${targetKey}"]`);
+    if (btn && !btn.classList.contains('locked')) {
+      btn.classList.add('guide-highlight');
+      // 添加 tooltip
+      if (!btn.querySelector('.guide-tooltip')) {
+        const tip = document.createElement('div');
+        tip.className = 'guide-tooltip';
+        tip.textContent = BLDS[targetKey].ratio || '点击选择 → 放入培养皿';
+        btn.style.position = 'relative';
+        btn.appendChild(tip);
+      }
+    }
   },
 
   // ===== 红点提醒 =====
