@@ -1780,10 +1780,11 @@ const G = {
   },
 
   // === Grid ===
-  // 理想格子像素大小（可微调）
-  _idealCellSize: 65,
-  _minCols: 8, _maxCols: 20,   // 列数范围
-  _minRows: 6, _maxRows: 16,   // 行数范围
+  // 格子最小像素（低于此值就减少格子数）和最大像素（高于此值就增加格子数）
+  _minCellPx: 44,
+  _maxCellPx: 62,
+  _minCols: 8, _maxCols: 24,
+  _minRows: 6, _maxRows: 18,
 
   _calcGridLayout() {
     const dishView = document.querySelector('.dish-view');
@@ -1796,26 +1797,46 @@ const G = {
     const padT = cs ? parseFloat(cs.paddingTop) || 10 : 10;
     const padL = cs ? parseFloat(cs.paddingLeft) || 10 : 10;
 
-    // 按理想格子大小，分别反算宽/高方向能放多少个
-    const ideal = this._idealCellSize;
-    const fitCols = Math.floor((vw - padL * 2 + gap) / (ideal + gap));
-    const fitRows = Math.floor((vh - padT * 2 + gap) / (ideal + gap));
-    // 列数和行数分别 clamp 到各自范围
-    const newCols = Math.max(this._minCols, Math.min(this._maxCols, fitCols));
-    const newRows = Math.max(this._minRows, Math.min(this._maxRows, fitRows));
+    // 策略：尽可能多放格子，但格子大小保持在 minCellPx ~ maxCellPx 之间
+    // 先按最小格子大小算出最多能放多少
+    const maxFitCols = Math.floor((vw - padL * 2 + gap) / (this._minCellPx + gap));
+    const maxFitRows = Math.floor((vh - padT * 2 + gap) / (this._minCellPx + gap));
+    // 再按最大格子大小算出最少放多少
+    const minFitCols = Math.floor((vw - padL * 2 + gap) / (this._maxCellPx + gap));
+    const minFitRows = Math.floor((vh - padT * 2 + gap) / (this._maxCellPx + gap));
+
+    // 取最多能放的数量（clamp 到范围内）
+    let newCols = Math.max(this._minCols, Math.min(this._maxCols, maxFitCols));
+    let newRows = Math.max(this._minRows, Math.min(this._maxRows, maxFitRows));
+
+    // 计算此时格子实际大小，如果太小就减少数量
+    let cellW = Math.floor((vw - padL * 2 - gap * (newCols - 1)) / newCols);
+    let cellH = Math.floor((vh - padT * 2 - gap * (newRows - 1)) / newRows);
+    let cellSize = Math.min(cellW, cellH);
+
+    // 如果格子太小，逐步减少行列直到格子大小合理
+    while (cellSize < this._minCellPx && (newCols > this._minCols || newRows > this._minRows)) {
+      // 优先减少格子更多（空间更紧张）的方向
+      if (cellW < cellH && newCols > this._minCols) {
+        newCols--;
+      } else if (newRows > this._minRows) {
+        newRows--;
+      } else {
+        newCols--;
+      }
+      cellW = Math.floor((vw - padL * 2 - gap * (newCols - 1)) / newCols);
+      cellH = Math.floor((vh - padT * 2 - gap * (newRows - 1)) / newRows);
+      cellSize = Math.min(cellW, cellH);
+    }
+
+    cellSize = Math.max(this._minCellPx, cellSize);
 
     // 如果列数或行数变了，扩展/收缩网格数组
     if (newCols !== this.gridCols || newRows !== this.gridRows) {
       this._resizeGrid(newCols, newRows);
     }
 
-    const cols = this.gridCols;
-    const rows = this.gridRows;
-    // 按实际格数计算最终格子像素大小（取宽高较小值保证正方形格子）
-    const cellW = Math.floor((vw - padL * 2 - gap * (cols - 1)) / cols);
-    const cellH = Math.floor((vh - padT * 2 - gap * (rows - 1)) / rows);
-    const cellSize = Math.max(40, Math.min(cellW, cellH));
-    return { cellSize, cols };
+    return { cellSize, cols: this.gridCols };
   },
 
   /* 动态调整网格大小（支持非正方形），保留原有建筑位置 */
@@ -1989,18 +2010,7 @@ const G = {
         label.textContent = bd.n;
         cell.appendChild(label);
 
-        // 产出速率小标签
-        const rateLabel = document.createElement('div');
-        rateLabel.className = 'cell-rate';
-        rateLabel.id = 'cellRate-' + i;
-        if (bd.isBoost) {
-          rateLabel.textContent = '+12%';
-          rateLabel.style.color = 'var(--color-muted)';
-        } else if (bd.isWonder && this.wonderComplete) {
-          rateLabel.textContent = '✦ 运行中';
-          rateLabel.style.color = bd.color;
-        }
-        cell.appendChild(rateLabel);
+        // （产出速率改为 hover tooltip 显示，不再叠加在格子上）
 
         // 输入端口（消耗的资源）
         const consKeys = Object.keys(bd.cons || {});
@@ -2148,8 +2158,53 @@ const G = {
           const multStr = lvl > 1 ? `<br><span style="color:var(--color-upgrade)">产出倍率: ${this.getUpgradeMultiplier(idx).toFixed(1)}x</span>` : '';
           const beltMult = this.getBeltMultiplierForBuilding(idx);
           const beltStr = beltMult < 1 ? `<br><span style="color:var(--orange)">⚠ 传送带效率: ${Math.round(beltMult*100)}% — 点击传送带升级！</span>` : (beltMult > 1 ? `<br><span style="color:var(--cyan)">✦ 传送带加成: ${Math.round(beltMult*100)}%</span>` : '');
+
+          // 产出速率详情
+          let rateStr = '';
+          if (bd.isBoost) {
+            rateStr = `<br><span style="color:${bd.color}">✦ 增益: +12%</span>`;
+          } else if (bd.isWonder && this.wonderComplete) {
+            rateStr = `<br><span style="color:${bd.color}">✦ 运行中</span>`;
+          } else if (!bd.isWonder) {
+            const coreConfig = CORE_COLONY[this.phase] || CORE_COLONY[1];
+            const maxC = coreConfig.maxCollectors || 2;
+            if (bd.corePowered) {
+              let seq = 0;
+              for (let ci = 0; ci <= idx; ci++) {
+                if (this.grid[ci] && BLDS[this.grid[ci].type]?.corePowered) seq++;
+              }
+              if (seq > maxC) {
+                rateStr = `<br><span style="color:var(--red)">⚠ 闲置（核心供能上限 ${maxC}）</span>`;
+              }
+            }
+            // 各项产出
+            const prodEntries = Object.entries(bd.prod || {});
+            if (prodEntries.length > 0 && !rateStr.includes('闲置')) {
+              const bldMult = this.getUpgradeMultiplier(idx);
+              const popMult = 1 + Math.min(this.pop, this._popCap()) * 0.002;
+              const mult = this.gEff * popMult * this.lEff * bldMult * beltMult;
+              const prodParts = prodEntries.map(([res, base]) => {
+                const actual = (base * mult).toFixed(1);
+                return `<span style="color:${RES[res]?.c || bd.color}">+${actual} ${RES[res]?.icon||''} ${RES[res]?.n||res}/s</span>`;
+              });
+              rateStr = `<br>${prodParts.join('  ')}`;
+            }
+            // 各项消耗
+            const consEntries = Object.entries(bd.cons || {});
+            if (consEntries.length > 0 && !rateStr.includes('闲置')) {
+              const bldMult = this.getUpgradeMultiplier(idx);
+              const popMult = 1 + Math.min(this.pop, this._popCap()) * 0.002;
+              const mult = this.gEff * popMult * this.lEff * bldMult * beltMult;
+              const consParts = consEntries.map(([res, base]) => {
+                const actual = (base * mult).toFixed(1);
+                return `<span style="color:${RES[res]?.c || '#f97316'}">-${actual} ${RES[res]?.icon||''} ${RES[res]?.n||res}/s</span>`;
+              });
+              rateStr += `<br>${consParts.join('  ')}`;
+            }
+          }
+
           document.getElementById('ttName').innerHTML = `${bd.emoji||''} ${bd.n}${lvlStr} <span style="color:${bd.color};font-size:0.85em">[T${bd.tier||1}]</span>`;
-          document.getElementById('ttDesc').innerHTML = `${bd.d}${multStr}${beltStr}<br><span style="color:var(--color-info);font-family:'Share Tech Mono',monospace">${bd.ratio}</span><br><span style="color:var(--color-muted-dark);font-size:0.85em">拖拽移动 · 双击升级 · 右键回收 · 空白拖拽框选</span>`;
+          document.getElementById('ttDesc').innerHTML = `${bd.d}${multStr}${rateStr}${beltStr}<br><span style="color:var(--color-info);font-family:'Share Tech Mono',monospace">${bd.ratio}</span><br><span style="color:var(--color-muted-dark);font-size:0.85em">拖拽移动 · 双击升级 · 右键回收 · 空白拖拽框选</span>`;
           tt.classList.add('show');
           tt.style.left = Math.min(e.clientX + 12, window.innerWidth - 240) + 'px';
           tt.style.top = Math.min(e.clientY + 12, window.innerHeight - 100) + 'px';
@@ -2254,43 +2309,23 @@ const G = {
     }
   },
 
-  // 更新格子内的产出速率标签
+  // 更新格子内的警告标签（产出速率已移至 hover tooltip）
   updateCellRates() {
-    // 预计算核心供给状态
     const coreConfig = CORE_COLONY[this.phase] || CORE_COLONY[1];
     const maxC = coreConfig.maxCollectors || 2;
     let collectorSeq = 0;
 
     this.grid.forEach((g, idx) => {
-      const el = document.getElementById('cellRate-' + idx);
-      if (!el || !g) return;
+      if (!g) return;
       const bd = BLDS[g.type];
-      if (!bd || bd.isBoost || bd.isWonder) return;
+      if (!bd) return;
 
-      // 核心供能建筑：超出上限的显示"闲置"
+      // 核心供能建筑：超出上限标记闲置
       if (bd.corePowered) {
         collectorSeq++;
-        if (collectorSeq > maxC) {
-          el.textContent = '⚠ 闲置';
-          el.style.color = 'var(--red)';
-          return;
-        }
       }
 
-      // 显示主产出资源
-      const mainProd = Object.entries(bd.prod)[0];
-      if (mainProd) {
-        const [res, base] = mainProd;
-        const bldMult = this.getUpgradeMultiplier(idx);
-        const beltMult = this.getBeltMultiplierForBuilding(idx);
-        const popMult = 1 + Math.min(this.pop, this._popCap()) * 0.002;
-        const mult = this.gEff * popMult * this.lEff * bldMult * beltMult;
-        const actual = (base * mult).toFixed(1);
-        const beltStr = beltMult < 1 ? ` ⚠${Math.round(beltMult*100)}%` : '';
-        el.textContent = `+${actual}${RES[res]?.icon||''}/s${beltStr}`;
-        el.style.color = beltMult < 1 ? '#f97316' : bd.color;
-      }
-      // 【新增】更新缺传送带警告
+      // 更新缺传送带警告
       const warnEl = document.getElementById('beltWarn-' + idx);
       if (warnEl) {
         const beltMult = this.getBeltMultiplierForBuilding(idx);
