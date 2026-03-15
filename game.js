@@ -886,18 +886,46 @@ const FLOW_MAP = [
   { from:'glucoseCollector', to:'energyStation',   res:'glucose',  icon:'🟢', color:'#22c55e', label:'葡萄糖' },
   { from:'glucoseCollector', to:'simpleExtractor',  res:'glucose',  icon:'🟢', color:'#22c55e', label:'葡萄糖' },
   { from:'energyStation',    to:'simpleExtractor',  res:'energy',   icon:'⚡', color:'#f97316', label:'ATP' },
+  // Phase 1 — 能量缓冲池（需要葡萄糖输入）
+  { from:'glucoseCollector', to:'energyBuffer',     res:'glucose',  icon:'🟢', color:'#22c55e', label:'葡萄糖' },
+  // 能量缓冲池也能作为能量供应源
+  { from:'energyBuffer',     to:'simpleExtractor',  res:'energy',   icon:'⚡', color:'#fb923c', label:'ATP' },
+  { from:'energyBuffer',     to:'nitrogenFixer',    res:'energy',   icon:'⚡', color:'#fb923c', label:'ATP' },
+  { from:'energyBuffer',     to:'proteinFactory',   res:'energy',   icon:'⚡', color:'#fb923c', label:'ATP' },
+  { from:'energyBuffer',     to:'geneExtractor',    res:'energy',   icon:'⚡', color:'#fb923c', label:'ATP' },
+  { from:'energyBuffer',     to:'ribosomeCluster',  res:'energy',   icon:'⚡', color:'#fb923c', label:'ATP' },
+  { from:'energyBuffer',     to:'biofilmReactor',   res:'energy',   icon:'⚡', color:'#fb923c', label:'ATP' },
+  { from:'energyBuffer',     to:'sporeSower',       res:'energy',   icon:'⚡', color:'#fb923c', label:'ATP' },
+  { from:'energyBuffer',     to:'qsController',     res:'energy',   icon:'⚡', color:'#fb923c', label:'ATP' },
+  { from:'energyBuffer',     to:'nanoAssembler',    res:'energy',   icon:'⚡', color:'#fb923c', label:'ATP' },
+  { from:'energyBuffer',     to:'pheromoneStation',  res:'energy',   icon:'⚡', color:'#fb923c', label:'ATP' },
   // Phase 2
   { from:'energyStation',    to:'nitrogenFixer',    res:'energy',   icon:'⚡', color:'#f97316', label:'ATP' },
   { from:'nitrogenFixer',    to:'proteinFactory',   res:'nitrogen', icon:'🔵', color:'#3b82f6', label:'氮源' },
   { from:'energyStation',    to:'proteinFactory',   res:'energy',   icon:'⚡', color:'#f97316', label:'ATP' },
   { from:'proteinFactory',   to:'geneExtractor',    res:'protein',  icon:'🧪', color:'#ec4899', label:'蛋白质' },
   { from:'energyStation',    to:'geneExtractor',    res:'energy',   icon:'⚡', color:'#f97316', label:'ATP' },
+  // Phase 2 — 氨基酸合成仪（需要氮源+葡萄糖）
+  { from:'nitrogenFixer',    to:'aminoSynth',       res:'nitrogen', icon:'🔵', color:'#3b82f6', label:'氮源' },
+  { from:'glucoseCollector', to:'aminoSynth',       res:'glucose',  icon:'🟢', color:'#22c55e', label:'葡萄糖' },
+  // Phase 2 — 核糖体集群（需要蛋白质+能量）
+  { from:'proteinFactory',   to:'ribosomeCluster',  res:'protein',  icon:'🧪', color:'#ec4899', label:'蛋白质' },
+  { from:'energyStation',    to:'ribosomeCluster',  res:'energy',   icon:'⚡', color:'#f97316', label:'ATP' },
   // Phase 3
   { from:'glucoseCollector', to:'biofilmReactor',   res:'glucose',  icon:'🟢', color:'#22c55e', label:'葡萄糖' },
   { from:'nitrogenFixer',    to:'biofilmReactor',   res:'nitrogen', icon:'🔵', color:'#3b82f6', label:'氮源' },
   { from:'energyStation',    to:'biofilmReactor',   res:'energy',   icon:'⚡', color:'#f97316', label:'ATP' },
+  // Phase 3 — 孢子播种器（需要生物质+能量）
+  { from:'biofilmReactor',   to:'sporeSower',       res:'biomass',  icon:'🧱', color:'#14b8a6', label:'生物质' },
+  { from:'energyStation',    to:'sporeSower',       res:'energy',   icon:'⚡', color:'#f97316', label:'ATP' },
   // Phase 4
   { from:'energyStation',    to:'qsController',     res:'energy',   icon:'⚡', color:'#f97316', label:'ATP' },
+  // Phase 4 — 纳米组装线（需要QS+能量）
+  { from:'qsController',     to:'nanoAssembler',    res:'qs',       icon:'📡', color:'#eab308', label:'QS信号' },
+  { from:'energyStation',    to:'nanoAssembler',    res:'energy',   icon:'⚡', color:'#f97316', label:'ATP' },
+  // Phase 4 — 信息素广播站（需要蛋白质+能量）
+  { from:'proteinFactory',   to:'pheromoneStation',  res:'protein',  icon:'🧪', color:'#ec4899', label:'蛋白质' },
+  { from:'energyStation',    to:'pheromoneStation',  res:'energy',   icon:'⚡', color:'#f97316', label:'ATP' },
 ];
 
 // ===== CHALLENGE MISSIONS =====
