@@ -1788,8 +1788,8 @@ const G = {
 
   // === Grid ===
   // 格子最小像素（低于此值就减少格子数）和最大像素（高于此值就增加格子数）
-  _minCellPx: 44,
-  _maxCellPx: 62,
+  _minCellPx: 56,
+  _maxCellPx: 78,
   _minCols: 8, _maxCols: 24,
   _minRows: 6, _maxRows: 18,
 
