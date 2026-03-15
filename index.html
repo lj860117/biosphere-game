@@ -1064,6 +1064,80 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
   color:var(--purple);cursor:default;opacity:0.8;
 }
 
+/* === 游戏修改建议栏 === */
+.suggestion-bar{
+  background:linear-gradient(135deg,rgba(10,16,30,0.85),rgba(8,14,26,0.9));
+  border:1px solid rgba(100,120,160,0.15);border-radius:6px;
+  margin:6px 8px 4px;padding:0;overflow:hidden;
+  transition:all 0.3s ease;
+}
+.suggestion-header{
+  display:flex;align-items:center;gap:6px;padding:6px 10px;
+  cursor:pointer;user-select:none;
+  border-bottom:1px solid rgba(100,120,160,0.08);
+}
+.suggestion-header:hover{background:rgba(100,120,160,0.04)}
+.suggestion-icon{font-size:0.8em;display:inline-block;animation:suggIconGlow 3.5s ease-in-out infinite}
+@keyframes suggIconGlow{
+  0%,100%{opacity:0.4;filter:brightness(0.7);transform:scale(0.9)}
+  50%{opacity:1;filter:brightness(1.4) drop-shadow(0 0 4px rgba(255,220,80,0.5));transform:scale(1.1)}
+}
+.suggestion-title{
+  font-family:'Orbitron',monospace;font-size:0.6em;color:rgba(160,180,210,0.6);
+  letter-spacing:1.5px;text-transform:uppercase;
+}
+.suggestion-toggle{
+  margin-left:auto;background:none;border:none;color:rgba(160,180,210,0.4);
+  cursor:pointer;font-size:0.9em;line-height:1;padding:0 2px;
+  transition:transform 0.2s;font-family:monospace;
+}
+.suggestion-bar.collapsed .suggestion-body{display:none}
+.suggestion-bar.collapsed .suggestion-toggle{transform:rotate(-90deg)}
+.suggestion-body{padding:8px 10px 10px}
+.suggestion-input-row{display:flex;gap:6px;margin-bottom:8px}
+.suggestion-input{
+  flex:1;background:rgba(6,12,24,0.7);border:1px solid rgba(100,120,160,0.15);
+  border-radius:4px;padding:5px 8px;font-size:0.7em;color:#a0b8d0;
+  font-family:'Share Tech Mono',monospace;outline:none;
+  transition:border-color 0.2s;
+}
+.suggestion-input:focus{border-color:rgba(100,140,200,0.35)}
+.suggestion-input::placeholder{color:rgba(100,120,160,0.3)}
+.suggestion-submit-btn{
+  background:rgba(80,120,180,0.12);border:1px solid rgba(80,120,180,0.25);
+  border-radius:4px;padding:4px 10px;font-size:0.65em;color:rgba(130,170,220,0.75);
+  font-family:'Rajdhani',sans-serif;font-weight:700;cursor:pointer;
+  transition:all 0.2s;white-space:nowrap;
+}
+.suggestion-submit-btn:hover{background:rgba(80,120,180,0.2);color:rgba(150,190,240,0.9)}
+.suggestion-submit-btn:active{transform:scale(0.95)}
+.suggestion-list{
+  max-height:120px;overflow-y:auto;display:flex;flex-direction:column;gap:4px;
+}
+.suggestion-list::-webkit-scrollbar{width:2px}
+.suggestion-list::-webkit-scrollbar-thumb{background:rgba(100,120,160,0.2);border-radius:1px}
+.suggestion-item{
+  display:flex;align-items:flex-start;gap:6px;padding:5px 7px;
+  background:rgba(6,12,24,0.5);border:1px solid rgba(100,120,160,0.06);
+  border-radius:3px;font-size:0.65em;color:#7a98b8;
+  animation:suggFadeIn 0.3s ease;
+}
+@keyframes suggFadeIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}
+.suggestion-item .sugg-name{
+  color:rgba(130,170,220,0.7);font-weight:700;font-family:'Rajdhani',sans-serif;
+  white-space:nowrap;flex-shrink:0;min-width:40px;
+}
+.suggestion-item .sugg-text{color:#8ab0d0;line-height:1.35;word-break:break-all}
+.suggestion-item .sugg-time{
+  margin-left:auto;color:rgba(100,120,160,0.3);font-size:0.85em;white-space:nowrap;flex-shrink:0;
+  font-family:'Share Tech Mono',monospace;
+}
+.suggestion-empty{
+  text-align:center;color:rgba(100,120,160,0.25);font-size:0.65em;padding:12px 0;
+  font-style:italic;
+}
+.suggestion-loading{text-align:center;color:rgba(100,120,160,0.3);font-size:0.6em;padding:8px 0}
+
 /* 阶段主题色 — 通过 data-phase 属性切换 */
 .core-colony-bar[data-phase="1"]{
   border-bottom-color:#1a3a2a;
@@ -1812,6 +1886,23 @@ body::after{
           <button class="core-upgrade-btn locked" id="coreUpgradeBtn" onclick="G.manualCoreUpgrade()" disabled>升级核心</button>
         </div>
       </div>
+      <!-- 游戏建议栏 -->
+      <div class="suggestion-bar" id="suggestionBar">
+        <div class="suggestion-header">
+          <span class="suggestion-icon">💡</span>
+          <span class="suggestion-title">修改建议</span>
+          <button class="suggestion-toggle" id="suggToggle" onclick="G.toggleSuggestionBar()">▾</button>
+        </div>
+        <div class="suggestion-body" id="suggBody">
+          <div class="suggestion-input-row">
+            <input type="text" class="suggestion-input" id="suggInput" placeholder="输入你的修改建议..." maxlength="200" onkeydown="if(event.key==='Enter')G.submitSuggestion()">
+            <button class="suggestion-submit-btn" onclick="G.submitSuggestion()">发送</button>
+          </div>
+          <div class="suggestion-list" id="suggList">
+            <div class="suggestion-empty">暂无建议，快来留下第一条吧 ✨</div>
+          </div>
+        </div>
+      </div>
       <div class="dish-view">
         <div class="pause-overlay" id="pauseOverlay">⏸ 已暂停</div>
         <div class="dish-scroll-inner" id="dishScrollInner">
@@ -2087,7 +2178,7 @@ body::after{
   window.supa = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
   window.supaReady = true;
 </script>
-<script src="game.js?v=20260316e"></script>
+<script src="game.js?v=20260316f"></script>
 <!-- Nickname Popup -->
 <div class="nickname-popup" id="nicknamePopup">
   <div style="font-family:'Orbitron',monospace;font-size:0.85em;color:var(--cyan);letter-spacing:2px;margin-bottom:10px">🧬 设置昵称</div>

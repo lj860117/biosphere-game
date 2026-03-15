@@ -1016,6 +1016,8 @@ const G = {
     setTimeout(() => this.refreshMiniLeaderboard(), 2000);
     // 每 60 秒自动刷新迷你排行榜
     setInterval(() => this.refreshMiniLeaderboard(), 60000);
+    // 初始加载建议列表 (延迟 3 秒)
+    setTimeout(() => this.loadSuggestions(), 3000);
     this._initTouchEvents();
     this.log('▸ 系统在线 — 微生物帝国启动', 's');
     this.log('▸ 起始资源: 50🟢葡萄糖 + 35⚡能量', 'ev');
@@ -3606,6 +3608,113 @@ const G = {
     const d = document.createElement('div');
     d.textContent = s;
     return d.innerHTML;
+  },
+
+  // ===== 游戏修改建议 =====
+  _suggLoaded: false,
+  _suggCache: [],
+  _suggLastFetch: 0,
+
+  toggleSuggestionBar() {
+    const bar = document.getElementById('suggestionBar');
+    if (!bar) return;
+    bar.classList.toggle('collapsed');
+    SFX.click();
+    // 展开时自动加载建议
+    if (!bar.classList.contains('collapsed') && !this._suggLoaded) {
+      this.loadSuggestions();
+    }
+  },
+
+  async submitSuggestion() {
+    const input = document.getElementById('suggInput');
+    if (!input) return;
+    const text = input.value.trim();
+    if (!text) { this.showCursorTooltip('请输入建议内容'); return; }
+    if (text.length > 200) { this.showCursorTooltip('建议内容不能超过200字'); return; }
+
+    if (!window.supaReady || !window.supa) {
+      this.showCursorTooltip('服务未连接，无法提交');
+      return;
+    }
+
+    const name = this._playerName || '匿名菌落';
+    const { error } = await window.supa.from('suggestions').insert({
+      player_id: this._playerId || 'anon',
+      player_name: name,
+      content: text
+    });
+
+    if (error) {
+      console.error('提交建议失败:', error);
+      this.showCursorTooltip('提交失败，请稍后重试');
+      return;
+    }
+
+    input.value = '';
+    this.log('💡 建议已提交，感谢反馈！', 's');
+    this.showCursorTooltip('建议已提交 ✓');
+    SFX.click();
+    // 刷新列表
+    this.loadSuggestions();
+  },
+
+  async loadSuggestions() {
+    if (!window.supaReady || !window.supa) return;
+
+    const listEl = document.getElementById('suggList');
+    if (!listEl) return;
+    listEl.innerHTML = '<div class="suggestion-loading">加载中...</div>';
+
+    const { data, error } = await window.supa
+      .from('suggestions')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(50);
+
+    if (error) {
+      console.error('加载建议失败:', error);
+      listEl.innerHTML = '<div class="suggestion-empty">加载失败，点击刷新重试</div>';
+      return;
+    }
+
+    this._suggLoaded = true;
+    this._suggCache = data || [];
+    this._suggLastFetch = Date.now();
+    this._renderSuggestions();
+  },
+
+  _renderSuggestions() {
+    const listEl = document.getElementById('suggList');
+    if (!listEl) return;
+
+    if (!this._suggCache.length) {
+      listEl.innerHTML = '<div class="suggestion-empty">暂无建议，快来留下第一条吧 ✨</div>';
+      return;
+    }
+
+    let html = '';
+    this._suggCache.forEach(s => {
+      const time = this._formatSuggTime(s.created_at);
+      html += `<div class="suggestion-item">
+        <span class="sugg-name">${this._escHtml(s.player_name || '匿名')}</span>
+        <span class="sugg-text">${this._escHtml(s.content)}</span>
+        <span class="sugg-time">${time}</span>
+      </div>`;
+    });
+    listEl.innerHTML = html;
+  },
+
+  _formatSuggTime(isoStr) {
+    if (!isoStr) return '';
+    const d = new Date(isoStr);
+    const now = new Date();
+    const diff = now - d;
+    if (diff < 60000) return '刚刚';
+    if (diff < 3600000) return Math.floor(diff / 60000) + '分钟前';
+    if (diff < 86400000) return Math.floor(diff / 3600000) + '小时前';
+    if (diff < 604800000) return Math.floor(diff / 86400000) + '天前';
+    return (d.getMonth() + 1) + '/' + d.getDate();
   },
 
   // ===== UTILITY =====
