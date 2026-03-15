@@ -2104,15 +2104,22 @@ const G = {
         dot.style.boxShadow = '0 0 3px ' + bd.color;
         cell.appendChild(dot);
 
-        // 【新增】缺少传送带警告 — 需要输入资源的建筑如果没有传送带连接
+        // 【增强】资源阻塞指示 — 需要输入资源的建筑如果没有传送带连接
         const needsInput = FLOW_MAP.some(f => f.to === btype);
         if (needsInput) {
-          const warnEl = document.createElement('div');
-          warnEl.className = 'cell-belt-warn';
-          warnEl.id = 'beltWarn-' + i;
-          warnEl.textContent = '⚠ 需要传送带';
-          warnEl.style.cssText = 'position:absolute;bottom:12px;left:0;right:0;text-align:center;font-size:0.5em;color:var(--orange);font-weight:700;z-index:8;pointer-events:none;display:none;text-shadow:0 1px 3px rgba(0,0,0,0.8);animation:blink 1.5s ease-in-out infinite';
-          cell.appendChild(warnEl);
+          // 斜线遮罩
+          const overlay = document.createElement('div');
+          overlay.className = 'cell-blocked-overlay';
+          overlay.id = 'blockOverlay-' + i;
+          overlay.style.display = 'none';
+          cell.appendChild(overlay);
+          // 顶部阻塞标签
+          const badge = document.createElement('div');
+          badge.className = 'cell-blocked-badge';
+          badge.id = 'blockBadge-' + i;
+          badge.textContent = '🚫 资源阻塞';
+          badge.style.display = 'none';
+          cell.appendChild(badge);
         }
 
         // 名称标签（增强可见度）
@@ -2268,7 +2275,7 @@ const G = {
           const lvlStr = lvl >= 5 ? ' <span style="color:var(--color-max)">★MAX</span>' : ` <span style="color:var(--color-upgrade)">Lv.${lvl}</span>`;
           const multStr = lvl > 1 ? `<br><span style="color:var(--color-upgrade)">产出倍率: ${this.getUpgradeMultiplier(idx).toFixed(1)}x</span>` : '';
           const beltMult = this.getBeltMultiplierForBuilding(idx);
-          const beltStr = beltMult < 1 ? `<br><span style="color:var(--orange)">⚠ 传送带效率: ${Math.round(beltMult*100)}% — 点击传送带升级！</span>` : (beltMult > 1 ? `<br><span style="color:var(--cyan)">✦ 传送带加成: ${Math.round(beltMult*100)}%</span>` : '');
+          const beltStr = beltMult === 0 ? `<br><span style="color:#ef4444;font-weight:700">🚫 资源阻塞 — 需要传送带连接输入资源！</span>` : beltMult < 1 ? `<br><span style="color:var(--orange)">⚠ 传送带效率: ${Math.round(beltMult*100)}% — 点击传送带升级！</span>` : (beltMult > 1 ? `<br><span style="color:var(--cyan)">✦ 传送带加成: ${Math.round(beltMult*100)}%</span>` : '');
 
           // 产出速率详情
           let rateStr = '';
@@ -2436,11 +2443,19 @@ const G = {
         collectorSeq++;
       }
 
-      // 更新缺传送带警告
-      const warnEl = document.getElementById('beltWarn-' + idx);
-      if (warnEl) {
+      // 更新资源阻塞状态
+      const overlayEl = document.getElementById('blockOverlay-' + idx);
+      const badgeEl = document.getElementById('blockBadge-' + idx);
+      if (overlayEl || badgeEl) {
         const beltMult = this.getBeltMultiplierForBuilding(idx);
-        warnEl.style.display = beltMult === 0 ? 'block' : 'none';
+        const isBlocked = beltMult === 0;
+        const gridEl = document.getElementById('grid');
+        const cellEl = gridEl && gridEl.children[idx];
+        if (cellEl) {
+          cellEl.classList.toggle('cell-blocked', isBlocked);
+        }
+        if (overlayEl) overlayEl.style.display = isBlocked ? 'block' : 'none';
+        if (badgeEl) badgeEl.style.display = isBlocked ? 'block' : 'none';
       }
     });
   },

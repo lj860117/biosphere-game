@@ -531,6 +531,36 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
   50%{box-shadow:0 0 16px rgba(249,115,22,0.45),inset 0 0 10px rgba(249,115,22,0.12)}
 }
 
+/* 资源阻塞状态 — 红色边框脉冲 + 半透明遮罩 */
+.cell.cell-blocked{
+  border-color:rgba(239,68,68,0.7)!important;
+  animation:cellBlockedPulse 2s ease-in-out infinite;
+}
+.cell.cell-blocked .cell-emoji{animation:none;opacity:0.45}
+.cell.cell-blocked .work-dot{background:#ef4444!important;box-shadow:0 0 4px #ef4444!important}
+.cell.cell-blocked .aura{display:none}
+.cell-blocked-overlay{
+  position:absolute;inset:0;z-index:9;pointer-events:none;
+  background:repeating-linear-gradient(
+    -45deg,
+    transparent,transparent 3px,
+    rgba(239,68,68,0.06) 3px,rgba(239,68,68,0.06) 6px
+  );
+  border-radius:3px;
+}
+.cell-blocked-badge{
+  position:absolute;top:0;left:0;right:0;z-index:10;pointer-events:none;
+  text-align:center;font-size:0.48em;font-weight:800;
+  color:#fca5a5;background:rgba(127,29,29,0.75);
+  padding:1px 0;letter-spacing:0.5px;
+  border-radius:3px 3px 0 0;
+  text-shadow:0 1px 2px rgba(0,0,0,0.8);
+}
+@keyframes cellBlockedPulse{
+  0%,100%{border-color:rgba(239,68,68,0.45);box-shadow:0 0 4px rgba(239,68,68,0.1)}
+  50%{border-color:rgba(239,68,68,0.8);box-shadow:0 0 12px rgba(239,68,68,0.25),inset 0 0 8px rgba(239,68,68,0.06)}
+}
+
 /* 主题色左侧竖条 */
 .cell-stripe{
   position:absolute;left:0;top:10%;bottom:10%;width:2px;border-radius:0 2px 2px 0;
@@ -2179,7 +2209,7 @@ body::after{
   window.supa = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
   window.supaReady = true;
 </script>
-<script src="game.js?v=20260316h"></script>
+<script src="game.js?v=20260316i"></script>
 <!-- Nickname Popup -->
 <div class="nickname-popup" id="nicknamePopup">
   <div style="font-family:'Orbitron',monospace;font-size:0.85em;color:var(--cyan);letter-spacing:2px;margin-bottom:10px">🧬 设置昵称</div>
