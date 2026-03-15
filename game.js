@@ -1130,6 +1130,22 @@ const G = {
       }
     };
     mql.addEventListener('change', handleChange);
+
+    // 窗口 resize 时重新计算格子大小
+    let resizeTimer = null;
+    window.addEventListener('resize', () => {
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => {
+        const gridEl = document.getElementById('grid');
+        if (!gridEl) return;
+        const layout = this._calcGridLayout();
+        if (layout.cellSize) {
+          gridEl.style.gridTemplateColumns = `repeat(${layout.cols}, ${layout.cellSize}px)`;
+          gridEl.style.gridAutoRows = `${layout.cellSize}px`;
+        }
+        this._resizeCanvases();
+      }, 150);
+    });
   },
 
   // ===== 触摸事件适配 =====
@@ -1227,12 +1243,12 @@ const G = {
 
   // Canvas resize helper
   _resizeCanvases() {
-    const view = document.querySelector('.dish-view');
-    if (!view) return;
+    const inner = document.getElementById('dishScrollInner');
+    if (!inner) return;
     const bg = document.getElementById('bgCanvas');
     const pt = document.getElementById('partCanvas');
-    if (bg) { bg.width = view.clientWidth; bg.height = view.clientHeight; }
-    if (pt) { pt.width = view.clientWidth; pt.height = view.clientHeight; }
+    if (bg) { bg.width = inner.offsetWidth; bg.height = inner.offsetHeight; }
+    if (pt) { pt.width = inner.offsetWidth; pt.height = inner.offsetHeight; }
   },
 
   // ===== 弹窗遮罩管理 =====
@@ -1758,10 +1774,38 @@ const G = {
   },
 
   // === Grid ===
+  _calcGridLayout() {
+    const dishView = document.querySelector('.dish-view');
+    const gridEl = document.getElementById('grid');
+    if (!dishView) return { cellSize: null, cols: this.gridSize };
+    const vw = dishView.clientWidth;  // 已减去滚动条宽度
+    const vh = dishView.clientHeight;
+    // 读取实际 CSS gap 和 padding
+    const cs = gridEl ? getComputedStyle(gridEl) : null;
+    const gap = cs ? parseFloat(cs.gap) || parseFloat(cs.rowGap) || 10 : 10;
+    const padT = cs ? parseFloat(cs.paddingTop) || 10 : 10;
+    const padL = cs ? parseFloat(cs.paddingLeft) || 10 : 10;
+    const cols = this.gridSize;
+    const rows = this.gridSize;
+    // 根据容器宽度计算每个格子的尺寸
+    const cellW = Math.floor((vw - padL * 2 - gap * (cols - 1)) / cols);
+    // 根据容器高度计算每个格子的尺寸
+    const cellH = Math.floor((vh - padT * 2 - gap * (rows - 1)) / rows);
+    // 取较小值确保格子正方形且不超出（设最小值 40px）
+    const cellSize = Math.max(40, Math.min(cellW, cellH));
+    return { cellSize, cols };
+  },
+
   renderGrid() {
     this._chainsDirty = true;  // 网格变了，传送带列表需要更新
     const gridEl = document.getElementById('grid');
-    gridEl.style.gridTemplateColumns = `repeat(${this.gridSize}, 1fr)`;
+    const layout = this._calcGridLayout();
+    if (layout.cellSize) {
+      gridEl.style.gridTemplateColumns = `repeat(${layout.cols}, ${layout.cellSize}px)`;
+      gridEl.style.gridAutoRows = `${layout.cellSize}px`;
+    } else {
+      gridEl.style.gridTemplateColumns = `repeat(${this.gridSize}, 1fr)`;
+    }
     gridEl.innerHTML = '';
 
     // 预计算每种建筑类型的序号映射: idx → seq number (1-based)
@@ -3719,11 +3763,12 @@ const G = {
     const bgCtx = bgCanvas.getContext('2d');
 
     const resize = () => {
-      const w = canvas.parentElement;
-      canvas.width = w.offsetWidth;
-      canvas.height = w.offsetHeight;
-      bgCanvas.width = w.offsetWidth;
-      bgCanvas.height = w.offsetHeight;
+      const inner = document.getElementById('dishScrollInner');
+      if (!inner) return;
+      canvas.width = inner.offsetWidth;
+      canvas.height = inner.offsetHeight;
+      bgCanvas.width = inner.offsetWidth;
+      bgCanvas.height = inner.offsetHeight;
     };
 
     // ===== 传送带点击检测 =====

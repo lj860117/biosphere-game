@@ -323,15 +323,19 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 .dish-env{display:flex;gap:8px;font-size:0.6em}
 .dish-env span{color:var(--dim)}
 .dish-env .val{font-family:'Orbitron',monospace;color:var(--color-info)}
-.dish-view{flex:1;position:relative;overflow:hidden}
-#bgCanvas,#partCanvas{position:absolute;inset:0}
-#bgCanvas{z-index:0}#partCanvas{z-index:5;pointer-events:none}
+.dish-view{flex:1;position:relative;overflow-y:auto;overflow-x:hidden;scrollbar-width:thin;scrollbar-color:rgba(6,214,160,0.3) transparent}
+.dish-view::-webkit-scrollbar{width:6px}
+.dish-view::-webkit-scrollbar-track{background:transparent}
+.dish-view::-webkit-scrollbar-thumb{background:rgba(6,214,160,0.3);border-radius:3px}
+.dish-view::-webkit-scrollbar-thumb:hover{background:rgba(6,214,160,0.5)}
+.dish-scroll-inner{position:relative;min-height:100%}
+#bgCanvas,#partCanvas{position:absolute;top:0;left:0;width:100%;pointer-events:none}
+#bgCanvas{z-index:0}#partCanvas{z-index:5}
 .grid{
-  position:absolute;inset:0;display:grid;gap:10px;padding:10px;z-index:2;
-  place-content:center;touch-action:manipulation;
+  position:relative;display:grid;gap:10px;padding:10px;z-index:2;
+  place-content:center;touch-action:manipulation;min-height:100%;
 }
 .cell{
-  width:100%;aspect-ratio:1;
   background:rgba(8,14,24,0.6);border:1px solid #0e1828;border-radius:3px;
   cursor:pointer;display:flex;align-items:center;justify-content:center;
   position:relative;overflow:hidden;transition:all 0.15s;
@@ -1547,10 +1551,12 @@ body::after{
         </div>
       </div>
       <div class="dish-view">
-        <canvas id="bgCanvas"></canvas>
-        <canvas id="partCanvas"></canvas>
         <div class="pause-overlay" id="pauseOverlay">⏸ 已暂停</div>
-        <div class="grid" id="grid"></div>
+        <div class="dish-scroll-inner" id="dishScrollInner">
+          <canvas id="bgCanvas"></canvas>
+          <canvas id="partCanvas"></canvas>
+          <div class="grid" id="grid"></div>
+        </div>
         <!-- Achievement Popup — 培养皿内顶部 toast -->
         <div class="achieve-popup" id="achievePopup">
           <div class="achieve-glow"></div>
