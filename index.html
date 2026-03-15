@@ -333,9 +333,10 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 #bgCanvas{z-index:0}#partCanvas{z-index:5}
 .grid{
   position:relative;display:grid;gap:10px;padding:10px;z-index:2;
-  justify-content:center;touch-action:manipulation;
+  justify-content:center;align-content:start;touch-action:manipulation;
 }
 .cell{
+  aspect-ratio:1;
   background:rgba(8,14,24,0.6);border:1px solid #0e1828;border-radius:3px;
   cursor:pointer;display:flex;align-items:center;justify-content:center;
   position:relative;overflow:hidden;transition:all 0.15s;

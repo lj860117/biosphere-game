@@ -1787,9 +1787,10 @@ const G = {
     const padL = cs ? parseFloat(cs.paddingLeft) || 10 : 10;
     const cols = this.gridSize;
     const rows = this.gridSize;
-    // 只用宽度来计算格子大小，高度超出时由 dish-view 的 overflow-y:auto 提供滚动
+    // 同时考虑宽度和高度，取较小值确保格子正方形且不超出容器
     const cellW = Math.floor((vw - padL * 2 - gap * (cols - 1)) / cols);
-    const cellSize = Math.max(40, cellW);
+    const cellH = Math.floor((vh - padT * 2 - gap * (rows - 1)) / rows);
+    const cellSize = Math.max(40, Math.min(cellW, cellH));
     return { cellSize, cols };
   },
 
