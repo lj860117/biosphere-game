@@ -1218,11 +1218,84 @@ const PRESTIGE = {
     { cost:100, n:'造价折扣', d:'所有建筑造价-20%', fn:(s)=>{s._costDiscount=(s._costDiscount||0)+0.2} },
     { cost:120, n:'终极基因', d:'初始效率+50% + 进化速度×2', fn:(s)=>{s.gEff+=0.5;s._evoSpeedMult=(s._evoSpeedMult||1)*2} },
   ],
+
+  // ===== 无限循环加成 — 13项买完后的永续追求 =====
+  // 每次购买成本递增，效果递增（但边际递减），永远买不完
+  infiniteBonuses: [
+    {
+      id: 'inf_prod',
+      n: '产能强化',
+      icon: '📈',
+      baseCost: 80,
+      costScale: 1.35,       // 每级成本 ×1.35
+      d: lv => `所有产出 +${(lv * 8)}% (当前Lv.${lv})`,
+      fn: (s, lv) => { s._prodMult = (s._prodMult || 1) * (1 + lv * 0.08); },
+    },
+    {
+      id: 'inf_eff',
+      n: '基因优化',
+      icon: '🧬',
+      baseCost: 100,
+      costScale: 1.4,
+      d: lv => `初始效率 +${(lv * 6)}% (当前Lv.${lv})`,
+      fn: (s, lv) => { s.gEff += lv * 0.06; },
+    },
+    {
+      id: 'inf_cost',
+      n: '资源回收',
+      icon: '♻️',
+      baseCost: 90,
+      costScale: 1.35,
+      d: lv => `建造费用 -${Math.min(lv * 4, 40)}% (当前Lv.${lv})`,
+      fn: (s, lv) => { s._costDiscount = (s._costDiscount || 0) + Math.min(lv * 0.04, 0.4); },
+    },
+    {
+      id: 'inf_pop',
+      n: '种群扩容',
+      icon: '🦠',
+      baseCost: 70,
+      costScale: 1.3,
+      d: lv => `人口上限 +${lv * 80} (当前Lv.${lv})`,
+      fn: (s, lv) => { s._popCapBonus = (s._popCapBonus || 0) + lv * 80; },
+    },
+    {
+      id: 'inf_belt',
+      n: '物流精通',
+      icon: '🔗',
+      baseCost: 85,
+      costScale: 1.35,
+      d: lv => `传送带效率 +${(lv * 12)}% (当前Lv.${lv})`,
+      fn: (s, lv) => { s._beltBonus = (s._beltBonus || 0) + lv * 0.12; },
+    },
+  ],
+
+  // 计算无限加成当前等级的成本
+  getInfCost(inf, lv) {
+    return Math.ceil(inf.baseCost * Math.pow(inf.costScale, lv));
+  },
+
+  // ===== 转生次数被动奖励 — 每次转生都变得更强 =====
+  // 这些效果自动应用，无需花费进化因子
+  passiveBonuses: [
+    { count: 1,  n: '轮回者', d: '初始效率 +5%', fn: s => { s.gEff += 0.05; } },
+    { count: 2,  n: '二度归来', d: '初始资源 +30%', fn: s => { s.res.glucose *= 1.3; s.res.energy *= 1.3; } },
+    { count: 3,  n: '三生万物', d: '全局产出 +10%', fn: s => { s._prodMult = (s._prodMult || 1) * 1.1; } },
+    { count: 5,  n: '五行轮转', d: '建造费用 -10%', fn: s => { s._costDiscount = (s._costDiscount || 0) + 0.1; } },
+    { count: 7,  n: '七星连珠', d: '进化速度 +30%', fn: s => { s._evoSpeedMult = (s._evoSpeedMult || 1) + 0.3; } },
+    { count: 10, n: '十世宿慧', d: '初始效率 +15% + 产出 +15%', fn: s => { s.gEff += 0.15; s._prodMult = (s._prodMult || 1) * 1.15; } },
+    { count: 15, n: '超越轮回', d: '科研时间 -20% + 人口上限 +200', fn: s => { s._techTimeMult = (s._techTimeMult || 1) * 0.8; s._popCapBonus = (s._popCapBonus || 0) + 200; } },
+    { count: 20, n: '永恒之灵', d: '全局效率 +25% + 产出 +25%', fn: s => { s.gEff += 0.25; s._prodMult = (s._prodMult || 1) * 1.25; } },
+  ],
+  // 每次转生的通用加成（叠乘）
+  prestigeCountBonus(count) {
+    // 每次转生: 全局效率 +2%（递减到 +0.5%），叠加上限 50%
+    return Math.min(count * Math.max(0.02 - count * 0.001, 0.005), 0.5);
+  },
 };
 
 // ===== GAME STATE =====
 const G = {
-  res:{}, rates:{}, grid:[], gridSize:12, gridCols:12, gridRows:12,
+  res:{}, rates:{}, grid:[], gridSize:20, gridCols:20, gridRows:20,
   pop:0, gEff:1, lEff:1, qsLv:0,
   eL:1, eP:0,
   phase:1, sel:null, paused:false, spd:1, rt:0,
@@ -1264,6 +1337,7 @@ const G = {
   prestigeCurrency: 0,
   prestigeCount: 0,
   prestigeBonuses: [], // indices of purchased bonuses
+  infiniteBonusLevels: {}, // { 'inf_prod': 3, 'inf_eff': 2, ... } 无限加成等级
   _evoSpeedMult: 1,
   _prodMult: 1,
   _techTimeMult: 1,
@@ -1275,6 +1349,8 @@ const G = {
   _powerWarningShown: false,
   // Choice event
   pendingChoice: null,
+  // Population allocation system — 菌群分工
+  popAlloc: { harvest: 34, research: 33, logistics: 33 }, // 百分比分配 (总和=100)
 
   // ===== INIT =====
   init() {
@@ -1285,6 +1361,7 @@ const G = {
     for (let k in TECHS) this.techs[k] = { done:false };
 
     this.load();           // 先加载存档（恢复 grid 数据和 gridSize）
+    this.applyPrestigeBonuses(); // 从 localStorage 恢复转生加成
     this._initPlayer();    // 初始化玩家 ID 和昵称
     this._restoreSectionStates(); // 恢复折叠状态
     this.buildUI();        // 再渲染 UI（renderGrid 会基于正确的数据）
@@ -1300,8 +1377,7 @@ const G = {
     setTimeout(() => this.refreshMiniLeaderboard(), 2000);
     // 每 60 秒自动刷新迷你排行榜
     setInterval(() => this.refreshMiniLeaderboard(), 60000);
-    // 初始加载建议列表 (延迟 3 秒)
-    setTimeout(() => this.loadSuggestions(), 3000);
+    // 初始加载建议列表已移除（功能已去掉）
     this._initTouchEvents();
     this.log('▸ 系统在线 — 微生物帝国启动', 's');
     this.log('▸ 起始资源: 50🟢葡萄糖 + 35⚡能量', 'ev');
@@ -1453,6 +1529,31 @@ const G = {
       // 初始化和每次渲染后也更新
       this._updateScrollHints = updateScrollHints;
       setTimeout(updateScrollHints, 200);
+
+      // === 帝国总览：滚动时自动折叠/展开 ===
+      const empireEl = document.getElementById('empireOverview');
+      if (empireEl) {
+        this._empireAutoCollapsed = false;   // 自动折叠标记
+        this._empireUserCollapsed = empireEl.classList.contains('collapsed'); // 用户手动折叠
+        const SCROLL_THRESHOLD = 30; // 向下滚动超过此值则折叠
+
+        dishView.addEventListener('scroll', () => {
+          const scrollY = dishView.scrollTop;
+          if (scrollY > SCROLL_THRESHOLD) {
+            // 需要折叠 — 但只在非用户手动折叠状态下操作
+            if (!empireEl.classList.contains('collapsed')) {
+              empireEl.classList.add('collapsed');
+              this._empireAutoCollapsed = true;
+            }
+          } else {
+            // 回到顶部 — 只恢复自动折叠的，用户手动折叠的不管
+            if (this._empireAutoCollapsed && !this._empireUserCollapsed) {
+              empireEl.classList.remove('collapsed');
+              this._empireAutoCollapsed = false;
+            }
+          }
+        }, { passive: true });
+      }
     }
   },
 
@@ -2145,9 +2246,9 @@ const G = {
   // === Grid ===
   // === Grid 布局 ===
   // 格子固定大小（像素），不随容器缩放 — 屏幕放不下时可滚动
-  _cellPx: 62,       // 舒适的格子尺寸（与之前 58~78 的手感一致）
-  _minCols: 8, _maxCols: 20,
-  _minRows: 6, _maxRows: 16,
+  _cellPx: 80,       // 加大格子尺寸，显示更清晰（超出时靠滚动查看）
+  _minCols: 8, _maxCols: 30,
+  _minRows: 6, _maxRows: 30,
 
   _calcGridLayout() {
     // 新策略：格子大小固定，网格行列数固定为 gridCols × gridRows
@@ -2537,8 +2638,10 @@ const G = {
             const prodEntries = Object.entries(bd.prod || {});
             if (prodEntries.length > 0 && !rateStr.includes('闲置')) {
               const bldMult = this.getUpgradeMultiplier(idx);
-              const popMult = 1 + Math.min(this.pop, this._popCap()) * 0.002;
-              const mult = this.gEff * popMult * this.lEff * bldMult * beltMult;
+              const hPop = Math.min(this.pop, this._popCap()) * (this.popAlloc.harvest / 100);
+              const popMult = 1 + hPop * 0.003 * (this._popEffMult || 1);
+              const _gProdMult = this._prodMult || 1;
+              const mult = this.gEff * popMult * this.lEff * bldMult * beltMult * _gProdMult;
               const prodParts = prodEntries.map(([res, base]) => {
                 const actual = (base * mult).toFixed(1);
                 return `<span style="color:${RES[res]?.c || bd.color}">+${actual} ${RES[res]?.icon||''} ${RES[res]?.n||res}/s</span>`;
@@ -2549,7 +2652,8 @@ const G = {
             const consEntries = Object.entries(bd.cons || {});
             if (consEntries.length > 0 && !rateStr.includes('闲置')) {
               const bldMult = this.getUpgradeMultiplier(idx);
-              const popMult = 1 + Math.min(this.pop, this._popCap()) * 0.002;
+              const hPop = Math.min(this.pop, this._popCap()) * (this.popAlloc.harvest / 100);
+              const popMult = 1 + hPop * 0.003 * (this._popEffMult || 1);
               const mult = this.gEff * popMult * this.lEff * bldMult * beltMult;
               const consParts = consEntries.map(([res, base]) => {
                 const actual = (base * mult).toFixed(1);
@@ -4130,7 +4234,7 @@ const G = {
     if (!listEl) return;
 
     if (!entries || entries.length === 0) {
-      listEl.innerHTML = '<div style="text-align:center;color:var(--dim);font-size:0.62em;padding:4px 0">暂无数据</div>';
+      listEl.innerHTML = '<span style="color:var(--dim);font-size:0.58em">暂无数据</span>';
       return;
     }
 
@@ -4141,12 +4245,12 @@ const G = {
     entries.forEach((e, i) => {
       const isMe = e.id === myId;
       const { color: rankColor } = this._scoreRank(e.score);
-      html += `<div class="mini-lb-row ${isMe ? 'mini-me' : ''}">
-        <div class="mini-lb-medal">${medals[i]}</div>
-        <div class="mini-lb-name" ${isMe ? 'style="color:var(--cyan)"' : ''}>${this._escHtml(e.name || '???')}${isMe ? '<span style="font-size:0.8em;color:var(--cyan)"> (我)</span>' : ''}</div>
-        <div class="mini-lb-score" style="color:${rankColor}">${(e.score || 0).toLocaleString()}</div>
-        <div class="mini-lb-grade" style="color:${rankColor};background:${rankColor}15;border:1px solid ${rankColor}30">${e.rank || 'E'}</div>
-      </div>`;
+      html += `<span class="mini-lb-entry" style="display:inline-flex;align-items:center;gap:4px;${isMe ? 'color:var(--cyan)' : ''}">
+        <span>${medals[i]}</span>
+        <span style="max-width:80px;overflow:hidden;text-overflow:ellipsis">${this._escHtml(e.name || '???')}</span>
+        <span style="color:${rankColor};font-weight:600;font-family:'Share Tech Mono',monospace">${(e.score || 0).toLocaleString()}</span>
+        <span style="color:${rankColor};font-size:0.85em;padding:1px 4px;border-radius:3px;background:${rankColor}15;border:1px solid ${rankColor}30">${e.rank || 'E'}</span>
+      </span>`;
     });
 
     listEl.innerHTML = html;
@@ -4359,6 +4463,84 @@ const G = {
     return 50 + this.totalBuildings() * 40 + (this.phase - 1) * 100 + (this._popCapBonus || 0);
   },
 
+  // ===== 菌群分工系统 =====
+  // 调整菌群分工比例（type = 'harvest'|'research'|'logistics', delta = ±5）
+  adjustPopAlloc(type, delta) {
+    // 人口不足3时禁止调整分工
+    if (this.pop < 3) return;
+    const keys = ['harvest', 'research', 'logistics'];
+    const others = keys.filter(k => k !== type);
+    const newVal = Math.max(0, Math.min(100, this.popAlloc[type] + delta));
+    const actualDelta = newVal - this.popAlloc[type];
+    if (actualDelta === 0) return;
+
+    this.popAlloc[type] = newVal;
+    // 从其他两项中按比例扣减/增加
+    const otherTotal = others.reduce((s, k) => s + this.popAlloc[k], 0);
+    if (otherTotal > 0) {
+      let remaining = -actualDelta;
+      for (const k of others) {
+        const share = this.popAlloc[k] / otherTotal;
+        const change = Math.round(remaining * share);
+        this.popAlloc[k] = Math.max(0, this.popAlloc[k] + change);
+      }
+    }
+    // 修正舍入误差，确保总和 = 100
+    const total = keys.reduce((s, k) => s + this.popAlloc[k], 0);
+    if (total !== 100) {
+      // 把差额加到/减到当前非零的最大项上
+      const diff = 100 - total;
+      const maxKey = keys.reduce((a, b) => this.popAlloc[a] >= this.popAlloc[b] ? a : b);
+      this.popAlloc[maxKey] += diff;
+    }
+    this.updatePopAllocUI();
+    this.save(true);
+  },
+
+  // 菌群分工预设
+  setPopAllocPreset(preset) {
+    if (this.pop < 3) return;
+    switch (preset) {
+      case 'balanced': this.popAlloc = { harvest: 34, research: 33, logistics: 33 }; break;
+      case 'harvest':  this.popAlloc = { harvest: 60, research: 20, logistics: 20 }; break;
+      case 'research': this.popAlloc = { harvest: 20, research: 60, logistics: 20 }; break;
+      case 'logistics':this.popAlloc = { harvest: 20, research: 20, logistics: 60 }; break;
+    }
+    this.updatePopAllocUI();
+    this.save(true);
+  },
+
+  // 获取菌群分工加成描述
+  getPopAllocBonuses() {
+    const cap = this._popCap();
+    const pop = Math.min(this.pop, cap);
+    const popEffMult = this._popEffMult || 1;
+    const harvestPop = pop * (this.popAlloc.harvest / 100);
+    const researchPop = pop * (this.popAlloc.research / 100);
+    const logisticsPop = pop * (this.popAlloc.logistics / 100);
+    return {
+      harvest: { pop: Math.floor(harvestPop), bonus: (harvestPop * 0.003 * popEffMult * 100).toFixed(1) },
+      research: { pop: Math.floor(researchPop), bonus: (researchPop * 0.002 * 100).toFixed(1) },
+      logistics: { pop: Math.floor(logisticsPop), bonus: (logisticsPop * 0.0005 * 100).toFixed(1) },
+    };
+  },
+
+  updatePopAllocUI() {
+    const bonuses = this.getPopAllocBonuses();
+    const els = {
+      harvest: document.getElementById('allocHarvest'),
+      research: document.getElementById('allocResearch'),
+      logistics: document.getElementById('allocLogistics'),
+    };
+    for (const [key, el] of Object.entries(els)) {
+      if (!el) continue;
+      el.querySelector('.alloc-pct').textContent = this.popAlloc[key] + '%';
+      el.querySelector('.alloc-bar-fill').style.width = this.popAlloc[key] + '%';
+      const info = el.querySelector('.alloc-info');
+      if (info) info.textContent = `${bonuses[key].pop}菌 +${bonuses[key].bonus}%`;
+    }
+  },
+
   // 递增造价：已有N个同类建筑 → 造价 = 基础造价 × COST_SCALE^N
   scaledCost(key) {
     const bd = BLDS[key];
@@ -4412,7 +4594,10 @@ const G = {
 
       const bldMult = this.getUpgradeMultiplier(idx); // building level multiplier
       const beltMult = this.getBeltMultiplierForBuilding(idx); // conveyor belt efficiency
-      const popMult = 1 + Math.min(this.pop, this._popCap()) * 0.002; // 人口加成受上限限制
+      // 菌群分工系统：采集菌分配到的人口提升产出
+      const popEffMult = this._popEffMult || 1;
+      const harvestPop = Math.min(this.pop, this._popCap()) * (this.popAlloc.harvest / 100);
+      const popMult = 1 + harvestPop * 0.003 * popEffMult; // 采集人口加成（比旧版0.002更高，但需要主动分配）
       // 科技树分支加成 — 特定建筑类型的额外乘数
       let techBonus = 1;
       let techConsPenalty = 1;
@@ -4426,7 +4611,8 @@ const G = {
       // 邻接加成 — 相邻建筑的空间协同效应
       const adjResult = this.getAdjacencyBonus(idx);
       const adjBonus = 1 + adjResult.bonus;
-      const mult = this.gEff * popMult * bldMult * beltMult * techBonus * adjBonus * this._foodPowerLevel;
+      const globalProdMult = this._prodMult || 1; // 转生产出加成
+      const mult = this.gEff * popMult * bldMult * beltMult * techBonus * adjBonus * this._foodPowerLevel * globalProdMult;
       for (let k in bd.prod) r[k] = (r[k]||0) + bd.prod[k] * mult;
       // 【修复】消耗乘建筑等级和传送带效率（升级建筑=吞吐量同步提升）
       const consMult = bldMult * beltMult * techConsPenalty;
@@ -4435,7 +4621,10 @@ const G = {
 
     // 【修复】物流效率(lEff)只加成正值(产出)，不增加消耗
     const transportRate = 0.10 + (this._transportBonus || 0); // 自适应物流科技加成
-    this.lEff = 1 + totalTransport * transportRate;
+    // 物流人口加成：分配到物流的人口提升传送带整体效率
+    const logisticsPop = Math.min(this.pop, this._popCap()) * (this.popAlloc.logistics / 100);
+    const logisticsPopBonus = logisticsPop * 0.0005; // 每个物流人口 +0.05% 物流效率
+    this.lEff = 1 + totalTransport * transportRate + logisticsPopBonus;
     for (let k in r) {
       if (r[k] > 0) r[k] *= this.lEff;
       // 代谢回路减少消耗
@@ -4485,7 +4674,10 @@ const G = {
   tickResearch() {
     if (!this.rTech) return;
     const t = TECHS[this.rTech];
-    this.rProg += 1 * (this._techTimeMult ? (1 / this._techTimeMult) : 1);  // 转生加成加速研究
+    // 研究人口加速：分配到研究的人口越多，研究越快
+    const researchPop = Math.min(this.pop, this._popCap()) * (this.popAlloc.research / 100);
+    const researchPopBonus = 1 + researchPop * 0.002; // 每个研究人口 +0.2% 研究速度
+    this.rProg += 1 * (this._techTimeMult ? (1 / this._techTimeMult) : 1) * researchPopBonus;  // 转生加成 + 人口加速
     const pct = Math.min(this.rProg / t.time * 100, 100);
     const fill = document.getElementById('techFill-' + this.rTech);
     if (fill) fill.style.width = pct + '%';
@@ -4541,11 +4733,13 @@ const G = {
   },
 
   // ===== EVOLUTION =====
-  // 进化需求随等级递增，低级只需DNA，高级加入蛋白质
+  // 进化成本：超线性增长，后期需要指数级更多的资源
+  // Lv1→22, Lv2→35, Lv3→52, Lv4→76, Lv5→110, Lv6→158... (约 ×1.45 增长)
   evoCost() {
     const lv = this.eL;
-    const cost = { dna: Math.ceil(12 + lv * 10) }; // Lv1→22, Lv2→32, Lv3→42...
-    if (lv >= 2) cost.protein = Math.ceil(10 + (lv - 2) * 15); // Lv2→10, Lv3→25, Lv4→40...
+    const cost = { dna: Math.ceil(12 + 10 * Math.pow(lv, 1.6)) };
+    if (lv >= 2) cost.protein = Math.ceil(8 + 7 * Math.pow(lv - 1, 1.5));
+    if (lv >= 4) cost.biomass = Math.ceil(5 * Math.pow(lv - 3, 1.4)); // Lv4+ 需要生物质
     return cost;
   },
 
@@ -4571,6 +4765,10 @@ const G = {
     let bonus = this.evoBonus();
     // 进化催化剂科技：加成翻倍
     bonus *= (this._evoBoostMult || 1);
+    // 研究人口加成进化效率奖励
+    const researchPop = Math.min(this.pop, this._popCap()) * (this.popAlloc.research / 100);
+    const researchBoost = 1 + researchPop * 0.001; // 每个研究人口 +0.1% 进化奖励
+    bonus *= researchBoost;
     this.eL++;
     // 【修复】效率改为加法叠加（不再是乘法爆炸）
     this.gEff += bonus;
@@ -4914,9 +5112,13 @@ const G = {
           this._foodPowerLevel = 1.0;
         }
 
-        // QS信号自然衰减 — 需要持续运转QS塔来维持高水位（受信号增幅器科技影响）
+        // QS信号自然衰减 — 按比例衰减（每秒扣当前值的3%）+ 最低衰减0.02/s
+        // 高QS时衰减显著，低QS时衰减平缓。受信号增幅器科技影响
         if ((this.res.qs || 0) > 0) {
-          const qsDecay = 0.08 * (this._qsDecayMult || 1);
+          const decayMult = this._qsDecayMult || 1;
+          const proportionalDecay = this.res.qs * 0.03 * decayMult;
+          const minDecay = 0.02 * decayMult;
+          const qsDecay = Math.max(proportionalDecay, minDecay);
           this.res.qs = Math.max(0, this.res.qs - qsDecay);
         }
 
@@ -4928,12 +5130,32 @@ const G = {
 
       // ===== 随机事件 — 独立于加速倍率，每真实秒只掷骰一次 =====
       // Random events (enhanced with more events + choice events)
+      // 事件奖励随阶段缩放：P1→×1, P2→×1.5, P3→×2.5, P4→×4, P5→×6
       if (Math.random() < 0.006) {
         const allEvents = [...EVENTS, ...EVENTS_EXTRA].filter(e => e.phase <= this.phase);
         if (allEvents.length) {
           const ev = allEvents[Math.floor(Math.random() * allEvents.length)];
+          // 阶段缩放：事件定义的阶段越低于当前阶段，奖励倍率越高
+          const phaseDiff = this.phase - (ev.phase || 1);
+          const eventScale = 1 + phaseDiff * 0.8; // P1事件在P4 = ×3.4倍
+          // 保存原始资源量，应用缩放后的事件
+          const origRes = {};
+          for (let k in this.res) origRes[k] = this.res[k];
+          const origPop = this.pop;
+          const origEff = this.gEff;
           ev.fn(this);
-          this.log('▸ ' + ev.n + ' — ' + ev.d, ev.ty === 'e' ? 'e' : ev.ty === 'w' ? 'w' : 's');
+          // 对资源增量应用缩放（仅放大增益，不放大惩罚）
+          if (ev.ty !== 'e' && eventScale > 1) {
+            for (let k in this.res) {
+              const delta = this.res[k] - origRes[k];
+              if (delta > 0) this.res[k] = origRes[k] + delta * eventScale;
+            }
+            const popDelta = this.pop - origPop;
+            if (popDelta > 0) this.pop = origPop + popDelta * eventScale;
+            // 效率加成不缩放（避免效率膨胀）
+          }
+          const scaleTag = eventScale > 1.5 ? ` (×${eventScale.toFixed(1)})` : '';
+          this.log('▸ ' + ev.n + ' — ' + ev.d + scaleTag, ev.ty === 'e' ? 'e' : ev.ty === 'w' ? 'w' : 's');
           if (ev.ty === 'e') SFX.eventBad();
           else SFX.eventGood();
           if (ev.ty === 'e' || ev.ty === 'ev') {
@@ -5253,7 +5475,7 @@ const G = {
             // 水平间隙（右侧）
             if (c < SZ - 1) {
               const gapX = cx + cw;
-              const gapW = 10; // gap size
+              const gapW = 16; // gap size (与CSS .grid gap一致)
               // 通道底纹 — 极淡的凹槽
               bgCtx.fillStyle = 'rgba(8,14,26,0.4)';
               bgCtx.fillRect(gapX, cy + ch * 0.15, gapW, ch * 0.7);
@@ -5273,7 +5495,7 @@ const G = {
             // 垂直间隙（下方）
             if (r < ROWS - 1) {
               const gapY = cy + ch;
-              const gapH = 10;
+              const gapH = 16;
               bgCtx.fillStyle = 'rgba(8,14,26,0.4)';
               bgCtx.fillRect(cx + cw * 0.15, gapY, cw * 0.7, gapH);
               bgCtx.strokeStyle = 'rgba(20,36,55,0.2)';
@@ -5802,7 +6024,8 @@ const G = {
               const actualFromIdx = (fromGrid && fromGrid.type === flow.from) ? belt.fi : belt.ti;
               const bldMult = this.getUpgradeMultiplier(actualFromIdx);
               const beltMult2 = this.getBeltMultiplierForBuilding(actualFromIdx);
-              const fullMult = this.gEff * (1 + Math.min(this.pop, this._popCap()) * 0.002) * bldMult * beltMult2 * this.lEff;
+              const _hPop = Math.min(this.pop, this._popCap()) * (this.popAlloc.harvest / 100);
+              const fullMult = this.gEff * (1 + _hPop * 0.003 * (this._popEffMult || 1)) * bldMult * beltMult2 * this.lEff * (this._prodMult || 1);
               const qsBoost = this.qsLv > 0 ? (1 + Math.min(this.qsLv * 0.03, 0.6)) : 1;
               const baseRate = fromBd.prod[flow.res] * fullMult * qsBoost;
               // 计算该 from 建筑同种资源输出到几条传送带
@@ -5829,7 +6052,8 @@ const G = {
                 if (rc === targetColor) {
                   const bldMult = this.getUpgradeMultiplier(belt.fi);
                   const beltMult2 = this.getBeltMultiplierForBuilding(belt.fi);
-                  const fullMult = this.gEff * (1 + Math.min(this.pop, this._popCap()) * 0.002) * bldMult * beltMult2 * this.lEff;
+                  const _hPop2 = Math.min(this.pop, this._popCap()) * (this.popAlloc.harvest / 100);
+                  const fullMult = this.gEff * (1 + _hPop2 * 0.003 * (this._popEffMult || 1)) * bldMult * beltMult2 * this.lEff * (this._prodMult || 1);
                   const qsBoost = this.qsLv > 0 ? (1 + Math.min(this.qsLv * 0.03, 0.6)) : 1;
                   flowRate = fiBd.prod[res] * fullMult * qsBoost;
                   found = true;
@@ -5844,7 +6068,8 @@ const G = {
                 if (rc === targetColor) {
                   const bldMult = this.getUpgradeMultiplier(belt.ti);
                   const beltMult2 = this.getBeltMultiplierForBuilding(belt.ti);
-                  const fullMult = this.gEff * (1 + Math.min(this.pop, this._popCap()) * 0.002) * bldMult * beltMult2 * this.lEff;
+                  const _hPop3 = Math.min(this.pop, this._popCap()) * (this.popAlloc.harvest / 100);
+                  const fullMult = this.gEff * (1 + _hPop3 * 0.003 * (this._popEffMult || 1)) * bldMult * beltMult2 * this.lEff * (this._prodMult || 1);
                   const qsBoost = this.qsLv > 0 ? (1 + Math.min(this.qsLv * 0.03, 0.6)) : 1;
                   flowRate = tiBd.prod[res] * fullMult * qsBoost;
                   break;
@@ -6297,24 +6522,45 @@ const G = {
     }
 
     document.getElementById('statPop').textContent = Math.floor(this.pop) + '/' + this._popCap();
-    // 显示人口食物消耗
+    // 显示人口食物消耗 — 始终显示
     const popFoodRow = document.getElementById('rowPopFood');
     if (popFoodRow) {
       if (this.pop > 0) {
-        popFoodRow.style.display = 'flex';
         const foodCost = (this.pop * 0.005).toFixed(1);
         document.getElementById('statPopFood').textContent = `-${foodCost}🟢/s`;
         document.getElementById('statPopFood').style.color = this.res.glucose >= this.pop * 0.005 ? '#8a6a3a' : '#ef4444';
       } else {
-        popFoodRow.style.display = 'none';
+        document.getElementById('statPopFood').textContent = '—';
+        document.getElementById('statPopFood').style.color = 'var(--dim)';
       }
     }
-    // 功率水平指示器
+    // 菌群分工面板 — 始终显示，pop<3 时禁用操作
+    const allocPanel = document.getElementById('popAllocPanel');
+    if (allocPanel) {
+      this.updatePopAllocUI();
+      // pop < 3 时添加 disabled 样式（3人是最少能每方向1人的阈值）
+      const allocChannels = allocPanel.querySelector('.csb-alloc-channels');
+      const allocPresets = allocPanel.querySelector('.alloc-presets');
+      if (allocChannels) {
+        if (this.pop < 3) {
+          allocChannels.classList.add('alloc-disabled');
+          if (allocPresets) allocPresets.classList.add('alloc-presets-disabled');
+        } else {
+          allocChannels.classList.remove('alloc-disabled');
+          if (allocPresets) allocPresets.classList.remove('alloc-presets-disabled');
+        }
+      }
+    }
+    // 转生入口按钮 — 满足条件时显示
+    const prestigeEntryBtn = document.getElementById('prestigeEntryBtn');
+    if (prestigeEntryBtn) {
+      prestigeEntryBtn.style.display = this.canPrestige() ? 'inline-block' : 'none';
+    }
+    // 功率水平指示器 — 始终显示
     const powerRow = document.getElementById('rowPowerLevel');
     const powerEl = document.getElementById('statPowerLevel');
     if (powerRow && powerEl) {
       if (this.pop > 0) {
-        powerRow.style.display = 'flex';
         const pct = Math.round(this._foodPowerLevel * 100);
         powerEl.textContent = pct + '%';
         if (pct >= 100) {
@@ -6325,7 +6571,8 @@ const G = {
           powerEl.style.color = '#ef4444';
         }
       } else {
-        powerRow.style.display = 'none';
+        powerEl.textContent = '—';
+        powerEl.style.color = 'var(--dim)';
       }
     }
     // 全局功率危机视觉效果
@@ -6447,6 +6694,11 @@ const G = {
     if (!sec) return;
     sec.classList.toggle('collapsed');
     SFX.click();
+    // 帝国总览：同步手动折叠标记
+    if (secId === 'empireOverview') {
+      this._empireUserCollapsed = sec.classList.contains('collapsed');
+      this._empireAutoCollapsed = false; // 手动操作后清除自动标记
+    }
     // 记住折叠状态
     try {
       const state = JSON.parse(localStorage.getItem('bioSphereSecState') || '{}');
@@ -6472,12 +6724,23 @@ const G = {
     const hasBuilding = this.totalBuildings() > 0;
     const evoLv2 = this.eL >= 2;
 
-    // 1. 菌落状态：建造第一个建筑后解锁
-    this._unlockSection('secColony', hasBuilding, '🔓 菌落状态 已解锁');
+    // 1. 帝国总览面板 — 始终显示（不再依赖建筑数量）
+    // colonyStatusBar 现在是隐藏的兼容占位符，不需要操作
+    // empireOverview 始终可见，无需条件控制
 
-    // 2. 排行榜 + 迷你排行榜：进化 >= Lv.2
-    this._unlockEl('miniLeaderboard', evoLv2);
-    this._unlockEl('lbBtnWrap', evoLv2);
+    // 2. 排行榜 + 迷你排行榜：进化 >= Lv.2 直接用 display 控制
+    const miniLb = document.getElementById('miniLeaderboard');
+    const lbWrap = document.getElementById('lbBtnWrap');
+    const lbHint = document.getElementById('lbLockedHint');
+    if (evoLv2) {
+      if (miniLb) miniLb.style.display = '';
+      if (lbWrap) lbWrap.style.display = '';
+      if (lbHint) lbHint.classList.add('hidden');
+    } else {
+      if (miniLb) miniLb.style.display = 'none';
+      if (lbWrap) lbWrap.style.display = 'none';
+      if (lbHint) lbHint.classList.remove('hidden');
+    }
 
     // 3. 进化详情：进化 >= Lv.2 或者已经研究过纯培养技术
     const showEvo = evoLv2 || (this.techs.pureCulture && this.techs.pureCulture.done);
@@ -7142,6 +7405,8 @@ const G = {
         _claimedMilestones: this._claimedMilestones || {},
         _everLowPower: this._everLowPower || false,
         _recoveredFromCrisis: this._recoveredFromCrisis || false,
+        // Population allocation
+        popAlloc: this.popAlloc,
       };
       localStorage.setItem('bioSphereV3', JSON.stringify(s));
       if (!silent) this.log('▸ 已保存', 's');
@@ -7240,6 +7505,8 @@ const G = {
       this._claimedMilestones = s._claimedMilestones || {};
       this._everLowPower = s._everLowPower || false;
       this._recoveredFromCrisis = s._recoveredFromCrisis || false;
+      // Population allocation
+      if (s.popAlloc) this.popAlloc = s.popAlloc;
       // Re-apply milestone buffs
       const achieveCount = Object.keys(this.achievements).length;
       for (const ms of ACHIEVE_MILESTONES) {
@@ -7262,6 +7529,11 @@ const G = {
           }
         }
         this.beltLevels = newBeltLevels;
+      }
+
+      // 旧存档自动迁移到 20×20（保留建筑位置）
+      if (this.gridCols < 20 || this.gridRows < 20) {
+        this._resizeGrid(Math.max(this.gridCols, 20), Math.max(this.gridRows, 20));
       }
 
       this.buildUI();
@@ -8115,7 +8387,27 @@ const G = {
     document.getElementById('prestigeCurrent').textContent = `当前: ${this.prestigeCurrency} ${PRESTIGE.currencyIcon}`;
     document.getElementById('prestigeTotal').textContent = `转生次数: ${this.prestigeCount}`;
 
-    // Render bonuses
+    // === 被动奖励预览 ===
+    const passiveEl = document.getElementById('prestigePassiveList');
+    if (passiveEl) {
+      let passiveHTML = '';
+      const pcBonus = PRESTIGE.prestigeCountBonus(this.prestigeCount);
+      if (this.prestigeCount > 0) {
+        passiveHTML += `<div style="padding:4px 8px;margin:2px 0;border-radius:4px;background:rgba(168,85,247,0.08);border:1px solid rgba(168,85,247,0.2);font-size:0.75em;color:var(--purple)">
+          🌀 轮回之力: 全局效率 +${(pcBonus * 100).toFixed(1)}% (${this.prestigeCount}次转生累计)</div>`;
+      }
+      for (const pb of PRESTIGE.passiveBonuses) {
+        const met = this.prestigeCount >= pb.count;
+        passiveHTML += `<div style="padding:4px 8px;margin:2px 0;border-radius:4px;font-size:0.75em;
+          background:${met ? 'rgba(168,85,247,0.06)' : 'transparent'};
+          border:1px solid ${met ? 'rgba(168,85,247,0.15)' : 'var(--color-panel-border)'};
+          color:${met ? 'var(--purple)' : 'var(--color-muted-dark)'}">
+          ${met ? '✓ ' : `🔒${pb.count}次 `}${pb.n}: ${pb.d}</div>`;
+      }
+      passiveEl.innerHTML = passiveHTML;
+    }
+
+    // === 固定加成列表 ===
     const list = document.getElementById('prestigeBonusList');
     list.innerHTML = '';
     PRESTIGE.bonuses.forEach((b, i) => {
@@ -8139,10 +8431,38 @@ const G = {
       list.appendChild(div);
     });
 
+    // === 无限循环加成 ===
+    const allBought = PRESTIGE.bonuses.every((b, i) => this.prestigeBonuses.includes(i));
+    const infEl = document.getElementById('prestigeInfiniteList');
+    if (infEl) {
+      if (!allBought) {
+        infEl.innerHTML = '<div style="font-size:0.7em;color:var(--color-muted-dark);text-align:center;padding:8px">🔒 购买全部固定加成后解锁</div>';
+      } else {
+        let infHTML = '';
+        for (const inf of PRESTIGE.infiniteBonuses) {
+          const lv = this.infiniteBonusLevels[inf.id] || 0;
+          const cost = PRESTIGE.getInfCost(inf, lv);
+          const canBuy = this.prestigeCurrency >= cost;
+          infHTML += `<div style="padding:6px 8px;margin:3px 0;border-radius:4px;display:flex;justify-content:space-between;align-items:center;
+            background:${lv > 0 ? 'rgba(234,179,8,0.06)' : 'var(--color-panel-bg)'};
+            border:1px solid ${canBuy ? 'rgba(234,179,8,0.3)' : 'var(--color-panel-border)'};
+            cursor:${canBuy ? 'pointer' : 'default'}" onclick="${canBuy ? `G.buyInfiniteBonus('${inf.id}')` : ''}">
+            <div>
+              <div style="font-size:0.85em;font-weight:700;color:var(--bright)">${inf.icon} ${inf.n} <span style="color:var(--yellow);font-size:0.8em">Lv.${lv}</span></div>
+              <div style="font-size:0.7em;color:var(--dim)">${inf.d(lv + 1)}</div>
+            </div>
+            <div style="font-size:0.75em;font-weight:700;color:${canBuy ? 'var(--yellow)' : 'var(--color-muted-dark)'}">${cost}${PRESTIGE.currencyIcon}</div>
+          </div>`;
+        }
+        infEl.innerHTML = infHTML;
+      }
+    }
+
     const canP = this.canPrestige();
     document.getElementById('prestigeBtn').disabled = !canP;
     document.getElementById('prestigeBtn').style.opacity = canP ? '1' : '0.3';
     pop.classList.add('show');
+    this._showBackdrop();
   },
 
   buyPrestigeBonus(idx) {
@@ -8156,10 +8476,31 @@ const G = {
     this.save(true);
   },
 
+  buyInfiniteBonus(infId) {
+    const inf = PRESTIGE.infiniteBonuses.find(i => i.id === infId);
+    if (!inf) return;
+    const lv = this.infiniteBonusLevels[infId] || 0;
+    const cost = PRESTIGE.getInfCost(inf, lv);
+    if (this.prestigeCurrency < cost) return;
+    this.prestigeCurrency -= cost;
+    this.infiniteBonusLevels[infId] = lv + 1;
+    this.log(`🌀 无限加成升级: ${inf.n} → Lv.${lv + 1}`, 's');
+    SFX.researchDone();
+    this.showPrestigePanel(); // refresh
+    this.save(true);
+  },
+
   doPrestige() {
     if (!this.canPrestige()) return;
     const gain = this.getPrestigeGain();
-    if (!confirm(`确定要转生？\n\n获得 +${gain} ${PRESTIGE.currencyIcon}${PRESTIGE.currencyName}\n\n所有进度将重置（转生加成和货币保留）`)) return;
+    // 显示更丰富的转生信息
+    const nextCount = this.prestigeCount + 1;
+    let extraInfo = '';
+    const nextPassive = PRESTIGE.passiveBonuses.find(pb => pb.count === nextCount);
+    if (nextPassive) extraInfo = `\n🌟 新被动解锁: ${nextPassive.n} — ${nextPassive.d}`;
+    const pcBonus = PRESTIGE.prestigeCountBonus(nextCount);
+    extraInfo += `\n🌀 轮回之力: 全局效率 +${(pcBonus * 100).toFixed(1)}%`;
+    if (!confirm(`确定要转生？\n\n获得 +${gain} ${PRESTIGE.currencyIcon}${PRESTIGE.currencyName}${extraInfo}\n\n所有进度将重置（转生加成和货币保留）`)) return;
 
     this.prestigeCurrency += gain;
     this.prestigeCount++;
@@ -8169,6 +8510,7 @@ const G = {
       pc: this.prestigeCurrency,
       pcount: this.prestigeCount,
       pbonuses: [...this.prestigeBonuses],
+      infLevels: { ...this.infiniteBonusLevels },
     };
     localStorage.removeItem('bioSphereV3');
     localStorage.setItem('bioSpherePrestige', JSON.stringify(pData));
@@ -8178,6 +8520,7 @@ const G = {
 
   closePrestige() {
     document.getElementById('prestigePopup')?.classList.remove('show');
+    this._hideBackdrop();
   },
 
   // Apply prestige bonuses on load
@@ -8189,15 +8532,33 @@ const G = {
       this.prestigeCurrency = pData.pc || 0;
       this.prestigeCount = pData.pcount || 0;
       this.prestigeBonuses = pData.pbonuses || [];
+      this.infiniteBonusLevels = pData.infLevels || {};
 
-      // Apply owned bonuses
+      // Apply owned fixed bonuses
       for (const idx of this.prestigeBonuses) {
         const b = PRESTIGE.bonuses[idx];
         if (b && b.fn) b.fn(this);
       }
 
+      // Apply infinite bonuses
+      for (const inf of PRESTIGE.infiniteBonuses) {
+        const lv = this.infiniteBonusLevels[inf.id] || 0;
+        if (lv > 0) inf.fn(this, lv);
+      }
+
+      // Apply prestige count passive bonuses
+      for (const pb of PRESTIGE.passiveBonuses) {
+        if (this.prestigeCount >= pb.count) pb.fn(this);
+      }
+
+      // Apply per-prestige cumulative bonus
+      const pcBonus = PRESTIGE.prestigeCountBonus(this.prestigeCount);
+      if (pcBonus > 0) this.gEff += pcBonus;
+
       if (this.prestigeCount > 0) {
         this.log(`🌀 转生加成已应用 (第${this.prestigeCount}世)`, 'ev');
+        const pcPct = (pcBonus * 100).toFixed(1);
+        if (pcBonus > 0) this.log(`🌀 轮回之力: 全局效率 +${pcPct}%`, 'ev');
         document.querySelector('.topbar')?.classList.add('has-prestige');
       }
     } catch(e){}

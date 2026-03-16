@@ -512,17 +512,17 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 .dish-env{display:flex;gap:8px;font-size:0.85em}
 .dish-env span{color:var(--dim)}
 .dish-env .val{font-family:'Orbitron',monospace;color:var(--color-info)}
-.dish-view{flex:1;position:relative;overflow:auto;scrollbar-width:thin;scrollbar-color:rgba(6,214,160,0.3) transparent}
-.dish-view::-webkit-scrollbar{width:6px;height:6px}
-.dish-view::-webkit-scrollbar-track{background:transparent}
-.dish-view::-webkit-scrollbar-thumb{background:rgba(6,214,160,0.3);border-radius:3px}
-.dish-view::-webkit-scrollbar-thumb:hover{background:rgba(6,214,160,0.5)}
+.dish-view{flex:1;position:relative;overflow:auto;scrollbar-width:thin;scrollbar-color:rgba(6,214,160,0.35) transparent}
+.dish-view::-webkit-scrollbar{width:8px;height:8px}
+.dish-view::-webkit-scrollbar-track{background:rgba(0,0,0,0.15);border-radius:4px}
+.dish-view::-webkit-scrollbar-thumb{background:rgba(6,214,160,0.35);border-radius:4px}
+.dish-view::-webkit-scrollbar-thumb:hover{background:rgba(6,214,160,0.55)}
 .dish-view::-webkit-scrollbar-corner{background:transparent}
 .dish-scroll-inner{position:relative;min-height:100%;width:fit-content;min-width:100%}
 #bgCanvas,#partCanvas{position:absolute;top:0;left:0;width:100%;pointer-events:none}
 #bgCanvas{z-index:0}#partCanvas{z-index:5}
 .grid{
-  position:relative;display:grid;gap:10px;padding:10px;z-index:2;
+  position:relative;display:grid;gap:16px;padding:16px 24px;z-index:2;
   justify-content:center;align-content:start;touch-action:manipulation;
   width:fit-content;min-width:100%;
 }
@@ -580,11 +580,11 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 }
 
 /* 滚动提示渐变阴影 — 网格超出可视区域时在边缘显示 */
-.dish-view.can-scroll-right::after{
+.dish-view.can-scroll-right:not(.scrolled-right)::after{
   content:'';position:absolute;right:0;top:0;bottom:0;width:24px;z-index:20;pointer-events:none;
   background:linear-gradient(to right,transparent,rgba(6,214,160,0.08) 40%,rgba(6,214,160,0.15));
 }
-.dish-view.can-scroll-down::before{
+.dish-view.can-scroll-down:not(.scrolled-down)::before{
   content:'';position:absolute;bottom:0;left:0;right:0;height:24px;z-index:20;pointer-events:none;
   background:linear-gradient(to bottom,transparent,rgba(6,214,160,0.08) 40%,rgba(6,214,160,0.15));
 }
@@ -1140,80 +1140,160 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
   color:var(--purple);cursor:default;opacity:0.8;
 }
 
-/* === 游戏修改建议栏 === */
-.suggestion-bar{
+/* === 帝国总览面板 — 左右两栏常驻布局 === */
+.empire-overview{
   background:linear-gradient(135deg,rgba(10,16,30,0.85),rgba(8,14,26,0.9));
-  border:1px solid rgba(100,120,160,0.15);border-radius:6px;
+  border:1px solid rgba(6,214,160,0.15);border-radius:6px;
   margin:6px 8px 4px;padding:0;overflow:hidden;
-  transition:all 0.3s ease;
+  transition:all 0.3s ease;flex-shrink:0;
 }
-.suggestion-header{
-  display:flex;align-items:center;gap:6px;padding:6px 10px;
+.empire-overview-header{
+  display:flex;align-items:center;gap:6px;padding:5px 10px;
   cursor:pointer;user-select:none;
-  border-bottom:1px solid rgba(100,120,160,0.08);
+  border-bottom:1px solid rgba(6,214,160,0.08);
 }
-.suggestion-header:hover{background:rgba(100,120,160,0.04)}
-.suggestion-icon{font-size:0.95em;display:inline-block;animation:suggIconGlow 3.5s ease-in-out infinite}
-@keyframes suggIconGlow{
-  0%,100%{opacity:0.25;filter:brightness(0.5);transform:scale(0.92)}
-  50%{opacity:0.7;filter:brightness(1) drop-shadow(0 0 3px rgba(255,220,80,0.25));transform:scale(1.05)}
-}
-.suggestion-title{
-  font-family:'Orbitron',monospace;font-size:0.72em;color:rgba(160,180,210,0.6);
+.empire-overview-header:hover{background:rgba(6,214,160,0.04)}
+.empire-overview-icon{font-size:0.95em;display:inline-block}
+.empire-overview-title{
+  font-family:'Orbitron',monospace;font-size:0.72em;color:rgba(6,214,160,0.6);
   letter-spacing:1.5px;text-transform:uppercase;
 }
-.suggestion-toggle{
+.colony-status-toggle{
   margin-left:auto;background:none;border:none;color:rgba(160,180,210,0.4);
   cursor:pointer;font-size:0.9em;line-height:1;padding:0 2px;
   transition:transform 0.2s;font-family:monospace;
 }
-.suggestion-bar.collapsed .suggestion-body{display:none}
-.suggestion-bar.collapsed .suggestion-toggle{transform:rotate(-90deg)}
-.suggestion-bar.collapsed .suggestion-icon{animation:none;opacity:0.3;filter:brightness(0.5)}
-.suggestion-body{padding:8px 10px 10px}
-.suggestion-input-row{display:flex;gap:6px;margin-bottom:8px}
-.suggestion-input{
-  flex:1;background:rgba(6,12,24,0.7);border:1px solid rgba(100,120,160,0.15);
-  border-radius:4px;padding:5px 8px;font-size:0.7em;color:#a0b8d0;
-  font-family:'Share Tech Mono',monospace;outline:none;
-  transition:border-color 0.2s;
+.empire-overview .empire-overview-body{
+  max-height:600px;overflow:hidden;
+  transition:max-height 0.35s ease,opacity 0.25s ease;
+  opacity:1;
 }
-.suggestion-input:focus{border-color:rgba(100,140,200,0.35)}
-.suggestion-input::placeholder{color:rgba(100,120,160,0.3)}
-.suggestion-submit-btn{
-  background:rgba(80,120,180,0.12);border:1px solid rgba(80,120,180,0.25);
-  border-radius:4px;padding:4px 10px;font-size:0.65em;color:rgba(130,170,220,0.75);
-  font-family:'Rajdhani',sans-serif;font-weight:700;cursor:pointer;
-  transition:all 0.2s;white-space:nowrap;
+.empire-overview.collapsed .empire-overview-body{
+  max-height:0!important;opacity:0;pointer-events:none;
+  padding-top:0!important;padding-bottom:0!important;
 }
-.suggestion-submit-btn:hover{background:rgba(80,120,180,0.2);color:rgba(150,190,240,0.9)}
-.suggestion-submit-btn:active{transform:scale(0.95)}
-.suggestion-list{
-  max-height:120px;overflow-y:auto;display:flex;flex-direction:column;gap:4px;
+.empire-overview.collapsed .colony-status-toggle{transform:rotate(-90deg)}
+/* 两栏body */
+.empire-overview-body{
+  display:flex;flex-direction:row;gap:0;padding:6px 10px 8px;
 }
-.suggestion-list::-webkit-scrollbar{width:2px}
-.suggestion-list::-webkit-scrollbar-thumb{background:rgba(100,120,160,0.2);border-radius:1px}
-.suggestion-item{
-  display:flex;align-items:flex-start;gap:6px;padding:5px 7px;
-  background:rgba(6,12,24,0.5);border:1px solid rgba(100,120,160,0.06);
-  border-radius:3px;font-size:0.65em;color:#7a98b8;
-  animation:suggFadeIn 0.3s ease;
+.empire-col{flex:1;min-width:0;padding:0 6px}
+.empire-col-left{border-right:1px solid rgba(6,214,160,0.08)}
+.empire-col-right{}
+/* fieldset 虚线框分区 */
+.empire-fieldset{
+  border:1px dashed rgba(6,214,160,0.12);border-radius:4px;
+  padding:6px 8px 8px;margin:0 0 6px;
 }
-@keyframes suggFadeIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}
-.suggestion-item .sugg-name{
-  color:rgba(130,170,220,0.7);font-weight:700;font-family:'Rajdhani',sans-serif;
-  white-space:nowrap;flex-shrink:0;min-width:40px;
+.empire-fieldset:last-child{margin-bottom:0}
+.empire-fieldset legend{
+  font-family:'Orbitron',monospace;font-size:0.62em;color:rgba(6,214,160,0.45);
+  letter-spacing:1.5px;text-transform:uppercase;padding:0 6px;
+  margin-left:4px;
 }
-.suggestion-item .sugg-text{color:#8ab0d0;line-height:1.35;word-break:break-all}
-.suggestion-item .sugg-time{
-  margin-left:auto;color:rgba(100,120,160,0.3);font-size:0.85em;white-space:nowrap;flex-shrink:0;
-  font-family:'Share Tech Mono',monospace;
+/* 核心栏在fieldset内部 — 减少外边距/内边距，保留底部装饰线 */
+.empire-fieldset .core-colony-bar{
+  border:none;border-bottom:2px solid var(--bdr);
+  margin:0;padding:6px 4px 8px;border-radius:0;
+  background:none;
 }
-.suggestion-empty{
-  text-align:center;color:rgba(100,120,160,0.25);font-size:0.65em;padding:12px 0;
-  font-style:italic;
+/* 分工面板在fieldset内部 — 去掉原padding/border */
+.empire-fieldset .csb-alloc-group{
+  border-bottom:none;padding:2px 0;
 }
-.suggestion-loading{text-align:center;color:rgba(100,120,160,0.3);font-size:0.6em;padding:8px 0}
+/* 零值状态灰色样式 */
+.alloc-disabled .ch-ctrl button{
+  opacity:0.3;pointer-events:none;cursor:default;
+}
+.alloc-disabled .ch-bar-fill{
+  opacity:0.2;
+}
+.alloc-disabled .ch-info{
+  color:var(--dim);opacity:0.5;
+}
+.alloc-disabled .ch-label{
+  opacity:0.5;
+}
+.alloc-disabled .ch-pct{
+  opacity:0.5;
+}
+/* 预设按钮禁用（通过JS控制 .alloc-presets-disabled） */
+.alloc-presets-disabled button{
+  opacity:0.3;pointer-events:none;cursor:default;
+}
+/* 排行榜锁定提示 */
+.empire-lb-locked{
+  padding:4px 0;
+}
+.empire-lb-locked.hidden{display:none}
+/* 基础数据行 */
+.csb-group{
+  display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;padding:5px 0;
+  border-bottom:1px solid rgba(6,214,160,0.06);
+}
+.csb-group:last-child{border-bottom:none}
+.csb-group .stat-item{
+  display:flex;align-items:center;gap:5px;font-size:0.82em;
+}
+.csb-group .stat-item .s-label{color:var(--dim);font-size:1em}
+.csb-group .stat-item .s-val{color:var(--text);font-family:'Share Tech Mono',monospace;font-weight:600}
+/* 菌群分工区块 */
+.csb-alloc-group{
+  display:flex;flex-direction:column;gap:6px;padding:8px 0;
+  border-bottom:1px solid rgba(6,214,160,0.06);
+}
+.csb-alloc-header{display:flex;align-items:center;gap:8px}
+.csb-alloc-group .alloc-title{
+  font-size:0.78em;color:var(--green);font-weight:700;letter-spacing:0.5px;
+}
+.csb-alloc-group .alloc-presets{display:flex;gap:4px;margin-left:4px}
+.csb-alloc-group .alloc-presets button{
+  font-size:0.7em;padding:2px 8px;border-radius:4px;
+  border:1px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.05);
+  color:var(--dim);cursor:pointer;line-height:1.4;transition:all .15s;
+}
+.csb-alloc-group .alloc-presets button:hover{background:rgba(255,255,255,0.1);color:var(--text)}
+.csb-alloc-channels{display:flex;flex-direction:column;gap:5px}
+.csb-alloc-channel{
+  display:flex;align-items:center;gap:8px;
+}
+.csb-alloc-channel .ch-label{font-size:0.85em}
+.csb-alloc-channel .ch-bar{
+  width:80px;height:6px;border-radius:3px;overflow:hidden;position:relative;flex-shrink:0;
+}
+.csb-alloc-channel .ch-bar-bg{
+  position:absolute;inset:0;border-radius:3px;opacity:0.15;
+}
+.csb-alloc-channel .ch-bar-fill{
+  height:100%;border-radius:3px;transition:width .3s;position:relative;z-index:1;
+}
+.csb-alloc-channel .ch-ctrl{display:flex;align-items:center;gap:3px}
+.csb-alloc-channel .ch-ctrl button{
+  width:20px;height:20px;font-size:0.72em;border-radius:3px;
+  border:1px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.05);
+  color:var(--dim);cursor:pointer;padding:0;line-height:20px;text-align:center;
+  transition:all .15s;
+}
+.csb-alloc-channel .ch-ctrl button:hover{background:rgba(255,255,255,0.12);color:var(--text)}
+.csb-alloc-channel .ch-pct{
+  font-size:0.8em;font-weight:700;min-width:32px;text-align:center;
+}
+.csb-alloc-channel .ch-info{font-size:0.72em;color:var(--dim)}
+/* 成就/分数行 */
+.csb-score-group{
+  display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;padding:5px 0;
+  border-bottom:1px solid rgba(6,214,160,0.06);
+}
+.csb-score-item{display:flex;align-items:center;gap:4px;font-size:0.82em}
+.csb-score-item .s-label{color:var(--dim)}
+.csb-score-item .s-val{font-family:'Share Tech Mono',monospace;font-weight:600}
+/* 排行榜区块 */
+.csb-lb-group{
+  display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:5px 0;
+  border-bottom:1px solid rgba(6,214,160,0.06);
+}
+.csb-lb-group .mini-lb-entry{font-size:0.78em}
+.csb-lb-group .lb-btn{font-size:0.72em;padding:3px 10px}
 
 /* 阶段主题色 — 通过 data-phase 属性切换 */
 .core-colony-bar[data-phase="1"]{
@@ -1807,11 +1887,17 @@ body::after{
   .core-phase-tag{font-size:0.55em}
   .core-colony-title{font-size:0.78em}
   .core-colony-desc{font-size:0.6em}
-  .grid{gap:8px;padding:8px}
+  .grid{gap:14px;padding:14px 20px}
   .cell .label{font-size:0.45em}
   .cell-emoji{font-size:0.9em}
   .cell-tier{font-size:0.4em}
   .cell-rate{font-size:0.38em}
+  /* 帝国总览适配 */
+  .csb-group .stat-item{font-size:0.75em}
+  .csb-alloc-group{gap:5px;padding:6px 0}
+  .csb-score-group{gap:6px;padding:4px 0}
+  .empire-fieldset{padding:4px 6px 6px}
+  .empire-fieldset legend{font-size:0.58em}
 }
 
 /* ===== RESPONSIVE: SMALL TABLET (≤900px) ===== */
@@ -1870,8 +1956,15 @@ body::after{
   .core-colony-status{font-size:0.5em}
   .core-phase-tag{font-size:0.5em;padding:1px 5px}
 
+  /* 帝国总览移动端：两栏改单栏 */
+  .empire-overview{margin:2px 4px}
+  .empire-overview-body{flex-direction:column}
+  .empire-col-left{border-right:none;border-bottom:1px solid rgba(6,214,160,0.08);padding-bottom:6px}
+  .empire-fieldset{padding:4px 6px;margin-bottom:4px}
+  .empire-fieldset legend{font-size:0.55em}
+
   /* Grid 调整 */
-  .grid{gap:6px;padding:6px}
+  .grid{gap:12px;padding:12px 16px}
   .cell .label{font-size:0.42em}
   .cell-emoji{font-size:0.85em}
   .cell-tier{font-size:0.38em;padding:0px 2px}
@@ -2039,45 +2132,137 @@ body::after{
           <span>T° <span class="val" id="envT">37</span></span>
         </div>
       </div>
-      <!-- 帝国核心展示区 — 独立于格子之上，显示供给状态 -->
-      <div class="core-colony-bar" id="coreColonyBar">
-        <div class="core-colony-glow" id="coreGlowBg"></div>
-        <div class="core-colony-icon" id="coreIcon">🔮</div>
-        <div class="core-colony-info">
-          <div class="core-colony-label"><span class="core-phase-tag" id="corePhaseTag">P1</span> <span class="core-colony-title" id="coreTitle">原始液泡</span></div>
-          <div class="core-colony-desc" id="coreDesc">最初的生命痕迹...一团脆弱的原始液泡</div>
+      <!-- ========== 帝国总览 — 左右两栏常驻面板 ========== -->
+      <div class="empire-overview" id="empireOverview">
+        <div class="empire-overview-header" onclick="G.toggleSection('empireOverview')">
+          <span class="empire-overview-icon">🏛️</span>
+          <span class="empire-overview-title">帝国总览</span>
+          <button class="colony-status-toggle" id="empireOverviewToggle">▾</button>
         </div>
-        <div class="core-colony-supply" id="coreSupplyPanel">
-          <div class="core-supply-label">⚡ 能量供给</div>
-          <div class="core-supply-value" id="coreSupplyText">0/2 🌱</div>
-          <div class="core-supply-bar"><div class="core-supply-fill" id="coreSupplyFill" style="width:0%;background:#22c55e"></div></div>
-          <div class="core-supply-status-tag idle" id="coreSupplyTag">待机</div>
-        </div>
-        <div class="core-colony-status" id="coreStatus">🏠 帝国核心</div>
-        <!-- 升级条件面板 -->
-        <div class="core-upgrade-panel" id="coreUpgradePanel">
-          <div class="core-upgrade-title">▸ 下一阶段升级条件</div>
-          <div class="core-upgrade-reqs" id="coreUpgradeReqs"></div>
-          <button class="core-upgrade-btn locked" id="coreUpgradeBtn" onclick="G.manualCoreUpgrade()" disabled>升级核心</button>
+        <div class="empire-overview-body" id="empireOverviewBody">
+          <!-- ===== 左栏：核心 + 状态 ===== -->
+          <div class="empire-col empire-col-left">
+            <!-- 帝国核心展示区 -->
+            <fieldset class="empire-fieldset">
+              <legend>核心</legend>
+              <div class="core-colony-bar" id="coreColonyBar">
+                <div class="core-colony-glow" id="coreGlowBg"></div>
+                <div class="core-colony-icon" id="coreIcon">🔮</div>
+                <div class="core-colony-info">
+                  <div class="core-colony-label"><span class="core-phase-tag" id="corePhaseTag">P1</span> <span class="core-colony-title" id="coreTitle">原始液泡</span></div>
+                  <div class="core-colony-desc" id="coreDesc">最初的生命痕迹...一团脆弱的原始液泡</div>
+                </div>
+                <div class="core-colony-supply" id="coreSupplyPanel">
+                  <div class="core-supply-label">⚡ 能量供给</div>
+                  <div class="core-supply-value" id="coreSupplyText">0/2 🌱</div>
+                  <div class="core-supply-bar"><div class="core-supply-fill" id="coreSupplyFill" style="width:0%;background:#22c55e"></div></div>
+                  <div class="core-supply-status-tag idle" id="coreSupplyTag">待机</div>
+                </div>
+                <div class="core-colony-status" id="coreStatus">🏠 帝国核心</div>
+                <!-- 升级条件面板 -->
+                <div class="core-upgrade-panel" id="coreUpgradePanel">
+                  <div class="core-upgrade-title">▸ 下一阶段升级条件</div>
+                  <div class="core-upgrade-reqs" id="coreUpgradeReqs"></div>
+                  <button class="core-upgrade-btn locked" id="coreUpgradeBtn" onclick="G.manualCoreUpgrade()" disabled>升级核心</button>
+                </div>
+              </div>
+            </fieldset>
+            <!-- 菌落状态 -->
+            <fieldset class="empire-fieldset">
+              <legend>状态</legend>
+              <div class="csb-group" id="colonyStatCard">
+                <div class="stat-item"><span class="s-label">🦠 种群</span><span class="s-val" id="statPop">0</span></div>
+                <div class="stat-item" id="rowPopFood"><span class="s-label">🍽️ 食耗</span><span class="s-val" id="statPopFood" style="color:var(--dim)">—</span></div>
+                <div class="stat-item" id="rowPowerLevel"><span class="s-label">🔋 功率</span><span class="s-val" id="statPowerLevel" style="font-weight:700;color:var(--dim)">—</span></div>
+                <div class="stat-item"><span class="s-label">⚡ 效率</span><span class="s-val" id="statEff">100%</span></div>
+                <div class="stat-item" title="物流效率"><span class="s-label">🚚 物流</span><span class="s-val" id="statLog">100%</span></div>
+                <div class="stat-item" id="rowQS" style="display:none"><span class="s-label">📡 QS信号</span><span class="s-val" id="statQS">0</span></div>
+              </div>
+            </fieldset>
+          </div>
+          <!-- ===== 右栏：菌群分工 + 荣誉 ===== -->
+          <div class="empire-col empire-col-right">
+            <!-- 菌群分工 — 始终显示 -->
+            <fieldset class="empire-fieldset">
+              <legend>菌群分工</legend>
+              <div class="csb-alloc-group" id="popAllocPanel">
+                <div class="csb-alloc-header">
+                  <div class="alloc-presets">
+                    <button onclick="G.setPopAllocPreset('balanced')" title="均衡分配">⚖️ 均衡</button>
+                    <button onclick="G.setPopAllocPreset('harvest')" title="采集优先" style="border-color:rgba(34,197,94,0.2);color:#22c55e">🌱 采集</button>
+                    <button onclick="G.setPopAllocPreset('research')" title="研究优先" style="border-color:rgba(168,85,247,0.2);color:#a855f7">🔬 研究</button>
+                    <button onclick="G.setPopAllocPreset('logistics')" title="物流优先" style="border-color:rgba(59,130,246,0.2);color:#3b82f6">🚚 物流</button>
+                  </div>
+                </div>
+                <div class="csb-alloc-channels">
+                  <!-- 采集 -->
+                  <div class="csb-alloc-channel" id="allocHarvest">
+                    <span class="ch-label" style="color:#22c55e">🌱 采集</span>
+                    <div class="ch-ctrl">
+                      <button onclick="G.adjustPopAlloc('harvest',-5)">−</button>
+                      <span class="alloc-pct ch-pct" style="color:#22c55e">34%</span>
+                      <button onclick="G.adjustPopAlloc('harvest',5)">+</button>
+                    </div>
+                    <div class="ch-bar"><div class="ch-bar-bg" style="background:#22c55e"></div><div class="alloc-bar-fill ch-bar-fill" style="background:#22c55e;width:34%"></div></div>
+                    <span class="alloc-info ch-info">0菌 +0%</span>
+                  </div>
+                  <!-- 研究 -->
+                  <div class="csb-alloc-channel" id="allocResearch">
+                    <span class="ch-label" style="color:#a855f7">🔬 研究</span>
+                    <div class="ch-ctrl">
+                      <button onclick="G.adjustPopAlloc('research',-5)">−</button>
+                      <span class="alloc-pct ch-pct" style="color:#a855f7">33%</span>
+                      <button onclick="G.adjustPopAlloc('research',5)">+</button>
+                    </div>
+                    <div class="ch-bar"><div class="ch-bar-bg" style="background:#a855f7"></div><div class="alloc-bar-fill ch-bar-fill" style="background:#a855f7;width:33%"></div></div>
+                    <span class="alloc-info ch-info">0菌 +0%</span>
+                  </div>
+                  <!-- 物流 -->
+                  <div class="csb-alloc-channel" id="allocLogistics">
+                    <span class="ch-label" style="color:#3b82f6">🚚 物流</span>
+                    <div class="ch-ctrl">
+                      <button onclick="G.adjustPopAlloc('logistics',-5)">−</button>
+                      <span class="alloc-pct ch-pct" style="color:#3b82f6">33%</span>
+                      <button onclick="G.adjustPopAlloc('logistics',5)">+</button>
+                    </div>
+                    <div class="ch-bar"><div class="ch-bar-bg" style="background:#3b82f6"></div><div class="alloc-bar-fill ch-bar-fill" style="background:#3b82f6;width:33%"></div></div>
+                    <span class="alloc-info ch-info">0菌 +0%</span>
+                  </div>
+                </div>
+              </div>
+            </fieldset>
+            <!-- 荣誉 — 成就/称号/分数/排行 -->
+            <fieldset class="empire-fieldset">
+              <legend>荣誉</legend>
+              <div class="csb-score-group">
+                <div class="csb-score-item"><span class="s-label">🏅 成就</span><span class="s-val" id="statAchieve" style="color:#fbbf24">0/37</span></div>
+                <div class="csb-score-item"><span class="s-label">👑 称号</span><span class="s-val" id="empireTitleDisplay" style="color:var(--cyan);font-size:0.9em">🦠 初生细胞</span></div>
+                <div class="csb-score-item" id="scoreRow" style="cursor:default" oncontextmenu="event.preventDefault();G.showRatingTooltip(event)">
+                  <span class="s-label" style="font-weight:600">🏆 总分</span>
+                  <span class="s-val" id="statScore" style="color:#fbbf24;font-weight:800;letter-spacing:0.5px">0</span>
+                  <span id="statRank" style="font-size:0.72em;font-weight:700;padding:1px 5px;border-radius:3px;background:rgba(251,191,36,0.1);border:1px solid rgba(251,191,36,0.2);color:#fbbf24;font-family:'Orbitron',monospace;letter-spacing:1px">E</span>
+                </div>
+              </div>
+              <!-- 排行榜 mini (evo>=2后显示) -->
+              <div class="csb-lb-group" id="miniLeaderboard" style="display:none">
+                <span style="font-size:0.78em;color:var(--dim)">👑 TOP3</span>
+                <div id="miniLbList" style="display:flex;flex-wrap:wrap;gap:8px">
+                  <span class="mini-lb-entry" style="color:var(--dim)">加载中...</span>
+                </div>
+              </div>
+              <div class="csb-group" id="lbBtnWrap" style="display:none;gap:8px">
+                <button onclick="G.showLeaderboard()" class="lb-btn" style="font-size:0.72em;padding:3px 10px">🏆 排行榜</button>
+                <button onclick="G.showPrestigePanel()" class="lb-btn" id="prestigeEntryBtn" style="font-size:0.72em;padding:3px 10px;border-color:rgba(168,85,247,0.3);color:#a855f7;background:rgba(168,85,247,0.06);display:none">🌀 转生</button>
+              </div>
+              <div class="empire-lb-locked" id="lbLockedHint">
+                <span style="font-size:0.72em;color:var(--dim);opacity:0.5">🔒 进化≥Lv.2 后解锁排行榜</span>
+              </div>
+            </fieldset>
+          </div>
         </div>
       </div>
-      <!-- 游戏建议栏 -->
-      <div class="suggestion-bar" id="suggestionBar">
-        <div class="suggestion-header">
-          <span class="suggestion-icon">💡</span>
-          <span class="suggestion-title">修改建议</span>
-          <button class="suggestion-toggle" id="suggToggle" onclick="G.toggleSuggestionBar()">▾</button>
-        </div>
-        <div class="suggestion-body" id="suggBody">
-          <div class="suggestion-input-row">
-            <input type="text" class="suggestion-input" id="suggInput" placeholder="输入你的修改建议..." maxlength="200" onkeydown="if(event.key==='Enter')G.submitSuggestion()">
-            <button class="suggestion-submit-btn" onclick="G.submitSuggestion()">发送</button>
-          </div>
-          <div class="suggestion-list" id="suggList">
-            <div class="suggestion-empty">暂无建议，快来留下第一条吧 ✨</div>
-          </div>
-        </div>
-      </div>
+      <!-- 兼容旧ID: colonyStatusBar 指向总览面板 -->
+      <div id="colonyStatusBar" style="display:none"></div>
       <div class="dish-view">
         <div class="pause-overlay" id="pauseOverlay">⏸ 已暂停</div>
         <div class="dish-scroll-inner" id="dishScrollInner">
@@ -2113,35 +2298,7 @@ body::after{
         </div>
       </div>
 
-      <!-- Colony Status (locked until first building) -->
-      <div class="section sec-locked" id="secColony">
-        <div class="section-title">菌落状态 <button class="sec-toggle" onclick="G.toggleSection('secColony')">▾</button></div>
-        <div class="sec-body">
-          <div class="stat-card" id="colonyStatCard">
-            <div class="stat-row"><span class="stat-label">🦠 细菌种群</span><span class="stat-value" id="statPop">0</span></div>
-            <div class="stat-row" id="rowPopFood" style="display:none"><span class="stat-label">&nbsp;&nbsp;🍽️ 食物消耗</span><span class="stat-value" id="statPopFood" style="font-size:0.9em;color:var(--orange)">0🟢/s</span></div>
-            <div class="stat-row" id="rowPowerLevel" style="display:none"><span class="stat-label">&nbsp;&nbsp;🔋 功率水平</span><span class="stat-value" id="statPowerLevel" style="font-size:0.9em;font-weight:700">100%</span></div>
-            <div class="stat-row"><span class="stat-label">⚡ 工作效率</span><span class="stat-value" id="statEff">100%</span></div>
-            <div class="stat-row" title="物流效率 = 仓储加成 × 传送带平均效率"><span class="stat-label">🚚 物流效率</span><span class="stat-value" id="statLog">100%</span></div>
-            <div class="stat-row" id="rowQS" style="display:none"><span class="stat-label">📡 QS信号</span><span class="stat-value" id="statQS">0</span></div>
-            <div class="stat-row" style="border-top:1px solid rgba(255,255,255,0.06);padding-top:4px;margin-top:3px"><span class="stat-label">🏅 成就</span><span class="stat-value" id="statAchieve" style="font-size:0.85em;color:#fbbf24">0/37</span></div>
-            <div class="stat-row"><span class="stat-label">👑 称号</span><span class="stat-value" id="empireTitleDisplay" style="font-size:0.78em;color:var(--cyan)">🦠 初生细胞</span></div>
-            <div class="stat-row" id="scoreRow" style="border-top:1px solid rgba(255,255,255,0.06);padding-top:6px;margin-top:3px;font-size:0.85em;cursor:default;position:relative" oncontextmenu="event.preventDefault();G.showRatingTooltip(event)"><span class="stat-label" style="font-size:1.05em;font-weight:600">🏆 总分数</span><span style="display:flex;align-items:center;gap:8px"><span class="stat-value" id="statScore" style="color:#fbbf24;font-weight:800;font-size:1.25em;letter-spacing:0.5px">0</span><span id="statRank" style="font-size:0.75em;font-weight:700;padding:2px 7px;border-radius:3px;background:rgba(251,191,36,0.1);border:1px solid rgba(251,191,36,0.2);color:#fbbf24;font-family:'Orbitron',monospace;letter-spacing:1px">E</span></span></div>
-            <!-- Mini Leaderboard Top 3 (locked until evoLv >= 2) -->
-            <div id="miniLeaderboard" class="sec-locked" style="margin-top:6px;padding-top:6px;border-top:1px solid rgba(255,255,255,0.06)">
-              <div style="font-size:0.65em;color:var(--dim);letter-spacing:1px;margin-bottom:4px;display:flex;align-items:center;gap:4px">
-                <span style="color:#fbbf24">👑</span> TOP 3
-              </div>
-              <div id="miniLbList" style="display:flex;flex-direction:column;gap:2px">
-                <div style="text-align:center;color:var(--dim);font-size:0.62em;padding:4px 0">加载中...</div>
-              </div>
-            </div>
-            <div id="lbBtnWrap" class="stat-row sec-locked" style="justify-content:center;padding-top:4px">
-              <button onclick="G.showLeaderboard()" class="lb-btn" style="width:100%">🏆 查看完整排行榜</button>
-            </div>
-          </div>
-        </div>
-      </div>
+      <!-- Colony Status: moved to petri dish area (colonyStatusBar) -->
 
       <!-- Evolution (locked until evoLv >= 2) -->
       <div class="section sec-locked" id="evoSection">
@@ -2341,6 +2498,40 @@ body::after{
   </div>
 </div>
 
+<!-- Prestige Popup -->
+<div class="upgrade-popup" id="prestigePopup" style="max-width:420px;max-height:85vh;overflow-y:auto">
+  <div style="font-family:'Orbitron',monospace;font-size:0.85em;color:var(--purple);letter-spacing:2px;margin-bottom:6px">🌀 转生系统</div>
+  <div style="font-size:0.75em;color:var(--dim);margin-bottom:4px">重置进度，换取永久强化</div>
+  <div style="font-size:0.9em;font-weight:700;color:var(--yellow);margin-bottom:2px" id="prestigeGain"></div>
+  <div style="display:flex;justify-content:space-between;font-size:0.72em;color:var(--dim);margin-bottom:10px">
+    <span id="prestigeCurrent"></span>
+    <span id="prestigeTotal"></span>
+  </div>
+
+  <!-- 被动奖励（转生次数） -->
+  <div style="margin-bottom:8px">
+    <div style="font-size:0.72em;color:var(--purple);font-weight:700;margin-bottom:4px;letter-spacing:1px">♾ 轮回被动 — 转生次数自动生效</div>
+    <div id="prestigePassiveList"></div>
+  </div>
+
+  <!-- 固定加成商店 -->
+  <div style="margin-bottom:8px">
+    <div style="font-size:0.72em;color:var(--cyan);font-weight:700;margin-bottom:4px;letter-spacing:1px">🛒 转生商店</div>
+    <div id="prestigeBonusList"></div>
+  </div>
+
+  <!-- 无限循环加成 -->
+  <div style="margin-bottom:12px">
+    <div style="font-size:0.72em;color:var(--yellow);font-weight:700;margin-bottom:4px;letter-spacing:1px">♾ 无限加成 — 永无止境的强化</div>
+    <div id="prestigeInfiniteList"></div>
+  </div>
+
+  <div style="display:flex;gap:8px;justify-content:center">
+    <button class="recycle-yes" id="prestigeBtn" onclick="G.doPrestige()" style="border-color:var(--purple);color:var(--purple);background:rgba(168,85,247,0.12)">🌀 执行转生</button>
+    <button class="recycle-no" onclick="G.closePrestige()">关闭</button>
+  </div>
+</div>
+
 <!-- Tooltip -->
 <div class="tooltip" id="tooltip">
   <div class="tt-name" id="ttName"></div>
@@ -2352,12 +2543,22 @@ body::after{
 <script>
   // ===== Supabase 配置 =====
   // TODO: 替换为你自己的 Supabase 项目配置
-  const SUPABASE_URL = 'https://aervhqhxwtdqkqwijhug.supabase.co';
-  const SUPABASE_ANON_KEY = 'sb_publishable_B0JOq4sXJPjmnnkSj-3ylg_qmrQQnEZ';
-  window.supa = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-  window.supaReady = true;
+  try {
+    const SUPABASE_URL = 'https://aervhqhxwtdqkqwijhug.supabase.co';
+    const SUPABASE_ANON_KEY = 'sb_publishable_B0JOq4sXJPjmnnkSj-3ylg_qmrQQnEZ';
+    if (typeof supabase !== 'undefined') {
+      window.supa = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+      window.supaReady = true;
+    } else {
+      console.warn('Supabase SDK 未加载，排行榜功能不可用');
+      window.supaReady = false;
+    }
+  } catch(e) {
+    console.warn('Supabase 初始化失败:', e);
+    window.supaReady = false;
+  }
 </script>
-<script src="game.js?v=20260316k"></script>
+<script src="game.js?v=20260316s"></script>
 <!-- Nickname Popup -->
 <div class="nickname-popup" id="nicknamePopup">
   <div style="font-family:'Orbitron',monospace;font-size:0.85em;color:var(--cyan);letter-spacing:2px;margin-bottom:10px">🧬 设置昵称</div>
