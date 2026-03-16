@@ -718,47 +718,87 @@ const BLDS = {
 // stackable: 同种加成是否可叠加（多个同类邻居各给一次）
 // maxStack: 最大叠加次数
 const ADJACENCY_RULES = [
-  // === 同类协同 ===
-  // 同类建筑相邻 → 协同加成（鼓励集群布局）
-  { self:'glucoseCollector', neighbor:'glucoseCollector', bonus:0.10, name:'碳源共振', icon:'🌱', stackable:true, maxStack:2 },
-  { self:'energyStation',    neighbor:'energyStation',    bonus:0.08, name:'能量串联', icon:'⚡', stackable:true, maxStack:2 },
+  // ═══════════════════════════════════════════════════
+  // ① 同类协同 — 同类建筑集群放置获得加成
+  // ═══════════════════════════════════════════════════
+  { self:'glucoseCollector', neighbor:'glucoseCollector', bonus:0.10, name:'碳源共振', icon:'🌱', stackable:true, maxStack:3 },
+  { self:'energyStation',    neighbor:'energyStation',    bonus:0.08, name:'能量串联', icon:'⚡', stackable:true, maxStack:3 },
   { self:'nitrogenFixer',    neighbor:'nitrogenFixer',    bonus:0.12, name:'固氮协同', icon:'💨', stackable:true, maxStack:2 },
   { self:'proteinFactory',   neighbor:'proteinFactory',   bonus:0.10, name:'蛋白质流水线', icon:'⚗️', stackable:true, maxStack:2 },
+  { self:'geneExtractor',    neighbor:'geneExtractor',    bonus:0.08, name:'DNA双螺旋', icon:'🧬', stackable:true, maxStack:2 },
+  { self:'biofilmReactor',   neighbor:'biofilmReactor',   bonus:0.10, name:'生物膜矩阵', icon:'🧫', stackable:true, maxStack:2 },
+  { self:'qsController',     neighbor:'qsController',     bonus:0.12, name:'群体共振', icon:'📡', stackable:true, maxStack:2 },
 
-  // === 上下游供给链加成 ===
-  // 上游建筑紧邻下游 → 双方都获得效率加成（鼓励产线紧凑布局）
-  { self:'energyStation',    neighbor:'glucoseCollector', bonus:0.12, name:'直供通道', icon:'🔗', stackable:true, maxStack:2 },
-  { self:'simpleExtractor',  neighbor:'energyStation',    bonus:0.10, name:'能量直供', icon:'🔋', stackable:true, maxStack:1 },
-  { self:'simpleExtractor',  neighbor:'glucoseCollector', bonus:0.08, name:'碳源直供', icon:'🌱', stackable:true, maxStack:1 },
-  { self:'proteinFactory',   neighbor:'nitrogenFixer',    bonus:0.10, name:'氮源直供', icon:'🔵', stackable:true, maxStack:1 },
-  { self:'geneExtractor',    neighbor:'proteinFactory',   bonus:0.12, name:'蛋白质直供', icon:'🧪', stackable:true, maxStack:1 },
-  { self:'biofilmReactor',   neighbor:'glucoseCollector', bonus:0.08, name:'碳源直通', icon:'🌱', stackable:true, maxStack:1 },
-  { self:'biofilmReactor',   neighbor:'nitrogenFixer',    bonus:0.10, name:'氮源直通', icon:'🔵', stackable:true, maxStack:1 },
-  { self:'nanoAssembler',    neighbor:'qsController',     bonus:0.15, name:'QS直连', icon:'📡', stackable:true, maxStack:1 },
+  // ═══════════════════════════════════════════════════
+  // ② 核心上下游供给链 — 上游紧邻下游 → 效率加成（★ 核心玩法）
+  // ═══════════════════════════════════════════════════
+  // Phase 1 核心链: 碳源 → ATP合成酶
+  { self:'energyStation',    neighbor:'glucoseCollector', bonus:0.15, name:'碳源直供', icon:'🔗', stackable:true, maxStack:2 },
+  // Phase 1: ATP合成酶 → 简易提取器
+  { self:'simpleExtractor',  neighbor:'energyStation',    bonus:0.12, name:'能量直供', icon:'🔋', stackable:true, maxStack:2 },
+  { self:'simpleExtractor',  neighbor:'glucoseCollector', bonus:0.08, name:'碳源捷径', icon:'🌱', stackable:true, maxStack:1 },
+  // Phase 1: 能量缓冲池联动
+  { self:'energyBuffer',     neighbor:'glucoseCollector', bonus:0.10, name:'储能直供', icon:'🔋', stackable:true, maxStack:2 },
+  { self:'energyBuffer',     neighbor:'energyStation',    bonus:0.15, name:'能量回路', icon:'🪫', stackable:true, maxStack:2 },
+  // Phase 2: 固氮→蛋白
+  { self:'proteinFactory',   neighbor:'nitrogenFixer',    bonus:0.12, name:'氮源直供', icon:'🔵', stackable:true, maxStack:2 },
+  // Phase 2: ATP→固氮
+  { self:'nitrogenFixer',    neighbor:'energyStation',    bonus:0.10, name:'ATP催化', icon:'⚡', stackable:true, maxStack:1 },
+  // Phase 2: 蛋白→DNA
+  { self:'geneExtractor',    neighbor:'proteinFactory',   bonus:0.15, name:'蛋白直供', icon:'🧪', stackable:true, maxStack:2 },
+  // Phase 2: ATP→蛋白（次级）
+  { self:'proteinFactory',   neighbor:'energyStation',    bonus:0.08, name:'ATP辅助', icon:'⚡', stackable:true, maxStack:1 },
+  // Phase 2: ATP→DNA
+  { self:'geneExtractor',    neighbor:'energyStation',    bonus:0.08, name:'ATP驱动', icon:'⚡', stackable:true, maxStack:1 },
+  // Phase 2: 氨基酸合成 — 需要氮+碳
+  { self:'aminoSynth',       neighbor:'nitrogenFixer',    bonus:0.12, name:'氨基酸捷径', icon:'🧬', stackable:true, maxStack:2 },
+  { self:'aminoSynth',       neighbor:'glucoseCollector', bonus:0.10, name:'碳骨架直供', icon:'🌱', stackable:true, maxStack:1 },
+  // Phase 2: 核糖体 — 需要蛋白+ATP
+  { self:'ribosomeCluster',  neighbor:'proteinFactory',   bonus:0.12, name:'核糖体协同', icon:'🫧', stackable:true, maxStack:2 },
+  { self:'ribosomeCluster',  neighbor:'energyStation',    bonus:0.08, name:'翻译加速', icon:'⚡', stackable:true, maxStack:1 },
+  // Phase 3: 生物膜 — 需要碳+氮+ATP
+  { self:'biofilmReactor',   neighbor:'glucoseCollector', bonus:0.10, name:'碳源直通', icon:'🌱', stackable:true, maxStack:2 },
+  { self:'biofilmReactor',   neighbor:'nitrogenFixer',    bonus:0.12, name:'氮源直通', icon:'🔵', stackable:true, maxStack:2 },
+  { self:'biofilmReactor',   neighbor:'energyStation',    bonus:0.08, name:'ATP直通', icon:'⚡', stackable:true, maxStack:1 },
+  // Phase 3: 孢子播种器 — 需要生物质+ATP
+  { self:'sporeSower',       neighbor:'biofilmReactor',   bonus:0.15, name:'生物质通道', icon:'🧱', stackable:true, maxStack:2 },
+  { self:'sporeSower',       neighbor:'energyStation',    bonus:0.08, name:'弹射加速', icon:'⚡', stackable:true, maxStack:1 },
+  // Phase 4: QS塔 — 需要ATP
+  { self:'qsController',     neighbor:'energyStation',    bonus:0.12, name:'能量共鸣', icon:'⚡', stackable:true, maxStack:2 },
+  // Phase 4: 纳米组装 — 需要QS+ATP
+  { self:'nanoAssembler',    neighbor:'qsController',     bonus:0.18, name:'QS直连', icon:'📡', stackable:true, maxStack:2 },
+  { self:'nanoAssembler',    neighbor:'energyStation',    bonus:0.08, name:'组装加速', icon:'⚡', stackable:true, maxStack:1 },
+  // Phase 4: 信息素广播 — 需要蛋白+ATP
+  { self:'pheromoneStation',  neighbor:'proteinFactory',  bonus:0.12, name:'底物直供', icon:'🧪', stackable:true, maxStack:1 },
+  { self:'pheromoneStation',  neighbor:'energyStation',   bonus:0.08, name:'广播加速', icon:'⚡', stackable:true, maxStack:1 },
 
-  // === 特殊增益邻接 ===
-  // 菌丝运输网/代谢回路 紧邻生产建筑 → 额外加成（鼓励把增益建筑放在产线中心）
-  { self:'*',                neighbor:'transport',        bonus:0.05, name:'菌丝渗透', icon:'🕸️', stackable:true, maxStack:2 },
-  { self:'*',                neighbor:'metabolicLoop',    bonus:0.04, name:'代谢催化', icon:'♻️', stackable:true, maxStack:2 },
+  // ═══════════════════════════════════════════════════
+  // ③ 特殊增益建筑邻接 — 菌丝/回路放在产线中心
+  // ═══════════════════════════════════════════════════
+  { self:'*',                neighbor:'transport',        bonus:0.06, name:'菌丝渗透', icon:'🕸️', stackable:true, maxStack:3 },
+  { self:'*',                neighbor:'metabolicLoop',    bonus:0.05, name:'代谢催化', icon:'♻️', stackable:true, maxStack:2 },
+  { self:'*',                neighbor:'energyBuffer',     bonus:0.04, name:'缓冲增益', icon:'🪫', stackable:true, maxStack:2 },
 
-  // === 跨阶段协同 ===
-  // 高级建筑旁放低级建筑获得微弱协同（鼓励混合布局而非纯高级集群）
-  { self:'qsController',    neighbor:'energyStation',    bonus:0.08, name:'能量共鸣', icon:'⚡', stackable:true, maxStack:1 },
-  { self:'sporeSower',      neighbor:'biofilmReactor',   bonus:0.12, name:'生物质通道', icon:'🧱', stackable:true, maxStack:1 },
-  { self:'ribosomeCluster', neighbor:'proteinFactory',   bonus:0.10, name:'核糖体协同', icon:'🫧', stackable:true, maxStack:1 },
-  { self:'aminoSynth',      neighbor:'nitrogenFixer',    bonus:0.10, name:'氨基酸捷径', icon:'🧬', stackable:true, maxStack:1 },
+  // ═══════════════════════════════════════════════════
+  // ④ 跨阶段特殊协同 — 鼓励混合布局
+  // ═══════════════════════════════════════════════════
+  { self:'sporeSower',       neighbor:'glucoseCollector', bonus:0.06, name:'孢子培养基', icon:'🍄', stackable:true, maxStack:1 },
+  { self:'qsController',     neighbor:'biofilmReactor',  bonus:0.10, name:'信号介质', icon:'📡', stackable:true, maxStack:1 },
+  { self:'nanoAssembler',    neighbor:'geneExtractor',    bonus:0.10, name:'纳米模板', icon:'🧬', stackable:true, maxStack:1 },
+  { self:'pheromoneStation',  neighbor:'qsController',   bonus:0.12, name:'信号耦合', icon:'📡', stackable:true, maxStack:1 },
 
-  // === 能量缓冲池特殊 ===
-  { self:'energyBuffer',    neighbor:'energyStation',    bonus:0.15, name:'能量回路', icon:'🪫', stackable:true, maxStack:1 },
-  { self:'*',               neighbor:'energyBuffer',     bonus:0.03, name:'缓冲增益', icon:'🪫', stackable:true, maxStack:1 },
-
-  // === 新旁路建筑邻接 ===
-  { self:'biomassConverter', neighbor:'proteinFactory',  bonus:0.12, name:'蛋白直供', icon:'🧪', stackable:true, maxStack:1 },
-  { self:'biomassConverter', neighbor:'biofilmReactor',  bonus:0.08, name:'生物质共振', icon:'🧫', stackable:true, maxStack:1 },
-  { self:'quantumExtractor', neighbor:'nitrogenFixer',   bonus:0.12, name:'氮源直通', icon:'🔵', stackable:true, maxStack:1 },
-  { self:'quantumExtractor', neighbor:'geneExtractor',   bonus:0.08, name:'DNA协同', icon:'🧬', stackable:true, maxStack:1 },
-  { self:'resonanceChamber', neighbor:'qsController',    bonus:0.15, name:'QS共振', icon:'📡', stackable:true, maxStack:1 },
-  { self:'resonanceChamber', neighbor:'resonanceChamber', bonus:0.10, name:'共振叠加', icon:'🌀', stackable:true, maxStack:2 },
+  // ═══════════════════════════════════════════════════
+  // ⑤ 旁路建筑专属邻接
+  // ═══════════════════════════════════════════════════
+  { self:'biomassConverter',  neighbor:'proteinFactory',  bonus:0.15, name:'蛋白直供', icon:'🧪', stackable:true, maxStack:2 },
+  { self:'biomassConverter',  neighbor:'biofilmReactor',  bonus:0.10, name:'生物质共振', icon:'🧫', stackable:true, maxStack:1 },
+  { self:'biomassConverter',  neighbor:'energyStation',   bonus:0.08, name:'转化加速', icon:'⚡', stackable:true, maxStack:1 },
+  { self:'quantumExtractor',  neighbor:'nitrogenFixer',   bonus:0.15, name:'氮源直通', icon:'🔵', stackable:true, maxStack:2 },
+  { self:'quantumExtractor',  neighbor:'geneExtractor',   bonus:0.10, name:'DNA协同', icon:'🧬', stackable:true, maxStack:1 },
+  { self:'quantumExtractor',  neighbor:'energyStation',   bonus:0.08, name:'量子加速', icon:'⚡', stackable:true, maxStack:1 },
+  { self:'resonanceChamber',  neighbor:'qsController',    bonus:0.18, name:'QS共振', icon:'📡', stackable:true, maxStack:2 },
+  { self:'resonanceChamber',  neighbor:'pheromoneStation', bonus:0.12, name:'信号反馈', icon:'📡', stackable:true, maxStack:1 },
+  { self:'resonanceChamber',  neighbor:'resonanceChamber', bonus:0.10, name:'共振叠加', icon:'🌀', stackable:true, maxStack:2 },
 ];
 
 // ===== TECHS =====
@@ -1182,7 +1222,7 @@ const PRESTIGE = {
 
 // ===== GAME STATE =====
 const G = {
-  res:{}, rates:{}, grid:[], gridSize:8, gridCols:8, gridRows:8,
+  res:{}, rates:{}, grid:[], gridSize:12, gridCols:12, gridRows:12,
   pop:0, gEff:1, lEff:1, qsLv:0,
   eL:1, eP:0,
   phase:1, sel:null, paused:false, spd:1, rt:0,
@@ -1386,27 +1426,34 @@ const G = {
     };
     mql.addEventListener('change', handleChange);
 
-    // 窗口 resize 时重新计算格子大小（可能导致 gridCols/gridRows 变化）
+    // 窗口 resize 时刷新画布（网格大小固定，不再动态调整行列）
     let resizeTimer = null;
     window.addEventListener('resize', () => {
       clearTimeout(resizeTimer);
       resizeTimer = setTimeout(() => {
-        const gridEl = document.getElementById('grid');
-        if (!gridEl) return;
-        const oldCols = this.gridCols;
-        const oldRows = this.gridRows;
-        const layout = this._calcGridLayout();
-        if (this.gridCols !== oldCols || this.gridRows !== oldRows) {
-          // 网格尺寸变了，需要完整重渲染
-          this.renderGrid();
-          this.save(true);
-        } else if (layout.cellSize) {
-          gridEl.style.gridTemplateColumns = `repeat(${layout.cols}, ${layout.cellSize}px)`;
-          gridEl.style.gridAutoRows = `${layout.cellSize}px`;
-        }
         this._resizeCanvases();
       }, 150);
     });
+
+    // 滚动指示器 — 当网格超出可视范围时在边缘显示渐变提示
+    const dishView = document.querySelector('.dish-view');
+    if (dishView) {
+      const updateScrollHints = () => {
+        const el = dishView;
+        const canRight = el.scrollWidth > el.clientWidth + 2;
+        const canDown = el.scrollHeight > el.clientHeight + 2;
+        const scrolledRight = el.scrollLeft >= el.scrollWidth - el.clientWidth - 2;
+        const scrolledDown = el.scrollTop >= el.scrollHeight - el.clientHeight - 2;
+        el.classList.toggle('can-scroll-right', canRight);
+        el.classList.toggle('can-scroll-down', canDown);
+        el.classList.toggle('scrolled-right', scrolledRight);
+        el.classList.toggle('scrolled-down', scrolledDown);
+      };
+      dishView.addEventListener('scroll', updateScrollHints, { passive: true });
+      // 初始化和每次渲染后也更新
+      this._updateScrollHints = updateScrollHints;
+      setTimeout(updateScrollHints, 200);
+    }
   },
 
   // ===== 触摸事件适配 =====
@@ -1685,22 +1732,22 @@ const G = {
       const actualCost = this.scaledCost(key);
       const costStr = Object.entries(actualCost).map(([k,v]) => `${v} ${RES[k]?.icon||k}`).join(' + ');
       const count = this.bldCount(key);
-      const countTag = count > 0 ? `<span style="font-size:0.65em;color:var(--color-muted);margin-left:4px">×${count}</span>` : '';
+      const countTag = count > 0 ? `<span style="font-size:0.75em;color:var(--color-muted);margin-left:4px">×${count}</span>` : '';
 
       let tagHTML = '';
       if (b.isWonder) tagHTML = '<span class="act-tag" style="color:var(--purple);border:1px solid var(--purple);background:rgba(168,85,247,0.15)">奇观</span>';
-      else if (b.tier) tagHTML = `<span class="act-tag" style="color:${b.color}80;border:1px solid ${b.color}30;background:${b.color}08;font-size:0.55em">T${b.tier}</span>`;
+      else if (b.tier) tagHTML = `<span class="act-tag" style="color:${b.color}80;border:1px solid ${b.color}30;background:${b.color}08;font-size:0.65em">T${b.tier}</span>`;
 
       // 直接显示转化比例
       const corePoweredInfo = b.corePowered
-        ? `<div style="font-size:0.65em;color:var(--color-muted-dark);margin:1px 0">🏠 核心供能上限: ${(CORE_COLONY[this.phase]||CORE_COLONY[1]).maxCollectors}台</div>`
+        ? `<div style="font-size:0.75em;color:var(--color-muted-dark);margin:2px 0">🏠 核心供能上限: ${(CORE_COLONY[this.phase]||CORE_COLONY[1]).maxCollectors}台</div>`
         : '';
       btn.innerHTML = `
         <div class="act-icon">${SVG[key]||''}</div>
         <div style="flex:1">
           <div class="act-name"><span style="margin-right:3px">${b.emoji||''}</span>${b.n}${countTag}</div>
           <div class="act-desc">${b.d}</div>
-          <div style="font-size:0.7em;color:var(--color-info);font-family:'Share Tech Mono',monospace;margin:1px 0">${b.ratio}</div>
+          <div style="font-size:0.82em;color:var(--color-info);font-family:'Share Tech Mono',monospace;margin:2px 0">${b.ratio}</div>
           ${corePoweredInfo}
           <div class="act-cost">造价: ${costStr}</div>
         </div>
@@ -2096,62 +2143,16 @@ const G = {
   },
 
   // === Grid ===
-  // 格子最小像素（低于此值就减少格子数）和最大像素（高于此值就增加格子数）
-  _minCellPx: 58,
-  _maxCellPx: 78,
-  _minCols: 6, _maxCols: 18,
-  _minRows: 4, _maxRows: 14,
+  // === Grid 布局 ===
+  // 格子固定大小（像素），不随容器缩放 — 屏幕放不下时可滚动
+  _cellPx: 62,       // 舒适的格子尺寸（与之前 58~78 的手感一致）
+  _minCols: 8, _maxCols: 20,
+  _minRows: 6, _maxRows: 16,
 
   _calcGridLayout() {
-    const dishView = document.querySelector('.dish-view');
-    const gridEl = document.getElementById('grid');
-    if (!dishView) return { cellSize: null, cols: this.gridCols };
-    const vw = dishView.clientWidth;
-    const vh = dishView.clientHeight;
-    const cs = gridEl ? getComputedStyle(gridEl) : null;
-    const gap = cs ? parseFloat(cs.gap) || parseFloat(cs.rowGap) || 10 : 10;
-    const padT = cs ? parseFloat(cs.paddingTop) || 10 : 10;
-    const padL = cs ? parseFloat(cs.paddingLeft) || 10 : 10;
-
-    // 策略：尽可能多放格子，但格子大小保持在 minCellPx ~ maxCellPx 之间
-    // 先按最小格子大小算出最多能放多少
-    const maxFitCols = Math.floor((vw - padL * 2 + gap) / (this._minCellPx + gap));
-    const maxFitRows = Math.floor((vh - padT * 2 + gap) / (this._minCellPx + gap));
-    // 再按最大格子大小算出最少放多少
-    const minFitCols = Math.floor((vw - padL * 2 + gap) / (this._maxCellPx + gap));
-    const minFitRows = Math.floor((vh - padT * 2 + gap) / (this._maxCellPx + gap));
-
-    // 取最多能放的数量（clamp 到范围内）
-    let newCols = Math.max(this._minCols, Math.min(this._maxCols, maxFitCols));
-    let newRows = Math.max(this._minRows, Math.min(this._maxRows, maxFitRows));
-
-    // 计算此时格子实际大小，如果太小就减少数量
-    let cellW = Math.floor((vw - padL * 2 - gap * (newCols - 1)) / newCols);
-    let cellH = Math.floor((vh - padT * 2 - gap * (newRows - 1)) / newRows);
-    let cellSize = Math.min(cellW, cellH);
-
-    // 如果格子太小，逐步减少行列直到格子大小合理
-    while (cellSize < this._minCellPx && (newCols > this._minCols || newRows > this._minRows)) {
-      // 优先减少格子更多（空间更紧张）的方向
-      if (cellW < cellH && newCols > this._minCols) {
-        newCols--;
-      } else if (newRows > this._minRows) {
-        newRows--;
-      } else {
-        newCols--;
-      }
-      cellW = Math.floor((vw - padL * 2 - gap * (newCols - 1)) / newCols);
-      cellH = Math.floor((vh - padT * 2 - gap * (newRows - 1)) / newRows);
-      cellSize = Math.min(cellW, cellH);
-    }
-
-    cellSize = Math.max(this._minCellPx, cellSize);
-
-    // 如果列数或行数变了，扩展/收缩网格数组
-    if (newCols !== this.gridCols || newRows !== this.gridRows) {
-      this._resizeGrid(newCols, newRows);
-    }
-
+    // 新策略：格子大小固定，网格行列数固定为 gridCols × gridRows
+    // 屏幕空间不够时靠 .dish-view 的滚动来解决（不再缩减格子数或尺寸）
+    const cellSize = this._cellPx;
     return { cellSize, cols: this.gridCols };
   },
 
@@ -2487,7 +2488,32 @@ const G = {
           const lvlStr = lvl >= 5 ? ' <span style="color:var(--color-max)">★MAX</span>' : ` <span style="color:var(--color-upgrade)">Lv.${lvl}</span>`;
           const multStr = lvl > 1 ? `<br><span style="color:var(--color-upgrade)">产出倍率: ${this.getUpgradeMultiplier(idx).toFixed(1)}x</span>` : '';
           const beltMult = this.getBeltMultiplierForBuilding(idx);
-          const beltStr = beltMult === 0 ? `<br><span style="color:#ef4444;font-weight:700">🚫 资源阻塞 — 需要传送带连接输入资源！</span>` : beltMult < 1 ? `<br><span style="color:var(--orange)">⚠ 传送带效率: ${Math.round(beltMult*100)}% — 点击传送带升级！</span>` : (beltMult > 1 ? `<br><span style="color:var(--cyan)">✦ 传送带加成: ${Math.round(beltMult*100)}%</span>` : '');
+          // 计算容量状态信息
+          let capInfo = '';
+          if (bd.cons && Object.keys(bd.cons).length > 0 && FLOW_MAP.some(f => f.to === bd.key || f.to === this.grid[idx]?.type)) {
+            const belts = this._activeBelts || [];
+            let totalCap = 0;
+            const selfType = this.grid[idx]?.type;
+            for (const belt of belts) {
+              if (belt.ti !== idx && belt.fi !== idx) continue;
+              const otherIdx = belt.fi === idx ? belt.ti : belt.fi;
+              const otherG = this.grid[otherIdx];
+              if (!otherG) continue;
+              if (FLOW_MAP.some(f => f.from === otherG.type && f.to === selfType)) {
+                const key = Math.min(belt.fi, belt.ti) + '-' + Math.max(belt.fi, belt.ti);
+                totalCap += this.getBeltCapacity(key);
+              }
+            }
+            const bldM = this.getUpgradeMultiplier(idx);
+            let demand = 0;
+            for (const k in bd.cons) demand += bd.cons[k] * bldM;
+            if (demand > 0 && totalCap > 0) {
+              const ratio = Math.min(100, Math.round(totalCap / demand * 100));
+              const capColor = ratio >= 100 ? 'var(--cyan)' : ratio >= 60 ? 'var(--yellow)' : 'var(--orange)';
+              capInfo = ` <span style="color:${capColor};font-size:0.85em">📦${totalCap.toFixed(1)}/${demand.toFixed(1)} (${ratio}%)</span>`;
+            }
+          }
+          const beltStr = beltMult === 0 ? `<br><span style="color:#ef4444;font-weight:700">🚫 资源阻塞 — 需要传送带连接输入资源！</span>` : beltMult < 1 ? `<br><span style="color:var(--orange)">⚠ 传送带效率: ${Math.round(beltMult*100)}%${capInfo} — 升级传送带或增加并行管线</span>` : (beltMult > 1 ? `<br><span style="color:var(--cyan)">✦ 传送带加成: ${Math.round(beltMult*100)}%${capInfo}</span>` : (capInfo ? `<br><span style="color:var(--color-info)">⛓ 传送带${capInfo}</span>` : ''));
 
           // 产出速率详情
           let rateStr = '';
@@ -2647,6 +2673,8 @@ const G = {
 
       gridEl.appendChild(cell);
     }
+    // 渲染完毕后刷新滚动指示器
+    if (this._updateScrollHints) setTimeout(this._updateScrollHints, 50);
   },
 
   // 更新格子内的警告标签（产出速率已移至 hover tooltip）
@@ -4685,7 +4713,7 @@ const G = {
 
     if (this.phase >= 5) {
       // 已达最高阶段
-      reqsEl.innerHTML = '<div style="font-size:0.65em;color:var(--purple);text-align:center;padding:4px 0">🌟 已达最高阶段</div>';
+      reqsEl.innerHTML = '<div style="font-size:0.78em;color:var(--purple);text-align:center;padding:4px 0">🌟 已达最高阶段</div>';
       btn.textContent = '✨ 帝国巅峰';
       btn.className = 'core-upgrade-btn maxed';
       btn.disabled = true;
@@ -5109,6 +5137,12 @@ const G = {
         if (this._hoverBeltKey) {
           this._hoverBeltKey = null;
           dishView.style.cursor = '';
+          // 隐藏传送带tooltip
+          const tt = document.getElementById('tooltip');
+          if (tt && this._beltTooltipActive) {
+            tt.classList.remove('show');
+            this._beltTooltipActive = false;
+          }
         }
         return;
       }
@@ -5120,12 +5154,65 @@ const G = {
       if (newKey !== this._hoverBeltKey) {
         this._hoverBeltKey = newKey;
         dishView.style.cursor = newKey ? 'pointer' : '';
+        const tt = document.getElementById('tooltip');
+        if (newKey && result.obj && tt) {
+          // 显示传送带悬停tooltip
+          const belt = result.obj;
+          const fromBld = this.grid[belt.fi];
+          const toBld = this.grid[belt.ti];
+          const fromName = fromBld ? (BLDS[fromBld.type]?.emoji || '') + ' ' + (BLDS[fromBld.type]?.n || '?') : '?';
+          const toName = toBld ? (BLDS[toBld.type]?.emoji || '') + ' ' + (BLDS[toBld.type]?.n || '?') : '?';
+          const lv = this.getBeltLevel(newKey);
+          const eff = this.getBeltEfficiency(newKey);
+          const cap = this.getBeltCapacity(newKey);
+          const effPct = Math.round(eff * 100);
+          const effColor = effPct >= 100 ? 'var(--cyan)' : effPct >= 70 ? 'var(--yellow)' : 'var(--orange)';
+          const lvColor = lv >= 5 ? 'var(--purple)' : lv >= 3 ? 'var(--cyan)' : lv >= 2 ? 'var(--yellow)' : 'var(--orange)';
+          // 计算两建筑的格子距离
+          const gridSize = Math.round(Math.sqrt(this.grid.length));
+          const r1 = Math.floor(belt.fi / gridSize), c1x = belt.fi % gridSize;
+          const r2 = Math.floor(belt.ti / gridSize), c2x = belt.ti % gridSize;
+          const cellDist = Math.abs(r1 - r2) + Math.abs(c1x - c2x);
+          const distColor = cellDist <= 1 ? '#22c55e' : cellDist <= 2 ? 'var(--cyan)' : cellDist <= 3 ? 'var(--yellow)' : 'var(--orange)';
+          const distLabel = cellDist <= 1 ? '📍 紧邻（最佳）' : cellDist <= 2 ? '📍 较近' : cellDist <= 3 ? '📍 中等距离' : '📍 较远';
+          document.getElementById('ttName').innerHTML = `⛓ 传送带 <span style="color:${lvColor}">Lv.${lv}</span>`;
+          document.getElementById('ttDesc').innerHTML =
+            `${fromName} → ${toName}` +
+            `<br><span style="color:${effColor}">⚡ 传输效率: ${effPct}%</span> · <span style="color:var(--color-info)">📦 容量: ${cap}/s</span>` +
+            `<br><span style="color:${distColor}">${distLabel} (距离${cellDist}格)</span>` +
+            `<br><span style="color:#7a9aba;font-size:0.9em">💡 建筑放得越近，传送带越短，资源传输更快更稳定！</span>` +
+            `<br><span style="color:var(--dim);font-size:0.85em">点击可升级/撤销传送带</span>`;
+          tt.classList.add('show');
+          tt.style.left = Math.min(e.clientX + 14, window.innerWidth - 260) + 'px';
+          tt.style.top = Math.min(e.clientY + 14, window.innerHeight - 140) + 'px';
+          this._beltTooltipActive = true;
+        } else if (!newKey && tt) {
+          // 移出传送带，隐藏tooltip
+          if (this._beltTooltipActive) {
+            tt.classList.remove('show');
+            this._beltTooltipActive = false;
+          }
+        }
+      }
+      // 跟随鼠标更新tooltip位置
+      if (this._beltTooltipActive && this._hoverBeltKey) {
+        const tt = document.getElementById('tooltip');
+        if (tt) {
+          tt.style.left = Math.min(e.clientX + 14, window.innerWidth - 260) + 'px';
+          tt.style.top = Math.min(e.clientY + 14, window.innerHeight - 140) + 'px';
+        }
       }
     });
     dishView.addEventListener('mouseleave', () => {
       if (this._hoverBeltKey) {
         this._hoverBeltKey = null;
         dishView.style.cursor = '';
+      }
+      // 隐藏传送带tooltip
+      const tt = document.getElementById('tooltip');
+      if (tt && this._beltTooltipActive) {
+        tt.classList.remove('show');
+        this._beltTooltipActive = false;
       }
     });
 
@@ -6853,6 +6940,8 @@ const G = {
         row.style.cssText = `padding:4px 6px;margin:2px 0;border-radius:3px;
           background:var(--color-panel-bg);border:1px solid ${minLv >= 5 ? 'rgba(74,26,106,0.25)' : minLv >= 3 ? 'rgba(26,58,58,0.25)' : 'rgba(58,42,26,0.25)'};
           cursor:pointer;transition:all 0.15s`;
+        const avgCap = grp.keys.reduce((s, k) => s + this.getBeltCapacity(k), 0) / count;
+        const capStr = avgCap.toFixed(1);
         row.innerHTML = `
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px">
             <span style="font-size:0.95em;color:var(--color-info)">${resIcons} ${grp.fromName} → ${grp.toName}${countTag}</span>
@@ -6860,7 +6949,7 @@ const G = {
           </div>
           <div style="display:flex;justify-content:space-between;align-items:center">
             <span style="font-size:0.75em;color:var(--color-muted-dark);font-family:'Share Tech Mono',monospace;letter-spacing:1px">${lvBar}</span>
-            <span style="font-size:0.85em;color:${effColor};font-weight:600">${effPct}%</span>
+            <span style="font-size:0.85em"><span style="color:${effColor};font-weight:600">${effPct}%</span> <span style="color:var(--color-muted);font-size:0.85em">|📦${capStr}/s</span></span>
           </div>`;
         // 点击批量升级同类传送带
         row.addEventListener('click', () => {
@@ -7471,27 +7560,36 @@ const G = {
 
   // ===== CONVEYOR BELT UPGRADE SYSTEM =====
   // 传送带等级: 1-5
-  // Lv1: 传输效率 0.5x（慢速），Lv2: 0.7x，Lv3: 1.0x（正常），Lv4: 1.2x，Lv5: 1.5x（高效）
+  // 每个等级有两个属性：
+  //   效率(eff) — 传输效率乘数，影响下游建筑产出倍率
+  //   容量(cap) — 每秒最大资源吞吐量，超出部分被钳制（需要并行多条管线）
+  // Lv1: eff=0.75x, cap=2.0/s | Lv2: 0.9x, 3.0/s | Lv3: 1.0x, 5.0/s | Lv4: 1.2x, 8.0/s | Lv5: 1.5x, 12.0/s
   getBeltLevel(beltKey) {
     return this.beltLevels[beltKey] || 1;
   },
 
+  // 传送带效率（产出乘数）
   getBeltEfficiency(beltKey) {
     const lv = this.getBeltLevel(beltKey);
-    // 【调优】Lv1=0.75(原0.5), Lv2=0.9(原0.7), Lv3=1.0, Lv4=1.2, Lv5=1.5
     const effMap = { 1: 0.75, 2: 0.9, 3: 1.0, 4: 1.2, 5: 1.5 };
     return effMap[lv] || 0.75;
+  },
+
+  // 传送带容量上限（每秒资源吞吐量）
+  getBeltCapacity(beltKey) {
+    const lv = this.getBeltLevel(beltKey);
+    const capMap = { 1: 2.0, 2: 3.0, 3: 5.0, 4: 8.0, 5: 12.0 };
+    return capMap[lv] || 2.0;
   },
 
   getBeltUpgradeCost(beltKey) {
     const lv = this.getBeltLevel(beltKey);
     if (lv >= 5) return null;
-    // 传送带升级费用：低级便宜，高级需要稀有资源
     const costs = {
-      1: { energy: 8, glucose: 5 },      // Lv1→2 — 早期可及
-      2: { energy: 20, glucose: 12 },     // Lv2→3
-      3: { energy: 40, glucose: 20, dna: 3 },   // Lv3→4
-      4: { energy: 70, glucose: 35, dna: 10 },   // Lv4→5
+      1: { energy: 8, glucose: 5 },
+      2: { energy: 20, glucose: 12 },
+      3: { energy: 40, glucose: 20, dna: 3 },
+      4: { energy: 70, glucose: 35, dna: 10 },
     };
     return costs[lv] || null;
   },
@@ -7503,16 +7601,17 @@ const G = {
       this._activeBelts = belts;
       this._beltEdges = usedEdges;
     }
-    this._chainsDirty = true;  // 数据变了，标记需要重渲染
+    this._chainsDirty = true;
   },
 
-  // 计算建筑的传送带加成
+  // 计算建筑的传送带加成（方向性 + 容量限制）
   // 规则：
-  //   - 如果建筑在 FLOW_MAP 中作为 to 端（即需要输入资源），
-  //     必须有 **合法的** 传送带连接（对端建筑是 FLOW_MAP 中该资源的 from 端）才能生产
-  //   - 两个相同建筑互连、或不在 FLOW_MAP 供给关系中的传送带不算有效连接
-  //   - 如果建筑不需要输入（纯采集建筑如碳源采集器），不受影响
-  //   - 有合法传送带时，产出受传送带平均效率影响
+  //   1. 方向性：只有 FLOW_MAP 中 from→to 方向正确的传送带才有效
+  //      即对端是 from 端，本建筑是 to 端 = 有效输入
+  //   2. 容量限制：每条传送带有吞吐量上限(cap/s)
+  //      建筑的总需求量 = sum(cons) * bldMult；如果总输入容量 < 需求，产出被钳制
+  //   3. 纯采集建筑(无 FLOW_MAP to 端)不受影响
+  //   4. 没有合法输入传送带的需求建筑 → 停产
   getBeltMultiplierForBuilding(idx) {
     const g = this.grid[idx];
     if (!g) return 1;
@@ -7520,44 +7619,69 @@ const G = {
     const bd = BLDS[type];
     if (!bd) return 1;
 
-    // 检查此建筑是否是某个FLOW的接收端（需要输入）
+    // 检查此建筑是否需要输入（是某个 FLOW 的 to 端）
     const needsInput = FLOW_MAP.some(f => f.to === type);
-    
-    // 查找所有连接到此建筑的传送带，但只计算合法供给关系的传送带
+
+    // 找所有方向正确的输入传送带（对端是 from，本端是 to）
     let totalEff = 0;
+    let totalCap = 0;
     let validBeltCount = 0;
     const belts = this._activeBelts || [];
-    
+
     for (const belt of belts) {
       if (belt.ti !== idx && belt.fi !== idx) continue;
-      
-      // 找到传送带对面建筑的类型
+
       const otherIdx = belt.fi === idx ? belt.ti : belt.fi;
       const otherG = this.grid[otherIdx];
       if (!otherG) continue;
       const otherType = otherG.type;
-      
-      // 检查是否存在合法的 FLOW_MAP 供给关系：
-      // 对面建筑是 from 端，当前建筑是 to 端（对面给我供货）
-      // 或者当前建筑是 from 端，对面是 to 端（我给对面供货，也算有效连接）
-      const isValidFlow = FLOW_MAP.some(f =>
-        (f.from === otherType && f.to === type) ||
-        (f.from === type && f.to === otherType)
-      );
-      
-      if (!isValidFlow) continue; // 不在供给关系中，跳过
-      
+
+      // ★ 方向性检查：只有对端→本端方向匹配 FLOW_MAP 的才算有效输入
+      const isValidInput = FLOW_MAP.some(f => f.from === otherType && f.to === type);
+      // 也计算输出方向（本端→对端），用于维持对称性让双方都不停产
+      const isValidOutput = FLOW_MAP.some(f => f.from === type && f.to === otherType);
+
+      if (!isValidInput && !isValidOutput) continue;
+
       const key = Math.min(belt.fi, belt.ti) + '-' + Math.max(belt.fi, belt.ti);
-      totalEff += this.getBeltEfficiency(key);
-      validBeltCount++;
+      const eff = this.getBeltEfficiency(key);
+      const cap = this.getBeltCapacity(key);
+
+      if (isValidInput) {
+        totalEff += eff;
+        totalCap += cap;
+        validBeltCount++;
+      } else if (isValidOutput) {
+        // 输出方向也算一条有效连接（否则上游会停产）
+        totalEff += eff;
+        totalCap += cap;
+        validBeltCount++;
+      }
     }
-    
+
     if (validBeltCount === 0) {
-      // 没有合法传送带：如果建筑需要输入资源，则停产
       return needsInput ? 0 : 1;
     }
-    const baseMult = totalEff / validBeltCount;
-    return baseMult * (1 + (this._beltBonus || 0)); // 转生加成加成传送带效率
+
+    // 基础效率 = 所有有效传送带的平均效率
+    const baseEff = totalEff / validBeltCount;
+
+    // ★ 容量钳制：计算建筑的总资源需求量
+    const bldMult = this.getUpgradeMultiplier(idx);
+    let totalDemand = 0;
+    for (const k in bd.cons) {
+      totalDemand += bd.cons[k] * bldMult;
+    }
+
+    // 如果没有消耗（纯产出建筑），不受容量限制
+    let capFactor = 1;
+    if (totalDemand > 0 && needsInput) {
+      // 容量因子 = min(1, 总容量 / 总需求)
+      // 容量不足时产出按比例降低，鼓励并行多条管线
+      capFactor = Math.min(1, totalCap / totalDemand);
+    }
+
+    return baseEff * capFactor * (1 + (this._beltBonus || 0));
   },
 
   showBeltUpgradePopup(beltKey) {
@@ -7573,15 +7697,18 @@ const G = {
     this._beltUpgradeKey = beltKey;
     const costStr = Object.entries(cost).map(([k,v]) => `${v}${RES[k]?.icon||k}`).join(' + ');
     const curEff = this.getBeltEfficiency(beltKey);
+    const curCap = this.getBeltCapacity(beltKey);
     const nextLv = lv + 1;
     const nextEffMap = { 1: 0.75, 2: 0.9, 3: 1.0, 4: 1.2, 5: 1.5 };
+    const nextCapMap = { 1: 2.0, 2: 3.0, 3: 5.0, 4: 8.0, 5: 12.0 };
     const nextEff = nextEffMap[nextLv];
+    const nextCap = nextCapMap[nextLv];
 
     const pop = document.getElementById('beltUpgradePopup');
     if (!pop) return;
     document.getElementById('beltUpgradeName').textContent = `⛓ 传送带`;
     document.getElementById('beltUpgradeLevel').textContent = `Lv.${lv} → Lv.${nextLv}`;
-    document.getElementById('beltUpgradeEffect').textContent = `传输效率: ${Math.round(curEff*100)}% → ${Math.round(nextEff*100)}%`;
+    document.getElementById('beltUpgradeEffect').textContent = `效率: ${Math.round(curEff*100)}% → ${Math.round(nextEff*100)}%  |  容量: ${curCap}/s → ${nextCap}/s`;
     document.getElementById('beltUpgradeCost').textContent = `造价: ${costStr}`;
 
     const canAfford = this.checkRes(cost);
@@ -7671,8 +7798,10 @@ const G = {
 
     const menu = document.getElementById('beltActionMenu');
     document.getElementById('beltActionTitle').textContent = `${fromName} → ${toName}`;
+    const cap = this.getBeltCapacity(beltKey);
     document.getElementById('beltActionInfo').innerHTML =
       `<span style="color:var(--orange)">Lv.${lv}</span> · 效率 <span style="color:${eff >= 1 ? 'var(--cyan)' : 'var(--yellow)'}">${Math.round(eff * 100)}%</span>` +
+      ` · 📦<span style="color:var(--color-info)">${cap}/s</span>` +
       (isManual ? ' · <span style="color:var(--cyan)">手动</span>' : '');
 
     // 升级按钮
@@ -7899,16 +8028,19 @@ const G = {
 
     const costStr = Object.entries(totalCost).map(([k,v]) => `${v}${RES[k]?.icon||k}`).join(' + ');
     const curEff = this.getBeltEfficiency(toUpgrade[0]);
+    const curCap = this.getBeltCapacity(toUpgrade[0]);
     const nextLv = minLv + 1;
     const nextEffMap = { 1: 0.75, 2: 0.9, 3: 1.0, 4: 1.2, 5: 1.5 };
+    const nextCapMap = { 1: 2.0, 2: 3.0, 3: 5.0, 4: 8.0, 5: 12.0 };
     const nextEff = nextEffMap[nextLv];
+    const nextCap = nextCapMap[nextLv];
 
     const pop = document.getElementById('beltUpgradePopup');
     if (!pop) return;
     const label = count > 1 ? `⛓ ${fromName} → ${toName} ×${count}` : `⛓ ${fromName} → ${toName}`;
     document.getElementById('beltUpgradeName').textContent = label;
     document.getElementById('beltUpgradeLevel').textContent = `Lv.${minLv} → Lv.${nextLv}`;
-    document.getElementById('beltUpgradeEffect').textContent = `传输效率: ${Math.round(curEff*100)}% → ${Math.round(nextEff*100)}%`;
+    document.getElementById('beltUpgradeEffect').textContent = `效率: ${Math.round(curEff*100)}% → ${Math.round(nextEff*100)}%  |  容量: ${curCap}/s → ${nextCap}/s`;
     document.getElementById('beltUpgradeCost').textContent = `造价: ${costStr}`;
 
     const canAfford = this.checkRes(totalCost);
@@ -8380,3 +8512,69 @@ const GameTooltip = (() => {
 document.addEventListener('mousemove', (e) => { window._lastMouseEvt = e; });
 G.init();
 GameTooltip.init();
+
+// ===== 传送带按钮 hover tooltip =====
+(() => {
+  const beltBtn = document.getElementById('beltConnectBtn');
+  if (!beltBtn) return;
+  let _beltBtnTooltipActive = false;
+
+  beltBtn.addEventListener('mouseenter', (e) => {
+    const tt = document.getElementById('tooltip');
+    if (!tt) return;
+
+    // 统计当前传送带信息
+    const belts = G.belts || [];
+    const beltCount = belts.length;
+    const manualCount = Object.keys(G.manualBelts || {}).length;
+
+    // 计算平均效率
+    let avgEff = 75;
+    if (beltCount > 0) {
+      let totalEff = 0;
+      belts.forEach(belt => {
+        const key = Math.min(belt.fi, belt.ti) + '-' + Math.max(belt.fi, belt.ti);
+        totalEff += G.getBeltEfficiency(key) * 100;
+      });
+      avgEff = Math.round(totalEff / beltCount);
+    }
+    const effColor = avgEff >= 100 ? 'var(--cyan)' : avgEff >= 70 ? 'var(--yellow)' : 'var(--orange)';
+
+    document.getElementById('ttName').innerHTML = '🔗 传送带系统';
+    document.getElementById('ttDesc').innerHTML =
+      `<span style="color:#8aa0c0">连接两个建筑，建立资源传输通道</span>` +
+      (beltCount > 0
+        ? `<br><span style="color:var(--dim)">当前传送带: <span style="color:var(--bright)">${beltCount}条</span></span>` +
+          `<br><span style="color:var(--dim)">平均效率: <span style="color:${effColor}">${avgEff}%</span></span>`
+        : `<br><span style="color:var(--dim)">当前暂无传送带</span>`) +
+      `<br>` +
+      `<br><span style="color:#f97316;font-weight:700">⚡ 效率提示</span>` +
+      `<br><span style="color:#22c55e">📍 建筑放得越近，传送带越短</span>` +
+      `<br><span style="color:#22c55e">&nbsp;&nbsp;&nbsp;→ 资源传输更快更稳定！</span>` +
+      `<br>` +
+      `<br><span style="color:#7a9aba;font-size:0.9em">📊 等级效率: Lv1=75% → Lv5=150%</span>` +
+      `<br><span style="color:#7a9aba;font-size:0.9em">📦 等级容量: Lv1=2/s → Lv5=12/s</span>` +
+      `<br><span style="color:var(--dim);font-size:0.85em">💡 升级传送带可大幅提升传输效率</span>`;
+
+    tt.classList.add('show');
+    tt.style.left = Math.min(e.clientX + 14, window.innerWidth - 280) + 'px';
+    tt.style.top = Math.min(e.clientY + 14, window.innerHeight - 240) + 'px';
+    _beltBtnTooltipActive = true;
+  });
+
+  beltBtn.addEventListener('mousemove', (e) => {
+    if (!_beltBtnTooltipActive) return;
+    const tt = document.getElementById('tooltip');
+    if (tt) {
+      tt.style.left = Math.min(e.clientX + 14, window.innerWidth - 280) + 'px';
+      tt.style.top = Math.min(e.clientY + 14, window.innerHeight - 240) + 'px';
+    }
+  });
+
+  beltBtn.addEventListener('mouseleave', () => {
+    if (!_beltBtnTooltipActive) return;
+    const tt = document.getElementById('tooltip');
+    if (tt) tt.classList.remove('show');
+    _beltBtnTooltipActive = false;
+  });
+})();

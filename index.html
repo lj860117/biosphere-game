@@ -87,7 +87,7 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 .title-box .sub{font-size:0.65em;color:var(--dim);letter-spacing:3px}
 .spacer{flex:1}
 .phase-badge{
-  padding:3px 10px;border-radius:12px;font-size:0.65em;font-weight:700;
+  padding:4px 12px;border-radius:12px;font-size:0.78em;font-weight:700;
   letter-spacing:1px;border:1px solid;
   animation:glow 2s ease-in-out infinite;
 }
@@ -131,27 +131,27 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 
 /* === LEFT: RESOURCES + ACTIONS === */
 .sidebar{
-  width:300px;flex-shrink:0;overflow-y:auto;padding:12px;
+  width:380px;flex-shrink:0;overflow-y:auto;padding:14px;
   background:var(--panel);border-right:1px solid var(--bdr);
   scrollbar-width:thin;scrollbar-color:#1a3050 transparent;
-  font-size:1.05em;
+  font-size:1.15em;
 }
-.sidebar::-webkit-scrollbar{width:3px}
-.sidebar::-webkit-scrollbar-thumb{background:#1a3050}
+.sidebar::-webkit-scrollbar{width:5px}
+.sidebar::-webkit-scrollbar-thumb{background:#1a3050;border-radius:3px}
 
 /* Resources */
-.res-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:12px}
+.res-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:14px}
 .res-card{
   padding:8px;background:rgba(10,18,30,0.8);border:1px solid var(--bdr);
   border-radius:4px;position:relative;overflow:hidden;transition:all 0.3s;
 }
 .res-card:hover{border-color:#2a4a6a}
 .res-card.hidden{display:none}
-.res-icon{font-size:1.3em;line-height:1}
-.res-name{font-size:0.82em;color:var(--dim);margin-top:1px}
-.res-val{font-family:'Orbitron',monospace;font-size:1.0em;font-weight:700;color:var(--bright);
+.res-icon{font-size:1.4em;line-height:1}
+.res-name{font-size:0.88em;color:var(--dim);margin-top:2px}
+.res-val{font-family:'Orbitron',monospace;font-size:1.1em;font-weight:700;color:var(--bright);
   text-shadow:0 1px 2px rgba(0,0,0,0.6)}
-.res-rate{font-family:'Share Tech Mono',monospace;font-size:0.8em;color:var(--dim)}
+.res-rate{font-family:'Share Tech Mono',monospace;font-size:0.85em;color:var(--dim)}
 .res-rate.pos{color:var(--green)}
 .res-rate.neg{color:var(--red)}
 .res-flash{position:absolute;inset:0;opacity:0;transition:opacity 0.25s;border-radius:4px;pointer-events:none}
@@ -164,11 +164,11 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
   padding:10px 8px;
 }
 .res-card.res-core .res-val{
-  font-size:1.1em;font-weight:900;letter-spacing:0.5px;
+  font-size:1.2em;font-weight:900;letter-spacing:0.5px;
 }
-.res-card.res-core .res-icon{font-size:1.4em}
-.res-card.res-core .res-name{font-size:0.8em;font-weight:600}
-.res-card.res-core .res-rate{font-size:0.72em;margin-top:2px}
+.res-card.res-core .res-icon{font-size:1.5em}
+.res-card.res-core .res-name{font-size:0.88em;font-weight:600}
+.res-card.res-core .res-rate{font-size:0.8em;margin-top:2px}
 /* 各核心资源的独特发光色 */
 .res-card.res-core[data-res="glucose"]{
   border-color:rgba(34,197,94,0.2);
@@ -195,9 +195,9 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 /* Section */
 .section{margin-bottom:12px}
 .section-title{
-  font-family:'Orbitron',monospace;font-size:0.82em;color:var(--dim);
-  letter-spacing:2px;text-transform:uppercase;margin-bottom:6px;
-  padding-bottom:3px;border-bottom:1px solid #0e1a2a;
+  font-family:'Orbitron',monospace;font-size:0.9em;color:var(--dim);
+  letter-spacing:2px;text-transform:uppercase;margin-bottom:8px;
+  padding-bottom:4px;border-bottom:1px solid #0e1a2a;
   display:flex;align-items:center;gap:6px;
 }
 
@@ -314,24 +314,24 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 .build-row{display:flex;gap:3px;margin-bottom:3px;align-items:stretch}
 .build-row .action-btn{margin-bottom:0;flex:1;min-width:0}
 .action-btn{
-  width:100%;padding:8px 10px;
+  width:100%;padding:10px 12px;
   border:1px solid var(--bdr);border-radius:4px;
   background:linear-gradient(135deg,rgba(8,16,28,0.9),rgba(6,12,22,0.9));
   color:var(--text);cursor:pointer;transition:all 0.2s;text-align:left;
-  display:flex;align-items:center;gap:8px;position:relative;overflow:hidden;
+  display:flex;align-items:center;gap:10px;position:relative;overflow:hidden;
 }
 .action-btn:hover:not(.locked){background:rgba(6,214,160,0.04);border-color:#1a4a50;transform:translateX(2px)}
 .action-btn.active{border-color:var(--cyan);background:rgba(6,214,160,0.06);box-shadow:0 0 10px rgba(6,214,160,0.08)}
 .action-btn.locked{opacity:0.25;cursor:not-allowed;pointer-events:none}
 .action-btn.new{animation:newItem 0.5s ease-out}
 @keyframes newItem{0%{opacity:0;transform:translateY(-8px)}100%{opacity:1;transform:translateY(0)}}
-.act-icon{width:28px;height:28px;flex-shrink:0}
+.act-icon{width:32px;height:32px;flex-shrink:0}
 .act-icon svg{width:100%;height:100%}
-.act-name{font-weight:700;font-size:0.85em;line-height:1.1}
-.act-desc{font-size:0.78em;color:var(--dim)}
-.act-cost{font-size:0.78em;color:var(--yellow);font-weight:600}
+.act-name{font-weight:700;font-size:1.05em;line-height:1.25}
+.act-desc{font-size:0.95em;color:var(--dim)}
+.act-cost{font-size:0.95em;color:var(--yellow);font-weight:600}
 .act-tag{
-  position:absolute;top:3px;right:5px;font-size:0.58em;padding:1px 5px;
+  position:absolute;top:3px;right:5px;font-size:0.7em;padding:2px 6px;
   border-radius:8px;font-weight:700;letter-spacing:0.5px;
 }
 
@@ -347,8 +347,8 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
   box-shadow:0 0 8px rgba(6,214,160,0.12);transform:scale(1.05)}
 .build-upgrade-btn.maxed{opacity:0.3;cursor:default;pointer-events:none;
   border-color:#1a2a3a;color:#3a5a6a}
-.build-up-icon{font-size:0.9em;line-height:1}
-.build-up-label{font-size:0.55em;font-weight:700;font-family:'Share Tech Mono',monospace;letter-spacing:0.5px}
+.build-up-icon{font-size:1.15em;line-height:1}
+.build-up-label{font-size:0.7em;font-weight:700;font-family:'Share Tech Mono',monospace;letter-spacing:0.5px}
 
 /* Cursor tooltip for insufficient resources */
 .cursor-tooltip{
@@ -391,8 +391,8 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
   filter:drop-shadow(0 0 4px rgba(249,115,22,0.3));
 }
 .belt-connect-text{display:flex;flex-direction:column;gap:1px}
-.belt-connect-name{font-weight:700;font-size:0.8em;color:#f97316}
-.belt-connect-desc{font-size:0.72em;color:var(--dim)}
+.belt-connect-name{font-weight:700;font-size:1.0em;color:#f97316}
+.belt-connect-desc{font-size:0.88em;color:var(--dim)}
 /* 有建筑阻塞时传送带按钮变红 */
 .belt-connect-action-btn.has-blocked{
   border-color:rgba(239,68,68,0.6);border-style:solid;
@@ -452,8 +452,8 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
   background:rgba(249,115,22,0.10);box-shadow:0 0 10px rgba(249,115,22,0.10);
   transform:scale(1.05)}
 .belt-upgrade-inline-btn.no-belts{opacity:0.25;pointer-events:none}
-.belt-upgrade-inline-btn .belt-up-icon{font-size:1em;line-height:1}
-.belt-upgrade-inline-btn .belt-up-label{font-size:0.55em;font-weight:700;
+.belt-upgrade-inline-btn .belt-up-icon{font-size:1.1em;line-height:1}
+.belt-upgrade-inline-btn .belt-up-label{font-size:0.6em;font-weight:700;
   font-family:'Share Tech Mono',monospace;letter-spacing:0.5px}
 
 /* Belt type selector popup */
@@ -508,21 +508,23 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
   padding:6px 12px;border-bottom:1px solid var(--bdr);
   background:rgba(5,10,18,0.95);flex-shrink:0;
 }
-.dish-name{font-family:'Orbitron',monospace;font-size:0.8em;color:var(--dim);letter-spacing:2px}
-.dish-env{display:flex;gap:8px;font-size:0.72em}
+.dish-name{font-family:'Orbitron',monospace;font-size:0.95em;color:var(--dim);letter-spacing:2px}
+.dish-env{display:flex;gap:8px;font-size:0.85em}
 .dish-env span{color:var(--dim)}
 .dish-env .val{font-family:'Orbitron',monospace;color:var(--color-info)}
-.dish-view{flex:1;position:relative;overflow-y:auto;overflow-x:hidden;scrollbar-width:thin;scrollbar-color:rgba(6,214,160,0.3) transparent}
-.dish-view::-webkit-scrollbar{width:6px}
+.dish-view{flex:1;position:relative;overflow:auto;scrollbar-width:thin;scrollbar-color:rgba(6,214,160,0.3) transparent}
+.dish-view::-webkit-scrollbar{width:6px;height:6px}
 .dish-view::-webkit-scrollbar-track{background:transparent}
 .dish-view::-webkit-scrollbar-thumb{background:rgba(6,214,160,0.3);border-radius:3px}
 .dish-view::-webkit-scrollbar-thumb:hover{background:rgba(6,214,160,0.5)}
-.dish-scroll-inner{position:relative;min-height:100%}
+.dish-view::-webkit-scrollbar-corner{background:transparent}
+.dish-scroll-inner{position:relative;min-height:100%;width:fit-content;min-width:100%}
 #bgCanvas,#partCanvas{position:absolute;top:0;left:0;width:100%;pointer-events:none}
 #bgCanvas{z-index:0}#partCanvas{z-index:5}
 .grid{
   position:relative;display:grid;gap:10px;padding:10px;z-index:2;
   justify-content:center;align-content:start;touch-action:manipulation;
+  width:fit-content;min-width:100%;
 }
 .cell{
   aspect-ratio:1;
@@ -576,6 +578,18 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
   0%,100%{border-color:rgba(239,68,68,0.45);box-shadow:0 0 4px rgba(239,68,68,0.1)}
   50%{border-color:rgba(239,68,68,0.8);box-shadow:0 0 12px rgba(239,68,68,0.25),inset 0 0 8px rgba(239,68,68,0.06)}
 }
+
+/* 滚动提示渐变阴影 — 网格超出可视区域时在边缘显示 */
+.dish-view.can-scroll-right::after{
+  content:'';position:absolute;right:0;top:0;bottom:0;width:24px;z-index:20;pointer-events:none;
+  background:linear-gradient(to right,transparent,rgba(6,214,160,0.08) 40%,rgba(6,214,160,0.15));
+}
+.dish-view.can-scroll-down::before{
+  content:'';position:absolute;bottom:0;left:0;right:0;height:24px;z-index:20;pointer-events:none;
+  background:linear-gradient(to bottom,transparent,rgba(6,214,160,0.08) 40%,rgba(6,214,160,0.15));
+}
+.dish-view.scrolled-right::after{display:none}
+.dish-view.scrolled-down::before{display:none}
 
 /* 邻接加成badge */
 .cell-adj-badge{
@@ -847,7 +861,7 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 /* Tooltip */
 .tooltip{
   position:fixed;z-index:9000;background:rgba(8,14,28,0.97);border:1px solid var(--bdr);
-  border-radius:6px;padding:10px 14px;max-width:250px;pointer-events:none;
+  border-radius:6px;padding:10px 14px;max-width:290px;pointer-events:none;
   font-size:0.7em;color:var(--text);box-shadow:0 4px 20px rgba(0,0,0,0.5);
   display:none;backdrop-filter:blur(4px);
 }
@@ -968,8 +982,8 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 
 /* 供能状态文字标签 */
 .core-supply-status-tag{
-  font-family:'Orbitron',monospace;font-size:0.65em;font-weight:700;
-  padding:2px 8px;border-radius:3px;letter-spacing:1px;
+  font-family:'Orbitron',monospace;font-size:0.78em;font-weight:700;
+  padding:3px 10px;border-radius:3px;letter-spacing:1px;
   white-space:nowrap;
   transition:all .3s;
 }
@@ -1037,17 +1051,17 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 .core-colony-info{flex:1;min-width:0}
 .core-colony-label{display:flex;align-items:center;gap:8px}
 .core-phase-tag{
-  font-family:'Orbitron',monospace;font-size:0.65em;font-weight:900;
-  padding:2px 8px;border-radius:4px;letter-spacing:1.5px;
+  font-family:'Orbitron',monospace;font-size:0.78em;font-weight:900;
+  padding:3px 10px;border-radius:4px;letter-spacing:1.5px;
   background:rgba(0,0,0,0.5);border:1px solid;
   transition:color .6s,border-color .6s;
 }
 .core-colony-title{
-  font-family:'Orbitron',monospace;font-size:0.92em;font-weight:900;
+  font-family:'Orbitron',monospace;font-size:1.08em;font-weight:900;
   letter-spacing:1.5px;transition:color .6s;
 }
 .core-colony-desc{
-  font-size:0.68em;color:#7a9aba;margin-top:3px;
+  font-size:0.82em;color:#7a9aba;margin-top:3px;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
   transition:color .4s;
 }
@@ -1057,11 +1071,11 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
   flex-shrink:0;
 }
 .core-supply-label{
-  font-family:'Orbitron',monospace;font-size:0.6em;font-weight:700;
+  font-family:'Orbitron',monospace;font-size:0.72em;font-weight:700;
   color:#4a7a6a;letter-spacing:1px;
 }
 .core-supply-value{
-  font-family:'Orbitron',monospace;font-size:0.85em;font-weight:900;
+  font-family:'Orbitron',monospace;font-size:1.0em;font-weight:900;
   letter-spacing:0.5px;
   transition:color .3s;
 }
@@ -1073,26 +1087,26 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
   height:100%;border-radius:2px;transition:width .3s,background .3s;
 }
 .core-colony-status{
-  font-size:0.6em;color:#5a7a9a;flex-shrink:0;
+  font-size:0.72em;color:#5a7a9a;flex-shrink:0;
   white-space:nowrap;font-weight:600;
 }
 /* ====== 帝国核心升级面板 ====== */
 .core-upgrade-panel{
-  width:100%;padding:8px 12px;margin-top:6px;
+  width:100%;padding:10px 14px;margin-top:6px;
   background:rgba(8,14,28,0.6);border:1px solid var(--bdr);border-radius:4px;
   grid-column:1/-1;
 }
 .core-upgrade-title{
-  font-family:'Orbitron',monospace;font-size:0.65em;font-weight:700;
+  font-family:'Orbitron',monospace;font-size:0.78em;font-weight:700;
   color:var(--dim);letter-spacing:1px;margin-bottom:6px;
 }
 .core-upgrade-reqs{
-  display:flex;flex-wrap:wrap;gap:4px 8px;margin-bottom:8px;
+  display:flex;flex-wrap:wrap;gap:5px 10px;margin-bottom:8px;
 }
 .core-req-item{
   display:inline-flex;align-items:center;gap:4px;
-  font-size:0.62em;font-weight:600;
-  padding:2px 8px;border-radius:10px;
+  font-size:0.75em;font-weight:600;
+  padding:3px 10px;border-radius:10px;
   background:rgba(255,255,255,0.03);white-space:nowrap;
 }
 .core-req-item.met{color:var(--green)}
@@ -1100,8 +1114,8 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 .core-req-item.unmet{color:var(--orange)}
 .core-req-item.unmet::before{content:'✗';font-weight:900;font-size:0.9em;color:var(--red)}
 .core-upgrade-btn{
-  width:100%;padding:5px 10px;border-radius:3px;
-  font-family:'Rajdhani',sans-serif;font-weight:700;font-size:0.7em;
+  width:100%;padding:6px 12px;border-radius:3px;
+  font-family:'Rajdhani',sans-serif;font-weight:700;font-size:0.82em;
   letter-spacing:1px;cursor:pointer;transition:all 0.3s;
   border:1px solid;position:relative;overflow:visible;
 }
@@ -1139,13 +1153,13 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
   border-bottom:1px solid rgba(100,120,160,0.08);
 }
 .suggestion-header:hover{background:rgba(100,120,160,0.04)}
-.suggestion-icon{font-size:0.8em;display:inline-block;animation:suggIconGlow 3.5s ease-in-out infinite}
+.suggestion-icon{font-size:0.95em;display:inline-block;animation:suggIconGlow 3.5s ease-in-out infinite}
 @keyframes suggIconGlow{
   0%,100%{opacity:0.25;filter:brightness(0.5);transform:scale(0.92)}
   50%{opacity:0.7;filter:brightness(1) drop-shadow(0 0 3px rgba(255,220,80,0.25));transform:scale(1.05)}
 }
 .suggestion-title{
-  font-family:'Orbitron',monospace;font-size:0.6em;color:rgba(160,180,210,0.6);
+  font-family:'Orbitron',monospace;font-size:0.72em;color:rgba(160,180,210,0.6);
   letter-spacing:1.5px;text-transform:uppercase;
 }
 .suggestion-toggle{
@@ -1779,7 +1793,7 @@ body::after{
 
 /* ===== RESPONSIVE: TABLET (≤1100px) ===== */
 @media (max-width:1100px){
-  .sidebar{width:260px;padding:10px;font-size:1em}
+  .sidebar{width:340px;padding:12px;font-size:1.1em}
   .right-panel{width:240px;padding:10px;font-size:1em}
   .topbar{padding:6px 10px;gap:8px}
   .logo{width:28px;height:28px}
@@ -1793,7 +1807,7 @@ body::after{
   .core-phase-tag{font-size:0.55em}
   .core-colony-title{font-size:0.78em}
   .core-colony-desc{font-size:0.6em}
-  .grid{gap:6px;padding:6px}
+  .grid{gap:8px;padding:8px}
   .cell .label{font-size:0.45em}
   .cell-emoji{font-size:0.9em}
   .cell-tier{font-size:0.4em}
@@ -1803,11 +1817,11 @@ body::after{
 /* ===== RESPONSIVE: SMALL TABLET (≤900px) ===== */
 @media (max-width:900px){
   .right-panel{width:210px;padding:8px;font-size:0.95em}
-  .sidebar{width:230px;padding:8px;font-size:0.95em}
+  .sidebar{width:300px;padding:10px;font-size:1.05em}
   .stat-row{font-size:0.68em}
   .guide-step{font-size:0.7em}
   .evo-header{font-size:0.9em}
-  .section-title{font-size:0.68em}
+  .section-title{font-size:0.78em}
   #phaseEvoHint{font-size:0.55em}
   #saveIndicator{font-size:0.55em}
 }
@@ -1857,7 +1871,7 @@ body::after{
   .core-phase-tag{font-size:0.5em;padding:1px 5px}
 
   /* Grid 调整 */
-  .grid{gap:4px;padding:4px}
+  .grid{gap:6px;padding:6px}
   .cell .label{font-size:0.42em}
   .cell-emoji{font-size:0.85em}
   .cell-tier{font-size:0.38em;padding:0px 2px}
@@ -1964,8 +1978,8 @@ body::after{
     </div>
     <div class="spacer"></div>
     <div class="phase-badge" id="phaseBadge" style="color:var(--green);border-color:var(--green)30">阶段 1 · 采集</div>
-    <div id="phaseEvoHint" style="font-size:0.65em;text-align:center;margin:-2px 0 2px;opacity:0.8"></div>
-    <div id="saveIndicator" style="font-size:0.65em;color:var(--dim);opacity:0;transition:opacity 0.3s;white-space:nowrap">💾 已保存</div>
+    <div id="phaseEvoHint" style="font-size:0.78em;text-align:center;margin:-2px 0 2px;opacity:0.8"></div>
+    <div id="saveIndicator" style="font-size:0.78em;color:var(--dim);opacity:0;transition:opacity 0.3s;white-space:nowrap">💾 已保存</div>
     <div class="ctrl-btns">
       <button class="ctrl-btn spd-btn" onclick="G.toggleSpeed()" id="spdBtn" title="加速">⚡ <span id="spdDisplay" style="font-family:'Orbitron',monospace;font-size:0.95em">1×</span></button>
       <button class="ctrl-btn pause-btn" onclick="G.togglePause()" id="pauseBtn" title="暂停/继续">⏸</button>
@@ -1980,40 +1994,46 @@ body::after{
     <!-- LEFT SIDEBAR -->
     <div class="sidebar">
       <!-- Resources -->
-      <div class="section">
-        <div class="section-title">资源</div>
-        <div class="res-grid" id="resGrid"></div>
+      <div class="section" id="secResources">
+        <div class="section-title">资源 <button class="sec-toggle" onclick="G.toggleSection('secResources')">▾</button></div>
+        <div class="sec-body">
+          <div class="res-grid" id="resGrid"></div>
+        </div>
       </div>
 
       <!-- Actions -->
-      <div class="section">
-        <div class="section-title">建造 <span class="hint" id="buildHint">选一个放到培养皿里</span></div>
-        <div id="buildList"></div>
-        <div class="belt-action-row">
-          <button class="belt-connect-action-btn" id="beltConnectBtn" onclick="G.startBeltConnect()">
-            <span class="belt-connect-icon">🔗</span>
-            <span class="belt-connect-text">
-              <span class="belt-connect-name">连接传送带</span>
-              <span class="belt-connect-desc">选择两个建筑，手动建立资源通道</span>
-            </span>
-          </button>
-          <button class="belt-upgrade-inline-btn" id="beltUpgradeInlineBtn" onclick="G.showBeltTypeSelector()" title="升级传送带">
-            <span class="belt-up-icon">⬆</span>
-            <span class="belt-up-label" id="beltUpgradeInlineLabel">升级</span>
-          </button>
+      <div class="section" id="secBuild">
+        <div class="section-title">建造 <span class="hint" id="buildHint">选一个放到培养皿里</span> <button class="sec-toggle" onclick="G.toggleSection('secBuild')">▾</button></div>
+        <div class="sec-body">
+          <div id="buildList"></div>
+          <div class="belt-action-row">
+            <button class="belt-connect-action-btn" id="beltConnectBtn" onclick="G.startBeltConnect()">
+              <span class="belt-connect-icon">🔗</span>
+              <span class="belt-connect-text">
+                <span class="belt-connect-name">连接传送带</span>
+                <span class="belt-connect-desc">选择两个建筑，手动建立资源通道</span>
+              </span>
+            </button>
+            <button class="belt-upgrade-inline-btn" id="beltUpgradeInlineBtn" onclick="G.showBeltTypeSelector()" title="升级传送带">
+              <span class="belt-up-icon">⬆</span>
+              <span class="belt-up-label" id="beltUpgradeInlineLabel">升级</span>
+            </button>
+          </div>
         </div>
       </div>
 
       <div class="section" id="techSection" style="display:none">
-        <div class="section-title">研究</div>
-        <div id="techList"></div>
+        <div class="section-title">研究 <button class="sec-toggle" onclick="G.toggleSection('techSection')">▾</button></div>
+        <div class="sec-body">
+          <div id="techList"></div>
+        </div>
       </div>
     </div>
 
     <!-- CENTER: PETRI DISH -->
     <div class="center">
       <div class="dish-header">
-        <div class="dish-name" id="dishName">培养皿 <span style="font-size:0.7em;color:var(--dim);font-family:'Rajdhani',sans-serif">· 拖拽移动 · 双击升级 · 右键回收 · 框选批量 · 快捷键: 空格暂停 / 1-3加速 / ESC关闭</span></div>
+        <div class="dish-name" id="dishName">培养皿 <span style="font-size:0.82em;color:var(--dim);font-family:'Rajdhani',sans-serif">· 拖拽移动 · 双击升级 · 右键回收 · 框选批量 · 快捷键: 空格暂停 / 1-3加速 / ESC关闭</span></div>
         <div class="dish-env">
           <span>pH <span class="val" id="envPH">7.0</span></span>
           <span>T° <span class="val" id="envT">37</span></span>
