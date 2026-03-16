@@ -131,9 +131,10 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 
 /* === LEFT: RESOURCES + ACTIONS === */
 .sidebar{
-  width:260px;flex-shrink:0;overflow-y:auto;padding:10px;
+  width:300px;flex-shrink:0;overflow-y:auto;padding:12px;
   background:var(--panel);border-right:1px solid var(--bdr);
   scrollbar-width:thin;scrollbar-color:#1a3050 transparent;
+  font-size:1.05em;
 }
 .sidebar::-webkit-scrollbar{width:3px}
 .sidebar::-webkit-scrollbar-thumb{background:#1a3050}
@@ -146,11 +147,11 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 }
 .res-card:hover{border-color:#2a4a6a}
 .res-card.hidden{display:none}
-.res-icon{font-size:1.2em;line-height:1}
-.res-name{font-size:0.7em;color:var(--dim);margin-top:1px}
-.res-val{font-family:'Orbitron',monospace;font-size:0.85em;font-weight:700;color:var(--bright);
+.res-icon{font-size:1.3em;line-height:1}
+.res-name{font-size:0.82em;color:var(--dim);margin-top:1px}
+.res-val{font-family:'Orbitron',monospace;font-size:1.0em;font-weight:700;color:var(--bright);
   text-shadow:0 1px 2px rgba(0,0,0,0.6)}
-.res-rate{font-family:'Share Tech Mono',monospace;font-size:0.7em;color:var(--dim)}
+.res-rate{font-family:'Share Tech Mono',monospace;font-size:0.8em;color:var(--dim)}
 .res-rate.pos{color:var(--green)}
 .res-rate.neg{color:var(--red)}
 .res-flash{position:absolute;inset:0;opacity:0;transition:opacity 0.25s;border-radius:4px;pointer-events:none}
@@ -166,8 +167,8 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
   font-size:1.1em;font-weight:900;letter-spacing:0.5px;
 }
 .res-card.res-core .res-icon{font-size:1.4em}
-.res-card.res-core .res-name{font-size:0.72em;font-weight:600}
-.res-card.res-core .res-rate{font-size:0.62em;margin-top:2px}
+.res-card.res-core .res-name{font-size:0.8em;font-weight:600}
+.res-card.res-core .res-rate{font-size:0.72em;margin-top:2px}
 /* 各核心资源的独特发光色 */
 .res-card.res-core[data-res="glucose"]{
   border-color:rgba(34,197,94,0.2);
@@ -194,7 +195,7 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 /* Section */
 .section{margin-bottom:12px}
 .section-title{
-  font-family:'Orbitron',monospace;font-size:0.7em;color:var(--dim);
+  font-family:'Orbitron',monospace;font-size:0.82em;color:var(--dim);
   letter-spacing:2px;text-transform:uppercase;margin-bottom:6px;
   padding-bottom:3px;border-bottom:1px solid #0e1a2a;
   display:flex;align-items:center;gap:6px;
@@ -247,7 +248,7 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 .guide-tooltip{
   position:absolute;left:0;right:0;bottom:calc(100% + 6px);
   background:rgba(160,175,195,0.08);border:1px solid rgba(160,175,195,0.18);
-  border-radius:4px;padding:4px 8px;font-size:0.6em;color:rgba(185,200,220,0.75);
+  border-radius:4px;padding:4px 8px;font-size:0.68em;color:rgba(185,200,220,0.75);
   font-weight:600;text-align:center;pointer-events:none;
   animation:fadeIn 0.3s;z-index:5;
 }
@@ -255,14 +256,14 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 /* === 引导步骤拆分: 当前步骤 vs 后续步骤 === */
 .guide-step-item{
   display:flex;align-items:flex-start;gap:6px;padding:3px 4px;border-radius:3px;
-  font-size:0.68em;font-weight:600;transition:all 0.2s;
+  font-size:0.82em;font-weight:600;transition:all 0.2s;
 }
 .guide-step-item.step-current{
   color:rgba(200,215,235,0.85);background:rgba(160,175,195,0.06);
   border-left:2px solid rgba(185,200,220,0.4);padding-left:6px;
 }
 .guide-step-item.step-done{color:var(--green);opacity:0.6;text-decoration:line-through}
-.guide-step-item.step-future{color:#3a5070;opacity:0.5;font-size:0.62em}
+.guide-step-item.step-future{color:#3a5070;opacity:0.5;font-size:0.72em}
 .guide-step-item .step-idx{
   min-width:16px;height:16px;border-radius:50%;display:flex;align-items:center;justify-content:center;
   font-size:0.75em;font-family:'Orbitron',monospace;flex-shrink:0;
@@ -326,11 +327,11 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 @keyframes newItem{0%{opacity:0;transform:translateY(-8px)}100%{opacity:1;transform:translateY(0)}}
 .act-icon{width:28px;height:28px;flex-shrink:0}
 .act-icon svg{width:100%;height:100%}
-.act-name{font-weight:700;font-size:0.75em;line-height:1.1}
-.act-desc{font-size:0.65em;color:var(--dim)}
-.act-cost{font-size:0.65em;color:var(--yellow);font-weight:600}
+.act-name{font-weight:700;font-size:0.85em;line-height:1.1}
+.act-desc{font-size:0.78em;color:var(--dim)}
+.act-cost{font-size:0.78em;color:var(--yellow);font-weight:600}
 .act-tag{
-  position:absolute;top:3px;right:5px;font-size:0.55em;padding:1px 5px;
+  position:absolute;top:3px;right:5px;font-size:0.58em;padding:1px 5px;
   border-radius:8px;font-weight:700;letter-spacing:0.5px;
 }
 
@@ -390,8 +391,8 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
   filter:drop-shadow(0 0 4px rgba(249,115,22,0.3));
 }
 .belt-connect-text{display:flex;flex-direction:column;gap:1px}
-.belt-connect-name{font-weight:700;font-size:0.75em;color:#f97316}
-.belt-connect-desc{font-size:0.65em;color:var(--dim)}
+.belt-connect-name{font-weight:700;font-size:0.8em;color:#f97316}
+.belt-connect-desc{font-size:0.72em;color:var(--dim)}
 /* 有建筑阻塞时传送带按钮变红 */
 .belt-connect-action-btn.has-blocked{
   border-color:rgba(239,68,68,0.6);border-style:solid;
@@ -476,9 +477,9 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 .belt-type-item:hover{border-color:#f97316;background:rgba(249,115,22,0.08);
   box-shadow:0 0 10px rgba(249,115,22,0.08);transform:translateX(2px)}
 .belt-type-item.maxed{opacity:0.35;cursor:default;pointer-events:none}
-.belt-type-route{font-size:0.68em;color:#8ab0d0;font-weight:600;flex:1;
+.belt-type-route{font-size:0.75em;color:#8ab0d0;font-weight:600;flex:1;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.belt-type-meta{display:flex;gap:6px;align-items:center;font-size:0.5em;margin-top:2px}
+.belt-type-meta{display:flex;gap:6px;align-items:center;font-size:0.6em;margin-top:2px}
 .belt-type-lv{font-family:'Share Tech Mono',monospace;font-weight:700}
 .belt-type-eff{font-family:'Share Tech Mono',monospace}
 .belt-type-count{color:#4a6a8a}
@@ -507,8 +508,8 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
   padding:6px 12px;border-bottom:1px solid var(--bdr);
   background:rgba(5,10,18,0.95);flex-shrink:0;
 }
-.dish-name{font-family:'Orbitron',monospace;font-size:0.7em;color:var(--dim);letter-spacing:2px}
-.dish-env{display:flex;gap:8px;font-size:0.6em}
+.dish-name{font-family:'Orbitron',monospace;font-size:0.8em;color:var(--dim);letter-spacing:2px}
+.dish-env{display:flex;gap:8px;font-size:0.72em}
 .dish-env span{color:var(--dim)}
 .dish-env .val{font-family:'Orbitron',monospace;color:var(--color-info)}
 .dish-view{flex:1;position:relative;overflow-y:auto;overflow-x:hidden;scrollbar-width:thin;scrollbar-color:rgba(6,214,160,0.3) transparent}
@@ -614,7 +615,7 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 .cell .icon svg{width:100%;height:100%}
 .cell .label{
   position:absolute;bottom:0px;left:0;right:14px;text-align:center;
-  font-size:0.55em;font-weight:700;color:rgba(200,215,230,0.85);
+  font-size:0.6em;font-weight:700;color:rgba(200,215,230,0.85);
   pointer-events:none;z-index:6;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
   text-shadow:0 1px 3px rgba(0,0,0,0.8);
   padding:0 1px;
@@ -673,9 +674,10 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 
 /* === RIGHT: STATUS + GUIDE === */
 .right-panel{
-  width:240px;flex-shrink:0;overflow-y:auto;padding:10px;
+  width:280px;flex-shrink:0;overflow-y:auto;padding:12px;
   background:var(--panel);border-left:1px solid var(--bdr);
   scrollbar-width:thin;scrollbar-color:#1a3050 transparent;
+  font-size:1.05em;
 }
 .right-panel::-webkit-scrollbar{width:3px}
 .right-panel::-webkit-scrollbar-thumb{background:#1a3050}
@@ -685,7 +687,7 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
   background:rgba(10,18,30,0.8);border:1px solid var(--bdr);
   border-radius:4px;padding:8px;margin-bottom:8px;
 }
-.stat-row{display:flex;justify-content:space-between;font-size:0.7em;padding:2px 0;border-bottom:1px solid rgba(255,255,255,0.02)}
+.stat-row{display:flex;justify-content:space-between;font-size:0.82em;padding:2px 0;border-bottom:1px solid rgba(255,255,255,0.02)}
 .stat-label{color:var(--dim)}
 .stat-value{color:var(--color-info);font-weight:600;font-family:'Share Tech Mono',monospace}
 
@@ -695,10 +697,10 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
   border:1px solid rgba(160,175,195,0.15);border-radius:6px;padding:10px;margin-bottom:8px;
   position:relative;
 }
-.guide-title{font-family:'Orbitron',monospace;font-size:0.7em;color:rgba(185,200,220,0.75);letter-spacing:1px;margin-bottom:4px}
-.guide-text{font-size:0.75em;color:#8ab0d0;line-height:1.4}
+.guide-title{font-family:'Orbitron',monospace;font-size:0.82em;color:rgba(185,200,220,0.75);letter-spacing:1px;margin-bottom:4px}
+.guide-text{font-size:0.88em;color:#8ab0d0;line-height:1.4}
 .guide-step{
-  display:flex;align-items:center;gap:6px;padding:4px 0;font-size:0.72em;
+  display:flex;align-items:center;gap:6px;padding:4px 0;font-size:0.82em;
   border-bottom:1px solid rgba(160,175,195,0.06);
 }
 .guide-step.done{color:var(--green);text-decoration:line-through;opacity:0.5}
@@ -786,12 +788,12 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 .wonder-name{font-family:'Orbitron',monospace;font-size:0.75em;color:var(--purple);margin-bottom:4px}
 .wonder-bar{width:100%;height:6px;background:rgba(255,255,255,0.04);border-radius:3px;overflow:hidden;margin:4px 0}
 .wonder-fill{height:100%;background:linear-gradient(90deg,var(--purple),var(--pink));transition:width 0.5s}
-.wonder-pct{font-family:'Orbitron',monospace;font-size:0.6em;color:#8a6aaa}
+.wonder-pct{font-family:'Orbitron',monospace;font-size:0.65em;color:#8a6aaa}
 
 /* Log */
 .log-box{
   background:rgba(3,6,12,0.8);border:1px solid #0e1828;border-radius:3px;
-  padding:4px;height:80px;overflow-y:auto;font-size:0.7em;font-family:'Share Tech Mono',monospace;
+  padding:4px;height:80px;overflow-y:auto;font-size:0.82em;font-family:'Share Tech Mono',monospace;
 }
 .log-box::-webkit-scrollbar{width:2px}.log-box::-webkit-scrollbar-thumb{background:#1a2a40}
 .log-msg{padding:1px 0;border-bottom:1px solid rgba(255,255,255,0.015);color:#5a7a9a}
@@ -1610,6 +1612,98 @@ body::after{
 }
 .cell.lvl-flash{animation:lvlUpFlash 0.6s ease-out}
 
+/* ===== POWER CRISIS EFFECTS ===== */
+@keyframes powerPulse{
+  0%{box-shadow:inset 0 0 0 0 rgba(239,68,68,0)}
+  50%{box-shadow:inset 0 0 30px 2px rgba(239,68,68,0.15)}
+  100%{box-shadow:inset 0 0 0 0 rgba(239,68,68,0)}
+}
+@keyframes powerPulseHard{
+  0%{box-shadow:inset 0 0 0 0 rgba(239,68,68,0)}
+  50%{box-shadow:inset 0 0 50px 5px rgba(239,68,68,0.25)}
+  100%{box-shadow:inset 0 0 0 0 rgba(239,68,68,0)}
+}
+.app.power-warning .grid-area{animation:powerPulse 2s ease-in-out infinite}
+.app.power-crisis .grid-area{animation:powerPulseHard 1.2s ease-in-out infinite}
+.cell.power-dim{opacity:0.5;transition:opacity 0.5s}
+.cell.power-dim::after{
+  content:'⚡';position:absolute;top:-2px;right:-2px;font-size:0.5em;
+  animation:blink 1s infinite;z-index:2;
+}
+@keyframes blink{0%,100%{opacity:0.3}50%{opacity:1}}
+
+/* ===== BELT GUIDANCE TOOLTIP ===== */
+.belt-guide-tooltip{
+  position:absolute;z-index:100;
+  background:rgba(6,214,160,0.15);border:1px solid var(--cyan);border-radius:6px;
+  padding:4px 10px;font-size:0.6em;color:var(--cyan);font-weight:600;
+  white-space:nowrap;pointer-events:auto;cursor:pointer;
+  animation:guideFloat 2s ease-in-out infinite;
+  box-shadow:0 0 12px rgba(6,214,160,0.2);
+}
+.belt-guide-tooltip:hover{background:rgba(6,214,160,0.25);transform:scale(1.05)}
+@keyframes guideFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
+
+/* ===== NEWBIE HAND GUIDE (一阶段虚幻小手引导) ===== */
+.guide-hand-overlay{
+  position:fixed;z-index:9999;pointer-events:none;
+  transition:left 0.5s ease-in-out, top 0.5s ease-in-out, opacity 0.3s;
+}
+.guide-hand{
+  width:52px;height:52px;
+  filter:drop-shadow(0 0 14px rgba(6,214,160,0.55)) drop-shadow(0 2px 6px rgba(0,0,0,0.5));
+  animation:handTap 1.4s ease-in-out infinite;
+  transform-origin:center center;
+}
+@keyframes handTap{
+  0%{transform:translate(0,0) scale(1);opacity:0.8}
+  25%{transform:translate(5px,5px) scale(0.9);opacity:1}
+  45%{transform:translate(5px,5px) scale(0.9);opacity:1}
+  65%{transform:translate(0,0) scale(1);opacity:0.8}
+  100%{transform:translate(0,0) scale(1);opacity:0.8}
+}
+/* 小手旁边的文字提示气泡 */
+.guide-hand-bubble{
+  position:absolute;left:52px;top:4px;
+  background:rgba(6,214,160,0.12);border:1px solid rgba(6,214,160,0.35);
+  border-radius:8px;padding:6px 12px;
+  font-size:0.82em;color:#8cecc8;font-weight:600;font-family:'Rajdhani',sans-serif;
+  white-space:nowrap;pointer-events:none;
+  box-shadow:0 0 16px rgba(6,214,160,0.15);
+  animation:bubblePulse 2.5s ease-in-out infinite;
+  max-width:180px;white-space:normal;line-height:1.3;
+}
+@keyframes bubblePulse{
+  0%,100%{opacity:0.8;border-color:rgba(6,214,160,0.2)}
+  50%{opacity:1;border-color:rgba(6,214,160,0.5)}
+}
+/* 小手指向的目标高亮光圈 */
+.guide-hand-ring{
+  position:fixed;z-index:9998;pointer-events:none;
+  border:2px solid rgba(6,214,160,0.4);border-radius:8px;
+  box-shadow:0 0 20px rgba(6,214,160,0.15),inset 0 0 12px rgba(6,214,160,0.05);
+  animation:ringPulse 2s ease-in-out infinite;
+  transition:left 0.5s ease-in-out, top 0.5s ease-in-out, width 0.3s, height 0.3s, opacity 0.3s;
+}
+@keyframes ringPulse{
+  0%,100%{border-color:rgba(6,214,160,0.25);box-shadow:0 0 12px rgba(6,214,160,0.08)}
+  50%{border-color:rgba(6,214,160,0.55);box-shadow:0 0 28px rgba(6,214,160,0.2)}
+}
+
+/* ===== ACHIEVEMENT TIERS ===== */
+.achieve-popup.tier-gold{border-color:#fbbf24 !important;box-shadow:0 0 40px rgba(251,191,36,0.4) !important}
+.achieve-popup.tier-diamond{border-color:#a855f7 !important;box-shadow:0 0 60px rgba(168,85,247,0.5),0 0 120px rgba(168,85,247,0.2) !important}
+@keyframes firework{
+  0%{transform:scale(0);opacity:1}
+  50%{transform:scale(1.5);opacity:0.8}
+  100%{transform:scale(2);opacity:0}
+}
+.milestone-flash{
+  position:fixed;top:0;left:0;right:0;bottom:0;z-index:10010;
+  background:radial-gradient(circle,rgba(251,191,36,0.15),transparent 70%);
+  pointer-events:none;animation:firework 1.5s ease-out forwards;
+}
+
 /* ===== BUILDING TYPE SELECTOR POPUP ===== */
 .bld-type-selector{
   position:fixed;z-index:10005;top:50%;left:50%;transform:translate(-50%,-50%) scale(0.9);
@@ -1631,16 +1725,16 @@ body::after{
 .bld-type-item:hover{border-color:var(--cyan);background:rgba(6,214,160,0.08);
   box-shadow:0 0 10px rgba(6,214,160,0.08);transform:translateX(2px)}
 .bld-type-item.maxed{opacity:0.35;cursor:default;pointer-events:none}
-.bld-type-emoji{font-size:1.2em;flex-shrink:0;width:24px;text-align:center}
+.bld-type-emoji{font-size:1.3em;flex-shrink:0;width:26px;text-align:center}
 .bld-type-info{flex:1;min-width:0}
-.bld-type-name{font-size:0.72em;color:#b8d0e8;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.bld-type-meta{display:flex;gap:6px;align-items:center;font-size:0.5em;margin-top:2px}
+.bld-type-name{font-size:0.78em;color:#b8d0e8;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bld-type-meta{display:flex;gap:6px;align-items:center;font-size:0.58em;margin-top:2px}
 .bld-type-lv{font-family:'Share Tech Mono',monospace;font-weight:700}
 .bld-type-mult{font-family:'Share Tech Mono',monospace}
 .bld-type-cost{color:var(--yellow);font-weight:600}
 .bld-type-arrow{font-size:0.8em;color:var(--cyan);flex-shrink:0;opacity:0.6}
 .bld-type-seq{
-  font-family:'Share Tech Mono',monospace;font-size:0.55em;font-weight:700;
+  font-family:'Share Tech Mono',monospace;font-size:0.6em;font-weight:700;
   color:#4a7090;background:rgba(0,0,0,0.4);border:1px solid #1a3a5a;
   border-radius:3px;padding:1px 4px;flex-shrink:0;
 }
@@ -1670,8 +1764,8 @@ body::after{
 
 /* ===== RESPONSIVE: TABLET (≤1100px) ===== */
 @media (max-width:1100px){
-  .sidebar{width:220px;padding:8px}
-  .right-panel{width:200px;padding:8px}
+  .sidebar{width:260px;padding:10px;font-size:1em}
+  .right-panel{width:240px;padding:10px;font-size:1em}
   .topbar{padding:6px 10px;gap:8px}
   .logo{width:28px;height:28px}
   .logo svg{width:18px;height:18px}
@@ -1693,12 +1787,12 @@ body::after{
 
 /* ===== RESPONSIVE: SMALL TABLET (≤900px) ===== */
 @media (max-width:900px){
-  .right-panel{width:180px;padding:6px}
-  .sidebar{width:200px;padding:6px}
-  .stat-row{font-size:0.62em}
-  .guide-step{font-size:0.65em}
+  .right-panel{width:210px;padding:8px;font-size:0.95em}
+  .sidebar{width:230px;padding:8px;font-size:0.95em}
+  .stat-row{font-size:0.68em}
+  .guide-step{font-size:0.7em}
   .evo-header{font-size:0.9em}
-  .section-title{font-size:0.62em}
+  .section-title{font-size:0.68em}
   #phaseEvoHint{font-size:0.55em}
   #saveIndicator{font-size:0.55em}
 }
@@ -1991,9 +2085,12 @@ body::after{
           <div class="stat-card" id="colonyStatCard">
             <div class="stat-row"><span class="stat-label">🦠 细菌种群</span><span class="stat-value" id="statPop">0</span></div>
             <div class="stat-row" id="rowPopFood" style="display:none"><span class="stat-label">&nbsp;&nbsp;🍽️ 食物消耗</span><span class="stat-value" id="statPopFood" style="font-size:0.9em;color:var(--orange)">0🟢/s</span></div>
+            <div class="stat-row" id="rowPowerLevel" style="display:none"><span class="stat-label">&nbsp;&nbsp;🔋 功率水平</span><span class="stat-value" id="statPowerLevel" style="font-size:0.9em;font-weight:700">100%</span></div>
             <div class="stat-row"><span class="stat-label">⚡ 工作效率</span><span class="stat-value" id="statEff">100%</span></div>
             <div class="stat-row" title="物流效率 = 仓储加成 × 传送带平均效率"><span class="stat-label">🚚 物流效率</span><span class="stat-value" id="statLog">100%</span></div>
             <div class="stat-row" id="rowQS" style="display:none"><span class="stat-label">📡 QS信号</span><span class="stat-value" id="statQS">0</span></div>
+            <div class="stat-row" style="border-top:1px solid rgba(255,255,255,0.06);padding-top:4px;margin-top:3px"><span class="stat-label">🏅 成就</span><span class="stat-value" id="statAchieve" style="font-size:0.85em;color:#fbbf24">0/37</span></div>
+            <div class="stat-row"><span class="stat-label">👑 称号</span><span class="stat-value" id="empireTitleDisplay" style="font-size:0.78em;color:var(--cyan)">🦠 初生细胞</span></div>
             <div class="stat-row" id="scoreRow" style="border-top:1px solid rgba(255,255,255,0.06);padding-top:6px;margin-top:3px;font-size:0.85em;cursor:default;position:relative" oncontextmenu="event.preventDefault();G.showRatingTooltip(event)"><span class="stat-label" style="font-size:1.05em;font-weight:600">🏆 总分数</span><span style="display:flex;align-items:center;gap:8px"><span class="stat-value" id="statScore" style="color:#fbbf24;font-weight:800;font-size:1.25em;letter-spacing:0.5px">0</span><span id="statRank" style="font-size:0.75em;font-weight:700;padding:2px 7px;border-radius:3px;background:rgba(251,191,36,0.1);border:1px solid rgba(251,191,36,0.2);color:#fbbf24;font-family:'Orbitron',monospace;letter-spacing:1px">E</span></span></div>
             <!-- Mini Leaderboard Top 3 (locked until evoLv >= 2) -->
             <div id="miniLeaderboard" class="sec-locked" style="margin-top:6px;padding-top:6px;border-top:1px solid rgba(255,255,255,0.06)">
@@ -2164,7 +2261,8 @@ body::after{
   <div style="font-family:'Orbitron',monospace;font-size:0.75em;color:var(--cyan);letter-spacing:2px;margin-bottom:8px">⬆ 选择建筑升级</div>
   <div style="font-size:0.55em;color:#5a7a90;margin-bottom:8px">点击选择要升级的建筑</div>
   <div class="bld-type-list" id="bldTypeList"></div>
-  <div style="margin-top:10px">
+  <div style="margin-top:10px;display:flex;gap:8px;justify-content:center;align-items:center">
+    <button class="recycle-yes" id="upgradeAllBtn" onclick="G.upgradeAllOfType()" style="border-color:var(--cyan);color:var(--cyan);background:rgba(6,214,160,0.12);font-size:0.72em;padding:6px 14px;display:none">⬆ 一键全部升级 <span id="upgradeAllCost" style="font-size:0.85em;opacity:0.8"></span></button>
     <button class="recycle-no" onclick="G.closeBldTypeSelector()">关闭</button>
   </div>
 </div>

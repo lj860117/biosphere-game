@@ -792,33 +792,84 @@ const SVG = {
 // ===== ACHIEVEMENTS =====
 const ACHIEVE = [
   // 建筑里程碑
-  { id:'firstBuild', n:'🏗️ 创世之砖', d:'放下第一个建筑', check: s => s.totalBuildings() >= 1, reward:{ glucose:20, energy:15 } },
-  { id:'build5', n:'🏘️ 小有规模', d:'拥有5个建筑', check: s => s.totalBuildings() >= 5, reward:{ glucose:50, energy:30 } },
-  { id:'build12', n:'🏙️ 微型都市', d:'拥有12个建筑', check: s => s.totalBuildings() >= 12, reward:{ energy:80, dna:15 } },
-  { id:'build20', n:'🌆 生物大都会', d:'拥有20个建筑', check: s => s.totalBuildings() >= 20, reward:{ energy:150, dna:30, protein:20 } },
+  { id:'firstBuild', n:'🏗️ 创世之砖', d:'放下第一个建筑', tier:'bronze', check: s => s.totalBuildings() >= 1, reward:{ glucose:20, energy:15 } },
+  { id:'build5', n:'🏘️ 小有规模', d:'拥有5个建筑', tier:'bronze', check: s => s.totalBuildings() >= 5, reward:{ glucose:50, energy:30 } },
+  { id:'build12', n:'🏙️ 微型都市', d:'拥有12个建筑', tier:'silver', check: s => s.totalBuildings() >= 12, reward:{ energy:80, dna:15 } },
+  { id:'build20', n:'🌆 生物大都会', d:'拥有20个建筑', tier:'gold', check: s => s.totalBuildings() >= 20, reward:{ energy:150, dna:30, protein:20 } },
   // 资源里程碑
-  { id:'glucose100', n:'🍬 糖分过剩', d:'葡萄糖累计超过200', check: s => s.res.glucose >= 200, reward:{ energy:30 } },
-  { id:'energy200', n:'⚡ 能量风暴', d:'ATP能量超过300', check: s => s.res.energy >= 300, reward:{ glucose:40 } },
-  { id:'dna50', n:'🧬 基因宝库', d:'DNA累计超过80', check: s => s.res.dna >= 80, reward:{ energy:50, glucose:50 } },
-  { id:'protein30', n:'🧪 蛋白质大师', d:'蛋白质超过50', check: s => s.res.protein >= 50, reward:{ dna:20, energy:30 } },
+  { id:'glucose100', n:'🍬 糖分过剩', d:'葡萄糖累计超过200', tier:'bronze', check: s => s.res.glucose >= 200, reward:{ energy:30 } },
+  { id:'energy200', n:'⚡ 能量风暴', d:'ATP能量超过300', tier:'bronze', check: s => s.res.energy >= 300, reward:{ glucose:40 } },
+  { id:'dna50', n:'🧬 基因宝库', d:'DNA累计超过80', tier:'silver', check: s => s.res.dna >= 80, reward:{ energy:50, glucose:50 } },
+  { id:'protein30', n:'🧪 蛋白质大师', d:'蛋白质超过50', tier:'silver', check: s => s.res.protein >= 50, reward:{ dna:20, energy:30 } },
   // 进化里程碑
-  { id:'evo2', n:'🧬 初次进化', d:'完成第一次进化', check: s => s.eL >= 2, reward:{ glucose:60, energy:40, dna:10 } },
-  { id:'evo3', n:'🧬 进化加速', d:'达到进化Lv.3', check: s => s.eL >= 3, reward:{ energy:80, dna:20, protein:15 } },
-  { id:'evo5', n:'🧬 超级物种', d:'达到进化Lv.5', check: s => s.eL >= 5, reward:{ energy:200, dna:50, protein:30 } },
+  { id:'evo2', n:'🧬 初次进化', d:'完成第一次进化', tier:'bronze', check: s => s.eL >= 2, reward:{ glucose:60, energy:40, dna:10 } },
+  { id:'evo3', n:'🧬 进化加速', d:'达到进化Lv.3', tier:'silver', check: s => s.eL >= 3, reward:{ energy:80, dna:20, protein:15 } },
+  { id:'evo5', n:'🧬 超级物种', d:'达到进化Lv.5', tier:'gold', check: s => s.eL >= 5, reward:{ energy:200, dna:50, protein:30 } },
   // 科技里程碑
-  { id:'firstTech', n:'📖 开拓者', d:'完成第一项研究', check: s => Object.values(s.techs).some(t=>t.done), reward:{ glucose:30, energy:20 } },
-  { id:'allTech', n:'🎓 学术大师', d:'完成全部研究', check: s => Object.values(s.techs).every(t=>t.done), reward:{ energy:200, dna:60 } },
+  { id:'firstTech', n:'📖 开拓者', d:'完成第一项研究', tier:'bronze', check: s => Object.values(s.techs).some(t=>t.done), reward:{ glucose:30, energy:20 } },
+  { id:'allTech', n:'🎓 学术大师', d:'完成全部研究', tier:'diamond', check: s => Object.values(s.techs).every(t=>t.done), reward:{ energy:200, dna:60 } },
   // 阶段里程碑
-  { id:'phase2', n:'⚗️ 代谢启动', d:'进入阶段2', check: s => s.phase >= 2, reward:{ energy:40, nitrogen:15 } },
-  { id:'phase3', n:'🔗 物流时代', d:'进入阶段3', check: s => s.phase >= 3, reward:{ energy:60, protein:20 } },
-  { id:'phase4', n:'📡 自动化纪元', d:'进入阶段4', check: s => s.phase >= 4, reward:{ energy:100, biomass:15 } },
-  { id:'phase5', n:'🏛️ 奇观时代', d:'进入阶段5', check: s => s.phase >= 5, reward:{ energy:150, dna:40 } },
+  { id:'phase2', n:'⚗️ 代谢启动', d:'进入阶段2', tier:'bronze', check: s => s.phase >= 2, reward:{ energy:40, nitrogen:15 } },
+  { id:'phase3', n:'🔗 物流时代', d:'进入阶段3', tier:'silver', check: s => s.phase >= 3, reward:{ energy:60, protein:20 } },
+  { id:'phase4', n:'📡 自动化纪元', d:'进入阶段4', tier:'gold', check: s => s.phase >= 4, reward:{ energy:100, biomass:15 } },
+  { id:'phase5', n:'🏛️ 奇观时代', d:'进入阶段5', tier:'diamond', check: s => s.phase >= 5, reward:{ energy:150, dna:40 } },
   // 效率里程碑
-  { id:'eff150', n:'📈 效率突破', d:'全局效率达到150%', check: s => s.gEff >= 1.5, reward:{ dna:15, energy:40 } },
-  { id:'eff200', n:'🚀 效率翻倍', d:'全局效率达到200%', check: s => s.gEff >= 2.0, reward:{ dna:30, energy:80 } },
+  { id:'eff150', n:'📈 效率突破', d:'全局效率达到150%', tier:'silver', check: s => s.gEff >= 1.5, reward:{ dna:15, energy:40 } },
+  { id:'eff200', n:'🚀 效率翻倍', d:'全局效率达到200%', tier:'gold', check: s => s.gEff >= 2.0, reward:{ dna:30, energy:80 } },
   // 人口里程碑
-  { id:'pop100', n:'🦠 百菌汇聚', d:'种群达到100', check: s => s.pop >= 100, reward:{ glucose:40, energy:30 } },
-  { id:'pop500', n:'🦠 千菌浩荡', d:'种群达到500', check: s => s.pop >= 500, reward:{ energy:60, dna:20 } },
+  { id:'pop100', n:'🦠 百菌汇聚', d:'种群达到100', tier:'bronze', check: s => s.pop >= 100, reward:{ glucose:40, energy:30 } },
+  { id:'pop500', n:'🦠 千菌浩荡', d:'种群达到500', tier:'silver', check: s => s.pop >= 500, reward:{ energy:60, dna:20 } },
+
+  // ========== 新增成就 ==========
+  // 升级成就
+  { id:'firstUpgrade', n:'🔧 初试锋芒', d:'完成第一次建筑升级', tier:'bronze', check: s => (s.stats.totalUpgrades || 0) >= 1, reward:{ energy:25, glucose:15 } },
+  { id:'upgrade10', n:'🔧 强化狂人', d:'累计升级10次', tier:'silver', check: s => (s.stats.totalUpgrades || 0) >= 10, reward:{ energy:80, dna:15 } },
+  { id:'upgrade25', n:'🔧 锻造大师', d:'累计升级25次', tier:'gold', check: s => (s.stats.totalUpgrades || 0) >= 25, reward:{ energy:150, dna:30, protein:15 } },
+  // 传送带成就
+  { id:'belt5', n:'🔗 传输先锋', d:'拥有5条传送带连接', tier:'bronze', check: s => (s._activeBelts || []).length >= 5, reward:{ energy:30, glucose:20 } },
+  { id:'belt15', n:'🔗 物流帝国', d:'拥有15条传送带连接', tier:'silver', check: s => (s._activeBelts || []).length >= 15, reward:{ energy:60, dna:15 } },
+  { id:'manualBelt3', n:'🔗 手动连接大师', d:'手动连接3条传送带', tier:'silver', check: s => Object.keys(s.manualBelts || {}).length >= 3, reward:{ energy:50, dna:10 } },
+  // 生存挑战
+  { id:'powerCrisis', n:'⚡ 涅槃重生', d:'从功率危机中恢复到满功率', tier:'silver', check: s => s._recoveredFromCrisis, reward:{ energy:100, glucose:60 } },
+  { id:'neverLowPower', n:'🛡️ 永不断电', d:'在线10分钟且功率从未低于70%', tier:'gold', check: s => s.stats.onlineTime >= 600 && !s._everLowPower, reward:{ energy:120, dna:25 } },
+  // 速度挑战
+  { id:'speedPhase2', n:'⏱️ 闪电进化', d:'5分钟内到达阶段2', tier:'gold', check: s => s.phase >= 2 && s.stats.onlineTime <= 300, reward:{ energy:80, dna:20 } },
+  { id:'speedBuild8', n:'⏱️ 疾风建造', d:'3分钟内建造8个建筑', tier:'silver', check: s => s.totalBuildings() >= 8 && s.stats.onlineTime <= 180, reward:{ energy:60, glucose:40 } },
+  // 人口进阶
+  { id:'pop1000', n:'🌍 千菌一心', d:'种群达到1000', tier:'gold', check: s => s.pop >= 1000, reward:{ energy:100, dna:30, protein:20 } },
+  { id:'pop2000', n:'🌌 万菌归一', d:'种群达到2000', tier:'diamond', check: s => s.pop >= 2000, reward:{ energy:200, dna:60, protein:40 } },
+  // 资源进阶
+  { id:'glucose500', n:'🍯 糖分帝国', d:'葡萄糖超过500', tier:'silver', check: s => s.res.glucose >= 500, reward:{ energy:60, dna:10 } },
+  { id:'energy1000', n:'⚡ 无尽能源', d:'ATP能量超过1000', tier:'gold', check: s => s.res.energy >= 1000, reward:{ dna:25, protein:15 } },
+  // 全面发展
+  { id:'balanced', n:'⚖️ 均衡发展', d:'同时拥有4种不同类型的建筑', tier:'silver', check: s => {
+    const types = new Set(); s.grid.forEach(g => { if (g) types.add(g.type); }); return types.size >= 4;
+  }, reward:{ energy:50, glucose:30, dna:10 } },
+  // 转生
+  { id:'firstPrestige', n:'♻️ 轮回初始', d:'完成第一次转生', tier:'gold', check: s => s.prestigeCount >= 1, reward:{ energy:100, dna:30 } },
+  { id:'prestige3', n:'♻️ 三度轮回', d:'转生3次', tier:'diamond', check: s => s.prestigeCount >= 3, reward:{ energy:200, dna:50, protein:30 } },
+];
+
+// ===== ACHIEVEMENT MILESTONE SYSTEM =====
+// 每N个成就解锁一个永久buff
+const ACHIEVE_MILESTONES = [
+  { count: 5,  n:'🌟 初露锋芒', d:'解锁5个成就', buff:'全局效率+5%', fn: s => { s.gEff += 0.05; } },
+  { count: 10, n:'⭐ 声名鹊起', d:'解锁10个成就', buff:'建造费用-8%', fn: s => { s._costDiscount = (s._costDiscount || 0) + 0.08; } },
+  { count: 15, n:'🌟 威震四方', d:'解锁15个成就', buff:'传送带初始效率+10%', fn: s => { s._beltBonus = (s._beltBonus || 0) + 0.1; } },
+  { count: 20, n:'💫 名满天下', d:'解锁20个成就', buff:'全局效率+8%', fn: s => { s.gEff += 0.08; } },
+  { count: 25, n:'✨ 传奇霸主', d:'解锁25个成就', buff:'人口上限+100', fn: s => { s._popCapBonus = (s._popCapBonus || 0) + 100; } },
+  { count: 30, n:'🏆 微生物之神', d:'解锁30个成就', buff:'全局效率+12% + 费用-10%', fn: s => { s.gEff += 0.12; s._costDiscount = (s._costDiscount || 0) + 0.1; } },
+];
+
+// ===== EMPIRE TITLES =====
+const EMPIRE_TITLES = [
+  { count: 0,  title:'🦠 初生细胞' },
+  { count: 5,  title:'🧫 微生物殖民地' },
+  { count: 10, title:'🏘️ 细菌城邦' },
+  { count: 15, title:'🏙️ 细菌帝国' },
+  { count: 20, title:'🌍 生物圈联邦' },
+  { count: 25, title:'🌌 生物圈霸主' },
+  { count: 30, title:'👑 微生物之神' },
 ];
 
 // ===== RANDOM EVENTS =====
@@ -1055,7 +1106,7 @@ const G = {
   milestones:{},
   achievements:{}, // 已解锁成就
   combo:0, comboTimer:null, // 连续建造连击
-  stats:{ totalBuilt:0, totalRecycled:0, totalEvo:0, totalTech:0, peakGlucose:0, peakEnergy:0, peakDna:0, peakPop:0, onlineTime:0 },
+  stats:{ totalBuilt:0, totalRecycled:0, totalEvo:0, totalTech:0, peakGlucose:0, peakEnergy:0, peakDna:0, peakPop:0, onlineTime:0, totalUpgrades:0 },
   onlineRewardTimer:0, // 在线奖励计时
   // === NEW SYSTEMS ===
   lastSaveTime: Date.now(),
@@ -1087,6 +1138,9 @@ const G = {
   _coreBonus: 0,
   _beltBonus: 0,
   _costDiscount: 0,
+  // Power level system
+  _foodPowerLevel: 1.0, // 1.0 = full power, 0.2 = minimum
+  _powerWarningShown: false,
   // Choice event
   pendingChoice: null,
 
@@ -1108,6 +1162,7 @@ const G = {
     this.startLoop();
     this.animLoop();
     this._initResponsive();
+    this._initGuideHand();       // 初始化一阶段新手小手引导
 
     // 初始加载迷你排行榜 (延迟 2 秒等 Supabase 就绪)
     setTimeout(() => this.refreshMiniLeaderboard(), 2000);
@@ -1713,9 +1768,15 @@ const G = {
       return;
     }
 
+    this._upgradeAllKey = buildingKey; // 记住当前建筑类型，供一键升级使用
+
     const listEl = document.getElementById('bldTypeList');
     if (!listEl) return;
     listEl.innerHTML = '';
+
+    // 统计可升级数量和总费用
+    let upgradableCount = 0;
+    const totalCost = {};
 
     // 计算每个实例的序号（同类型内的顺序号）
     instances.forEach((idx, seqIdx) => {
@@ -1725,6 +1786,12 @@ const G = {
       const costStr = cost ? Object.entries(cost).map(([k,v]) => `${v}${RES[k]?.icon||k}`).join('+') : '';
       const mult = this.getUpgradeMultiplier(idx).toFixed(1);
       const nextMult = isMax ? mult : (1 + lv * 0.4).toFixed(1);
+
+      // 累计可升级数量和总费用
+      if (!isMax && cost) {
+        upgradableCount++;
+        for (let k in cost) totalCost[k] = (totalCost[k] || 0) + cost[k];
+      }
 
       const item = document.createElement('div');
       item.className = 'bld-type-item' + (isMax ? ' maxed' : '');
@@ -1755,6 +1822,21 @@ const G = {
       }
       listEl.appendChild(item);
     });
+
+    // 更新一键全部升级按钮
+    const upgradeAllBtn = document.getElementById('upgradeAllBtn');
+    if (upgradeAllBtn) {
+      if (upgradableCount >= 2) {
+        const costStr = Object.entries(totalCost).map(([k,v]) => `${v}${RES[k]?.icon||k}`).join('+');
+        const canAfford = this.checkRes(totalCost);
+        upgradeAllBtn.style.display = '';
+        upgradeAllBtn.disabled = !canAfford;
+        upgradeAllBtn.style.opacity = canAfford ? '1' : '0.4';
+        document.getElementById('upgradeAllCost').textContent = `(${costStr})`;
+      } else {
+        upgradeAllBtn.style.display = 'none';
+      }
+    }
 
     document.getElementById('bldTypeSelector').classList.add('show');
     SFX.click();
@@ -1892,8 +1974,8 @@ const G = {
 
   // === Grid ===
   // 格子最小像素（低于此值就减少格子数）和最大像素（高于此值就增加格子数）
-  _minCellPx: 68,
-  _maxCellPx: 92,
+  _minCellPx: 58,
+  _maxCellPx: 78,
   _minCols: 6, _maxCols: 18,
   _minRows: 4, _maxRows: 14,
 
@@ -2490,6 +2572,46 @@ const G = {
     } else {
       document.getElementById('buildHint').textContent = '选一个放到培养皿里';
     }
+    // 选中建筑后更新小手指向
+    if (this.phase === 1) this._updateGuideHand();
+  },
+
+  // ===== BELT GUIDANCE TOOLTIP =====
+  _showBeltGuide(idx, bd) {
+    // 移除之前的引导提示
+    document.querySelectorAll('.belt-guide-tooltip').forEach(e => e.remove());
+
+    const cell = document.querySelector(`.cell[data-i="${idx}"]`);
+    if (!cell) return;
+
+    // 判断这个建筑需要哪些输入资源
+    const needsInput = FLOW_MAP.filter(f => f.to === bd.key || f.to === this.grid[idx]?.type);
+    const needsOutput = FLOW_MAP.filter(f => f.from === bd.key || f.from === this.grid[idx]?.type);
+    const isReceiver = needsInput.length > 0;
+
+    const tip = document.createElement('div');
+    tip.className = 'belt-guide-tooltip';
+    tip.innerHTML = isReceiver
+      ? '🔗 需要传送带输入！点此连接'
+      : '🔗 点此连接传送带输出';
+
+    tip.onclick = (e) => {
+      e.stopPropagation();
+      tip.remove();
+      this.startBeltConnect();
+    };
+
+    cell.style.position = 'relative';
+    cell.appendChild(tip);
+
+    // 同时让格子闪烁提示
+    cell.classList.add('power-dim');
+    setTimeout(() => cell.classList.remove('power-dim'), 3000);
+
+    // 5秒后自动消失
+    setTimeout(() => {
+      if (tip.parentElement) tip.remove();
+    }, 5000);
   },
 
   // ===== BELT CONNECTION CHECK =====
@@ -2977,15 +3099,26 @@ const G = {
       }
     }
 
-    // 传送带连接提示
+    // 传送带连接提示 — 阶段1自动连接，阶段2+弹框提示手动连接
     const beltInfoAfter = this._checkBeltConnections(idx, this.sel);
-    if (beltInfoAfter.count > 0) {
-      this.log(`🔗 传送带已连接 ×${beltInfoAfter.count}`, 's');
+    if (this.phase === 1) {
+      // 阶段1: 保留自动连接，新手友好
+      if (beltInfoAfter.count > 0) {
+        this.log(`🔗 传送带已自动连接 ×${beltInfoAfter.count}`, 's');
+      } else {
+        const hasFlowRole = FLOW_MAP.some(f => f.from === this.sel || f.to === this.sel);
+        if (hasFlowRole) {
+          this.log('🔗 传送带已自动规划，放心建造！', 's');
+        }
+      }
     } else {
-      // 检查这个建筑是否有FLOW_MAP中的关系
+      // 阶段2+: 不再自动连接，弹框提示手动连接
+      if (beltInfoAfter.count > 0) {
+        this.log(`🔗 检测到 ${beltInfoAfter.count} 条可用连接`, 's');
+      }
       const hasFlowRole = FLOW_MAP.some(f => f.from === this.sel || f.to === this.sel);
       if (hasFlowRole) {
-        this.log('⚠ 暂无传送带连接 — 试试放在相关建筑附近', 'w');
+        this._showBeltGuide(idx, bd);
       }
     }
 
@@ -3088,6 +3221,8 @@ const G = {
 
   // ===== ACHIEVEMENTS =====
   checkAchievements() {
+    const prevCount = Object.keys(this.achievements).length;
+
     for (const a of ACHIEVE) {
       if (this.achievements[a.id]) continue;
       if (a.check(this)) {
@@ -3098,31 +3233,98 @@ const G = {
           this.res[k] = (this.res[k] || 0) + a.reward[k];
           rewardParts.push(`+${a.reward[k]}${RES[k]?.icon||k}`);
         }
-        // 华丽弹出
-        this.showAchievement(a.n, a.d, rewardParts.join(' '));
+        // 根据等级决定展示效果
+        const tier = a.tier || 'bronze';
+        this.showAchievement(a.n, a.d, rewardParts.join(' '), tier);
         SFX.achieve();
         this.log(`🏆 成就解锁: ${a.n} — ${a.d}`, 's');
         this.log(`   奖励: ${rewardParts.join(' ')}`, 'ev');
-        this.screenShake(6);
-        this.showGoldenFloat('🏆 ' + rewardParts.join(' '));
+
+        // 等级化屏幕震动和飘字
+        if (tier === 'diamond') {
+          this.screenShake(10);
+          this.showGoldenFloat('💎 ' + rewardParts.join(' '));
+          // 钻石级全屏闪光
+          const flash = document.createElement('div');
+          flash.className = 'milestone-flash';
+          document.body.appendChild(flash);
+          setTimeout(() => flash.remove(), 1500);
+        } else if (tier === 'gold') {
+          this.screenShake(8);
+          this.showGoldenFloat('🏆 ' + rewardParts.join(' '));
+        } else {
+          this.screenShake(6);
+          this.showGoldenFloat('🏆 ' + rewardParts.join(' '));
+        }
+      }
+    }
+
+    // ===== 里程碑检查 =====
+    const newCount = Object.keys(this.achievements).length;
+    if (newCount > prevCount) {
+      this._checkMilestones(newCount);
+      // 更新帝国称号
+      this._updateEmpireTitle(newCount);
+    }
+
+    // 功率危机恢复成就追踪
+    if (this._foodPowerLevel <= 0.4) this._wasInCrisis = true;
+    if (this._wasInCrisis && this._foodPowerLevel >= 1.0) {
+      this._recoveredFromCrisis = true;
+      this._wasInCrisis = false;
+    }
+    // 永不断电追踪
+    if (this._foodPowerLevel < 0.7) this._everLowPower = true;
+  },
+
+  _checkMilestones(achieveCount) {
+    if (!this._claimedMilestones) this._claimedMilestones = {};
+    for (const ms of ACHIEVE_MILESTONES) {
+      if (achieveCount >= ms.count && !this._claimedMilestones[ms.count]) {
+        this._claimedMilestones[ms.count] = true;
+        ms.fn(this);
+        this.log(`🌟 里程碑达成: ${ms.n} — ${ms.buff}`, 's');
+        this.showAchievement(`${ms.n}`, `${ms.d} — 永久buff: ${ms.buff}`, '🎖️ 永久增益已激活', 'gold');
+        SFX.achieve();
+        this.screenShake(8);
+        // 全屏闪光
+        const flash = document.createElement('div');
+        flash.className = 'milestone-flash';
+        document.body.appendChild(flash);
+        setTimeout(() => flash.remove(), 1500);
       }
     }
   },
 
-  showAchievement(name, desc, reward) {
+  _updateEmpireTitle(achieveCount) {
+    let title = EMPIRE_TITLES[0].title;
+    for (const t of EMPIRE_TITLES) {
+      if (achieveCount >= t.count) title = t.title;
+    }
+    this._empireTitle = title;
+    // 如果顶栏有标题区域就更新
+    const titleEl = document.getElementById('empireTitleDisplay');
+    if (titleEl) titleEl.textContent = title;
+  },
+
+  showAchievement(name, desc, reward, tier) {
     this._enqueueNotify({
-      dur: 4500,
+      dur: tier === 'diamond' ? 6000 : tier === 'gold' ? 5000 : 4500,
       show: () => {
         const el = document.getElementById('achievePopup');
         document.getElementById('achieveName').textContent = name;
         document.getElementById('achieveDesc').textContent = desc;
         document.getElementById('achieveReward').textContent = '🎁 ' + reward;
-        el.classList.remove('show');
+        // 等级化样式
+        el.classList.remove('show', 'tier-gold', 'tier-diamond');
         void el.offsetWidth; // force reflow
+        if (tier === 'gold') el.classList.add('tier-gold');
+        if (tier === 'diamond') el.classList.add('tier-diamond');
         el.classList.add('show');
       },
       hide: () => {
-        document.getElementById('achievePopup').classList.remove('show');
+        const el = document.getElementById('achievePopup');
+        el.classList.remove('show', 'tier-gold', 'tier-diamond');
       }
     });
   },
@@ -3982,7 +4184,7 @@ const G = {
       }
       if (g.type === 'nitrogenFixer' && this._nitrogenBonus) techBonus += this._nitrogenBonus;
       if (g.type === 'proteinFactory' && this._proteinBonus) techBonus += this._proteinBonus;
-      const mult = this.gEff * popMult * bldMult * beltMult * techBonus;
+      const mult = this.gEff * popMult * bldMult * beltMult * techBonus * this._foodPowerLevel;
       for (let k in bd.prod) r[k] = (r[k]||0) + bd.prod[k] * mult;
       // 【修复】消耗乘建筑等级和传送带效率（升级建筑=吞吐量同步提升）
       const consMult = bldMult * beltMult * techConsPenalty;
@@ -4198,6 +4400,23 @@ const G = {
   // 手动升级核心
   manualCoreUpgrade() {
     if (!this.canPhaseUp()) return;
+
+    // 阶段1→2时: 将自动传送带转化为手动传送带（保留已有连接）
+    if (this.phase === 1 && this._computeBelts) {
+      const { belts } = this._computeBelts();
+      for (const belt of belts) {
+        if (belt.isManual) continue; // 已经是手动的跳过
+        const key = Math.min(belt.fi, belt.ti) + '-' + Math.max(belt.fi, belt.ti);
+        if (!this.manualBelts[key]) {
+          this.manualBelts[key] = {
+            fi: belt.fi, ti: belt.ti,
+            colors: belt.colors || [], icons: belt.icons || [], labels: belt.labels || []
+          };
+        }
+      }
+      this.log('🔗 已有传送带已全部转为手动模式', 's');
+    }
+
     this.phase++;
     const p = PHASES[this.phase - 1];
     this.showMilestone(p.icon, '进入阶段 ' + p.id + ': ' + p.name);
@@ -4216,6 +4435,9 @@ const G = {
     this.renderResources();
     this.renderBuildings();
     this.renderTechs();
+
+    // 阶段升级后更新小手引导（阶段2+自动隐藏）
+    this._updateGuideHand();
     this.renderGrid();
     this.renderCoreColony(true);
     this.updateCoreUpgradeUI();
@@ -4367,6 +4589,9 @@ const G = {
 
     // 更新建造按钮高亮
     this.updateGuideHighlight();
+
+    // 更新新手小手引导（仅阶段1）
+    this._updateGuideHand();
   },
 
   // ===== MAIN LOOP =====
@@ -4390,13 +4615,49 @@ const G = {
           const growth = bCount * 0.03 * this.gEff;
           this.pop = Math.min(this.pop + growth, popCap);
         }
-        // 人口消耗葡萄糖 (每100人口消耗0.5葡萄糖/s)
+        // 人口消耗葡萄糖 (每100人口消耗0.5葡萄糖/s) + 功率水平系统
         const popFoodCost = this.pop * 0.005;
-        if (this.res.glucose >= popFoodCost) {
-          this.res.glucose -= popFoodCost;
+        if (popFoodCost > 0) {
+          // 计算葡萄糖储备比（以30秒消耗量为基准）
+          const foodBuffer = popFoodCost * 30;
+          const foodRatio = foodBuffer > 0 ? this.res.glucose / foodBuffer : 1;
+
+          // 阶梯式功率计算
+          if (foodRatio > 0.8) {
+            this._foodPowerLevel = 1.0;          // 🟢 满功率
+          } else if (foodRatio > 0.5) {
+            this._foodPowerLevel = 1.0;          // 🟡 正常但预警
+          } else if (foodRatio > 0.2) {
+            this._foodPowerLevel = 0.7;          // 🟠 低功率 70%
+          } else if (foodRatio > 0) {
+            this._foodPowerLevel = 0.4;          // 🔴 危机模式 40%
+          } else {
+            this._foodPowerLevel = 0.2;          // ⛔ 极限模式 20%
+          }
+
+          if (this.res.glucose >= popFoodCost) {
+            this.res.glucose -= popFoodCost;
+          } else {
+            // 食物不足：人口加速下降（功率越低降得越快）
+            const popLoss = this._foodPowerLevel <= 0.4 ? 2.0 : this._foodPowerLevel <= 0.7 ? 1.0 : 0.5;
+            this.pop = Math.max(0, this.pop - popLoss);
+          }
+
+          // 功率警告（每次降档只提示一次）
+          if (this._foodPowerLevel < 1.0 && !this._powerWarningShown) {
+            this._powerWarningShown = true;
+            if (this._foodPowerLevel <= 0.4) {
+              this.log('🔴 能量危机！功率降至 ' + Math.round(this._foodPowerLevel * 100) + '% — 建造更多碳源采集器！', 'e');
+              this.showEvent('⚡ 能量危机', '葡萄糖严重不足！产能大幅下降', 'var(--red)');
+              SFX.eventBad();
+            } else if (this._foodPowerLevel <= 0.7) {
+              this.log('🟠 低功率警告！产能降至 70% — 补充葡萄糖储备', 'w');
+            }
+          }
+          // 功率恢复时重置警告
+          if (this._foodPowerLevel >= 1.0) this._powerWarningShown = false;
         } else {
-          // 食物不足，人口缓慢下降
-          this.pop = Math.max(0, this.pop - 0.5);
+          this._foodPowerLevel = 1.0;
         }
 
         // QS信号自然衰减 — 需要持续运转QS塔来维持高水位（受信号增幅器科技影响）
@@ -4753,10 +5014,11 @@ const G = {
 
     // ===== 核心：计算不重叠的传送带连接 =====
     // 规则:
-    //   1. 每个 from 建筑实例对每种 flow 只连最近的 to 建筑实例（1:1最近匹配）
-    //   2. 同一对格子之间只出一条传送带，多种资源合流显示（混合颜色/图标）
-    //   3. 传送带路径不穿过其他已有建筑的格子
-    //   4. 全局记录已占用的"格子间通道"，同通道不重复生成
+    //   1. 阶段1: 自动连接（新手友好），阶段2+: 仅手动连接
+    //   2. 每个 from 建筑实例对每种 flow 只连最近的 to 建筑实例（1:1最近匹配）
+    //   3. 同一对格子之间只出一条传送带，多种资源合流显示（混合颜色/图标）
+    //   4. 传送带路径不穿过其他已有建筑的格子
+    //   5. 全局记录已占用的"格子间通道"，同通道不重复生成
     const computeBelts = () => {
       const bldMap = findBuildingCells();
       const occupiedCells = new Set();
@@ -4764,67 +5026,63 @@ const G = {
         if (this.grid[i]) occupiedCells.add(i);
       }
 
-      // Step 1: 为每个 flow，每个 from 实例找最近的 to 实例（1:1）
-      const rawLinks = []; // { fi, ti, flow }
-      for (const flow of FLOW_MAP) {
-        const froms = bldMap[flow.from];
-        const tos = bldMap[flow.to];
-        if (!froms || !tos) continue;
-
-        // 使用贪心最近匹配：每个 from 找最近的未配对 to
-        // 先按距离排序所有 from-to 对，贪心匹配
-        const pairs = [];
-        for (const fi of froms) {
-          for (const ti of tos) {
-            pairs.push({ fi, ti, dist: manhattan(fi, ti) });
-          }
-        }
-        pairs.sort((a, b) => a.dist - b.dist);
-
-        const usedFrom = new Set();
-        const usedTo = new Set();
-        for (const p of pairs) {
-          if (usedFrom.has(p.fi) || usedTo.has(p.ti)) continue;
-          // 距离限制：超过4格不连（太远没意义）
-          if (p.dist > 4) continue;
-          rawLinks.push({ fi: p.fi, ti: p.ti, flow });
-          usedFrom.add(p.fi);
-          usedTo.add(p.ti);
-        }
-      }
-
-      // Step 2: 按格子对合并 — 同一对格子只出一条带
       const pairMap = {}; // "min-max" -> { fi, ti, flows:[], colors:[], icons:[], labels:[] }
       const usedEdges = new Set(); // 已占用的通道，"min-max" 形式
 
-      for (const link of rawLinks) {
-        const key = Math.min(link.fi, link.ti) + '-' + Math.max(link.fi, link.ti);
+      // 阶段1: 自动连接传送带（新手引导期）
+      // 阶段2+: 跳过自动连接，只保留手动传送带
+      if (this.phase === 1) {
+        // Step 1: 为每个 flow，每个 from 实例找最近的 to 实例（1:1）
+        const rawLinks = []; // { fi, ti, flow }
+        for (const flow of FLOW_MAP) {
+          const froms = bldMap[flow.from];
+          const tos = bldMap[flow.to];
+          if (!froms || !tos) continue;
 
-        // 跳过被用户撤销的自动传送带
-        if (this.removedBelts[key]) continue;
+          const pairs = [];
+          for (const fi of froms) {
+            for (const ti of tos) {
+              pairs.push({ fi, ti, dist: manhattan(fi, ti) });
+            }
+          }
+          pairs.sort((a, b) => a.dist - b.dist);
 
-        // Step 3: 路径碰撞检测 — 传送带不能穿过其他建筑
-        if (!pairMap[key]) {
-          // 新传送带，检查路径上是否有障碍
-          const blocked = isBeltPathBlocked(link.fi, link.ti, occupiedCells);
-          if (blocked) continue; // 路径被挡住，不生成这条传送带
+          const usedFrom = new Set();
+          const usedTo = new Set();
+          for (const p of pairs) {
+            if (usedFrom.has(p.fi) || usedTo.has(p.ti)) continue;
+            if (p.dist > 4) continue;
+            rawLinks.push({ fi: p.fi, ti: p.ti, flow });
+            usedFrom.add(p.fi);
+            usedTo.add(p.ti);
+          }
         }
 
-        if (!pairMap[key]) {
-          pairMap[key] = { fi: link.fi, ti: link.ti, flows: [], colors: [], icons: [], labels: [], isManual: false };
-          usedEdges.add(key);
+        // Step 2: 按格子对合并
+        for (const link of rawLinks) {
+          const key = Math.min(link.fi, link.ti) + '-' + Math.max(link.fi, link.ti);
+          if (this.removedBelts[key]) continue;
+
+          if (!pairMap[key]) {
+            const blocked = isBeltPathBlocked(link.fi, link.ti, occupiedCells);
+            if (blocked) continue;
+          }
+
+          if (!pairMap[key]) {
+            pairMap[key] = { fi: link.fi, ti: link.ti, flows: [], colors: [], icons: [], labels: [], isManual: false };
+            usedEdges.add(key);
+          }
+          const entry = pairMap[key];
+          if (!entry.colors.includes(link.flow.color)) {
+            entry.colors.push(link.flow.color);
+            entry.icons.push(link.flow.icon);
+            entry.labels.push(link.flow.label);
+          }
+          entry.flows.push(link.flow);
         }
-        const entry = pairMap[key];
-        // 避免同色重复
-        if (!entry.colors.includes(link.flow.color)) {
-          entry.colors.push(link.flow.color);
-          entry.icons.push(link.flow.icon);
-          entry.labels.push(link.flow.label);
-        }
-        entry.flows.push(link.flow);
       }
 
-      // Step 4: 添加手动连接的传送带
+      // Step 4: 添加手动连接的传送带（所有阶段都生效）
       for (const [key, mb] of Object.entries(this.manualBelts)) {
         // 确保两端建筑仍然存在
         if (!this.grid[mb.fi] || !this.grid[mb.ti]) continue;
@@ -5738,6 +5996,35 @@ const G = {
         popFoodRow.style.display = 'none';
       }
     }
+    // 功率水平指示器
+    const powerRow = document.getElementById('rowPowerLevel');
+    const powerEl = document.getElementById('statPowerLevel');
+    if (powerRow && powerEl) {
+      if (this.pop > 0) {
+        powerRow.style.display = 'flex';
+        const pct = Math.round(this._foodPowerLevel * 100);
+        powerEl.textContent = pct + '%';
+        if (pct >= 100) {
+          powerEl.style.color = '#22c55e';
+        } else if (pct >= 70) {
+          powerEl.style.color = '#f97316';
+        } else {
+          powerEl.style.color = '#ef4444';
+        }
+      } else {
+        powerRow.style.display = 'none';
+      }
+    }
+    // 全局功率危机视觉效果
+    const app = document.querySelector('.app');
+    if (app) {
+      app.classList.remove('power-warning', 'power-crisis');
+      if (this._foodPowerLevel <= 0.4) {
+        app.classList.add('power-crisis');
+      } else if (this._foodPowerLevel <= 0.7) {
+        app.classList.add('power-warning');
+      }
+    }
     document.getElementById('statEff').textContent = (this.gEff * 100).toFixed(0) + '%';
     // 物流效率 = 仓储加成(lEff) × 传送带平均效率
     const beltsActive = this._activeBelts || [];
@@ -5755,6 +6042,15 @@ const G = {
     logEl.textContent = logPct + '%';
     logEl.style.color = logPct >= 100 ? '#6aa0c0' : logPct >= 70 ? '#eab308' : '#f97316';
     document.getElementById('statQS').textContent = this.qsLv;
+
+    // 成就进度
+    const achieveEl = document.getElementById('statAchieve');
+    if (achieveEl) {
+      const count = Object.keys(this.achievements).length;
+      const total = ACHIEVE.length;
+      achieveEl.textContent = `${count}/${total}`;
+      achieveEl.style.color = count >= total ? '#a855f7' : count >= 20 ? '#fbbf24' : count >= 10 ? '#22c55e' : '#6889a8';
+    }
 
     // 实时更新总分数 + 评级
     const scoreEl = document.getElementById('statScore');
@@ -5965,6 +6261,194 @@ const G = {
         btn.appendChild(tip);
       }
     }
+  },
+
+  // ===== NEWBIE HAND GUIDE (一阶段虚幻小手引导) =====
+  _guideHandEl: null,
+  _guideHandRingEl: null,
+  _guideHandActive: false,
+  _guideHandTarget: null, // 'build:key' | 'grid' | 'research:key' | 'evolve' | 'coreUpgrade'
+  _guideHandTimer: null,
+
+  // 初始化小手引导（游戏开始时调用）
+  _initGuideHand() {
+    // 如果已经创建过就跳过
+    if (this._guideHandEl) return;
+
+    // 创建小手 overlay
+    const hand = document.createElement('div');
+    hand.className = 'guide-hand-overlay';
+    hand.id = 'guideHandOverlay';
+    hand.innerHTML = `
+      <svg class="guide-hand" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <filter id="arrowGlow"><feGaussianBlur stdDeviation="2" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+          <linearGradient id="arrowGrad" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#06d6a0"/>
+            <stop offset="100%" stop-color="#00b386"/>
+          </linearGradient>
+        </defs>
+        <g filter="url(#arrowGlow)" transform="rotate(135,32,32)">
+          <path d="M32 6 L56 30 L44 30 L44 56 L20 56 L20 30 L8 30 Z"
+                fill="url(#arrowGrad)" fill-opacity="0.85"
+                stroke="rgba(6,214,160,0.9)" stroke-width="2" stroke-linejoin="round"/>
+        </g>
+      </svg>
+      <div class="guide-hand-bubble" id="guideHandBubble"></div>
+    `;
+    hand.style.display = 'none';
+    document.body.appendChild(hand);
+    this._guideHandEl = hand;
+
+    // 创建目标高亮光圈
+    const ring = document.createElement('div');
+    ring.className = 'guide-hand-ring';
+    ring.id = 'guideHandRing';
+    ring.style.display = 'none';
+    document.body.appendChild(ring);
+    this._guideHandRingEl = ring;
+  },
+
+  // 根据当前引导状态判断小手应该指向哪里
+  _getGuideHandTarget() {
+    if (this.phase !== 1) return null; // 阶段2+不再需要小手
+
+    const steps = GUIDE[1] || [];
+    for (let i = 0; i < steps.length; i++) {
+      if (!steps[i].check(this)) continue;
+      const text = steps[i].text;
+
+      // 建造类引导 → 先检查是否已选中建筑
+      const buildMatch = text.match(/建造「(.+?)」/);
+      if (buildMatch) {
+        const name = buildMatch[1];
+        let bldKey = null;
+        for (const key in BLDS) {
+          if (BLDS[key].n === name) { bldKey = key; break; }
+        }
+        if (bldKey) {
+          // 如果玩家已选中该建筑，指向培养皿空格
+          if (this.sel === bldKey) {
+            return { type: 'grid', text: '点击空格放置建筑！', icon: steps[i].icon };
+          }
+          return { type: 'build', key: bldKey, text: `选择「${name}」`, icon: steps[i].icon };
+        }
+      }
+
+      // 研究类引导
+      if (text.includes('研究') && text.includes('「')) {
+        const resMatch = text.match(/「(.+?)」/);
+        if (resMatch) {
+          const techName = resMatch[1];
+          let techKey = null;
+          for (const k in TECHS) {
+            if (TECHS[k].n === techName) { techKey = k; break; }
+          }
+          if (techKey) {
+            return { type: 'research', key: techKey, text: `点击研究「${techName}」`, icon: steps[i].icon };
+          }
+        }
+      }
+
+      // 进化类引导
+      if (text.includes('进化') && (text.includes('按钮') || text.includes('Lv'))) {
+        if (this.canEvolve()) {
+          return { type: 'evolve', text: '点击「进化」按钮！', icon: steps[i].icon };
+        }
+        return null; // 资源不够时不显示小手
+      }
+
+      // DNA合成中...等待类，不显示小手
+      if (text.includes('攒到') || text.includes('合成中') || text.includes('攒够')) {
+        return null;
+      }
+
+      return null;
+    }
+    return null;
+  },
+
+  // 更新小手位置和可见性
+  _updateGuideHand() {
+    if (!this._guideHandEl) this._initGuideHand();
+
+    const target = this._getGuideHandTarget();
+    const hand = this._guideHandEl;
+    const ring = this._guideHandRingEl;
+    const bubble = document.getElementById('guideHandBubble');
+
+    // 阶段2+ 或无目标 → 隐藏小手
+    if (!target || this.phase !== 1) {
+      hand.style.display = 'none';
+      ring.style.display = 'none';
+      this._guideHandActive = false;
+      return;
+    }
+
+    // 找到目标元素的位置
+    let targetEl = null;
+    let bubbleText = target.text;
+
+    if (target.type === 'build') {
+      targetEl = document.querySelector(`.action-btn[data-b="${target.key}"]`);
+      if (!targetEl || targetEl.classList.contains('locked')) {
+        hand.style.display = 'none';
+        ring.style.display = 'none';
+        return;
+      }
+    } else if (target.type === 'grid') {
+      // 指向第一个空格子
+      const gridEl = document.getElementById('grid');
+      if (gridEl) {
+        for (let ci = 0; ci < gridEl.children.length; ci++) {
+          if (!this.grid[ci]) {
+            targetEl = gridEl.children[ci];
+            break;
+          }
+        }
+      }
+    } else if (target.type === 'research') {
+      targetEl = document.querySelector(`.tech-btn[data-t="${target.key}"]`);
+      if (!targetEl) {
+        // 尝试查找包含科技名的按钮
+        document.querySelectorAll('.tech-btn').forEach(btn => {
+          if (btn.textContent.includes(target.key) || btn.dataset.t === target.key) {
+            targetEl = btn;
+          }
+        });
+      }
+    } else if (target.type === 'evolve') {
+      targetEl = document.getElementById('evoBtn');
+    }
+
+    if (!targetEl) {
+      hand.style.display = 'none';
+      ring.style.display = 'none';
+      return;
+    }
+
+    // 计算位置
+    const rect = targetEl.getBoundingClientRect();
+    const handX = rect.left + rect.width / 2 - 24;
+    const handY = rect.top - 8;
+
+    hand.style.display = 'block';
+    hand.style.left = handX + 'px';
+    hand.style.top = handY + 'px';
+
+    // 更新气泡文字
+    if (bubble) {
+      bubble.textContent = `${target.icon || '👆'} ${bubbleText}`;
+    }
+
+    // 更新高亮光圈
+    ring.style.display = 'block';
+    ring.style.left = (rect.left - 4) + 'px';
+    ring.style.top = (rect.top - 4) + 'px';
+    ring.style.width = (rect.width + 8) + 'px';
+    ring.style.height = (rect.height + 8) + 'px';
+
+    this._guideHandActive = true;
   },
 
   // ===== 红点提醒 =====
@@ -6339,6 +6823,10 @@ const G = {
         _qsDecayMult: this._qsDecayMult,
         _qsCapBonus: this._qsCapBonus,
         _evoBoostMult: this._evoBoostMult,
+        // Achievement milestones & power tracking
+        _claimedMilestones: this._claimedMilestones || {},
+        _everLowPower: this._everLowPower || false,
+        _recoveredFromCrisis: this._recoveredFromCrisis || false,
       };
       localStorage.setItem('bioSphereV3', JSON.stringify(s));
       if (!silent) this.log('▸ 已保存', 's');
@@ -6433,6 +6921,16 @@ const G = {
       if (s._qsDecayMult) this._qsDecayMult = s._qsDecayMult;
       if (s._qsCapBonus) this._qsCapBonus = s._qsCapBonus;
       if (s._evoBoostMult) this._evoBoostMult = s._evoBoostMult;
+      // Achievement milestones & power tracking
+      this._claimedMilestones = s._claimedMilestones || {};
+      this._everLowPower = s._everLowPower || false;
+      this._recoveredFromCrisis = s._recoveredFromCrisis || false;
+      // Re-apply milestone buffs
+      const achieveCount = Object.keys(this.achievements).length;
+      for (const ms of ACHIEVE_MILESTONES) {
+        if (this._claimedMilestones[ms.count]) ms.fn(this);
+      }
+      this._updateEmpireTitle(achieveCount);
       // 旧存档迁移：如果网格尺寸发生变化，传送带key中的索引也需要更新
       if (savedGrid.length !== savedLen && savedGrid.length > 0) {
         const migOldCols = s.gridCols || Math.round(Math.sqrt(savedGrid.length));
@@ -6665,6 +7163,7 @@ const G = {
     this.buildingLevels[idx] = (this.buildingLevels[idx] || 1) + 1;
     const lv = this.buildingLevels[idx];
     const bd = BLDS[this.grid[idx].type];
+    this.stats.totalUpgrades = (this.stats.totalUpgrades || 0) + 1;
 
     this.log(`⬆ ${bd.n} 升级到 Lv.${lv} — 产出×${this.getUpgradeMultiplier(idx).toFixed(1)}`, 's');
     SFX.coreUpgrade();
@@ -6682,6 +7181,66 @@ const G = {
     this.upgradeIdx = null;
     document.getElementById('upgradePopup')?.classList.remove('show');
     this._hideBackdrop();
+  },
+
+  // ===== ONE-CLICK UPGRADE ALL =====
+  upgradeAllOfType() {
+    const buildingKey = this._upgradeAllKey;
+    if (!buildingKey) return;
+
+    // 收集所有可升级的实例
+    const targets = [];
+    this.grid.forEach((g, i) => {
+      if (g && g.type === buildingKey) {
+        const cost = this.getUpgradeCost(i);
+        if (cost) targets.push({ idx: i, cost });
+      }
+    });
+
+    if (targets.length === 0) {
+      this.log('没有可升级的建筑', 'w');
+      SFX.buildFail();
+      return;
+    }
+
+    // 先检查总费用
+    const totalCost = {};
+    for (const t of targets) {
+      for (let k in t.cost) totalCost[k] = (totalCost[k] || 0) + t.cost[k];
+    }
+
+    // 逐个升级（资源足够的就升，不够就跳过）
+    let upgraded = 0;
+    for (const t of targets) {
+      if (this.checkRes(t.cost)) {
+        this.spend(t.cost);
+        this.buildingLevels[t.idx] = (this.buildingLevels[t.idx] || 1) + 1;
+        upgraded++;
+        this.buildBurst(t.idx);
+      }
+    }
+
+    if (upgraded > 0) {
+      const bd = BLDS[buildingKey];
+      this.stats.totalUpgrades = (this.stats.totalUpgrades || 0) + upgraded;
+      this.log(`⬆ 批量升级 ${bd.n} ×${upgraded} 完成！`, 's');
+      SFX.coreUpgrade();
+      this.screenShake(6);
+      this.showGoldenFloat(`⬆ ${bd.n} ×${upgraded} 升级！`);
+      this.renderGrid();
+      this.renderBuildings();
+      this.updateRates();
+      this.updateUI();
+      // 刷新弹窗内容
+      this.closeBldTypeSelector();
+      if (upgraded < targets.length) {
+        // 还有未升级的，重新打开弹窗
+        setTimeout(() => this.showBldTypeSelector(buildingKey), 200);
+      }
+    } else {
+      this.log('资源不足，无法升级', 'e');
+      SFX.buildFail();
+    }
   },
 
   // ===== CONVEYOR BELT UPGRADE SYSTEM =====
@@ -7358,7 +7917,9 @@ const GameTooltip = (() => {
 
     // ===== 右侧面板 — 菌落状态 =====
     dict['细菌种群'] = { title: '🦠 细菌种群', tag: '状态', desc: '你的微生物帝国总人口数量。种群越多，生产效率越高。', detail: '每100人口提供+2%效率加成\n种群上限 = 50 + 建筑数×40 + (阶段-1)×100\n种群需要消耗葡萄糖作为食物', color: '#3b82f6' };
-    dict['食物消耗'] = { title: '🍽️ 食物消耗', tag: '机制', desc: '种群需要消耗葡萄糖维持生存。每100人口每秒消耗0.5葡萄糖。', detail: '食物不足时种群会缓慢下降\n保持葡萄糖充足 = 人口稳定增长', color: '#f97316' };
+    dict['食物消耗'] = { title: '🍽️ 食物消耗', tag: '机制', desc: '种群需要消耗葡萄糖维持生存。每100人口每秒消耗0.5葡萄糖。', detail: '食物不足时会触发功率下降:\n🟢 储备>80%: 满功率100%\n🟡 储备50-80%: 正常但预警\n🟠 储备20-50%: 低功率70%\n🔴 储备<20%: 危机模式40%\n⛔ 储备耗尽: 极限模式20%\n功率下降会降低所有建筑产出！', color: '#f97316' };
+    dict['功率水平'] = { title: '🔋 功率水平', tag: '机制', desc: '反映葡萄糖储备状况，直接影响全局产能。', detail: '功率水平 = 葡萄糖储备 ÷ (30秒消耗量)\n功率低于100%时所有建筑产出按比例降低\n保持充足的葡萄糖储备是帝国运转的基础！', color: '#22c55e' };
+    dict['成就里程碑'] = { title: '🏅 成就里程碑', tag: '系统', desc: '每解锁5个成就触发一个里程碑，获得永久buff加成。', detail: '5个成就: 全局效率+5%\n10个成就: 建造费用-8%\n15个成就: 传送带效率+10%\n20个成就: 全局效率+8%\n25个成就: 人口上限+100\n30个成就: 效率+12% + 费用-10%', color: '#fbbf24' };
     dict['工作效率'] = { title: '⚡ 工作效率', tag: '状态', desc: '所有建筑的全局产出倍率。初始100%，通过多种途径提升。', detail: '提升途径：进化(+10~20%) / 科技 / QS信号(最高+80%) / 挑战奖励 / 转生加成\n效率越高，所有资源产出越快', color: '#22c55e' };
     dict['物流效率'] = { title: '🚚 物流效率', tag: '状态', desc: '资源运输的综合效率。由仓储加成和传送带平均效率共同决定。', detail: '物流效率 = 仓储加成 × 传送带平均效率\n升级传送带可提升物流效率\n「自适应物流」科技提供额外+20%', color: '#60a5fa' };
     dict['总分数'] = { title: '🏆 总分数', tag: '评分', desc: '衡量你的帝国发展综合实力的评分。决定转生时获得的进化因子数量。', detail: '分数来源：阶段 + 进化 + 建筑 + 科技 + 成就 + 挑战 + 资源峰值 + 效率\n时间惩罚：30分钟后每小时-50分', color: '#fbbf24' };
