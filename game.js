@@ -676,6 +676,31 @@ const BLDS = {
     color:'#facc15', bg:'bg-yellow', emoji:'📢', tier:4, techReq:'quorumSensing',
   },
 
+  // Phase 3 — 旁路建筑（新增）
+  biomassConverter: {
+    n:'生物质转化炉', phase:3,
+    d:'蛋白质直接转化生物质（旁路）',
+    ratio:'0.6🧪 + 0.8⚡ → 0.5🧱 + 0.1🧬/s',
+    cost:{ protein:30, energy:35 }, prod:{ biomass:0.5, dna:0.1 }, cons:{ protein:0.6, energy:0.8 },
+    color:'#2dd4bf', bg:'bg-teal', emoji:'🔥', tier:3, techReq:'biofilmTech',
+  },
+  quantumExtractor: {
+    n:'量子提取器', phase:3,
+    d:'氮源+能量→高纯DNA（旁路）',
+    ratio:'0.6🔵 + 1.2⚡ → 0.7🧬/s',
+    cost:{ nitrogen:20, energy:40, dna:10 }, prod:{ dna:0.7 }, cons:{ nitrogen:0.6, energy:1.2 },
+    color:'#818cf8', bg:'bg-purple', emoji:'💎', tier:3, techReq:'biofilmTech',
+  },
+
+  // Phase 4 — 旁路建筑（新增）
+  resonanceChamber: {
+    n:'共振培养箱', phase:4,
+    d:'QS驱动的多资源转化器',
+    ratio:'0.2📡 + 1⚡ → 0.4🟢 + 0.3🔵 + 0.2🧪/s',
+    cost:{ qs:10, protein:25, biomass:15 }, prod:{ glucose:0.4, nitrogen:0.3, protein:0.2 }, cons:{ qs:0.2, energy:1 },
+    color:'#c084fc', bg:'bg-purple', emoji:'🌀', tier:4, techReq:'quorumSensing',
+  },
+
   // Phase 5 — 奇观
   microDyson: {
     n:'微型戴森球', phase:5,
@@ -687,6 +712,55 @@ const BLDS = {
   },
 };
 
+// ===== ADJACENCY BONUS SYSTEM =====
+// 相邻建筑加成规则：当格子四周（上下左右）存在特定建筑时，获得产出加成
+// bonus: 产出乘数加成（0.15 = +15%）
+// stackable: 同种加成是否可叠加（多个同类邻居各给一次）
+// maxStack: 最大叠加次数
+const ADJACENCY_RULES = [
+  // === 同类协同 ===
+  // 同类建筑相邻 → 协同加成（鼓励集群布局）
+  { self:'glucoseCollector', neighbor:'glucoseCollector', bonus:0.10, name:'碳源共振', icon:'🌱', stackable:true, maxStack:2 },
+  { self:'energyStation',    neighbor:'energyStation',    bonus:0.08, name:'能量串联', icon:'⚡', stackable:true, maxStack:2 },
+  { self:'nitrogenFixer',    neighbor:'nitrogenFixer',    bonus:0.12, name:'固氮协同', icon:'💨', stackable:true, maxStack:2 },
+  { self:'proteinFactory',   neighbor:'proteinFactory',   bonus:0.10, name:'蛋白质流水线', icon:'⚗️', stackable:true, maxStack:2 },
+
+  // === 上下游供给链加成 ===
+  // 上游建筑紧邻下游 → 双方都获得效率加成（鼓励产线紧凑布局）
+  { self:'energyStation',    neighbor:'glucoseCollector', bonus:0.12, name:'直供通道', icon:'🔗', stackable:true, maxStack:2 },
+  { self:'simpleExtractor',  neighbor:'energyStation',    bonus:0.10, name:'能量直供', icon:'🔋', stackable:true, maxStack:1 },
+  { self:'simpleExtractor',  neighbor:'glucoseCollector', bonus:0.08, name:'碳源直供', icon:'🌱', stackable:true, maxStack:1 },
+  { self:'proteinFactory',   neighbor:'nitrogenFixer',    bonus:0.10, name:'氮源直供', icon:'🔵', stackable:true, maxStack:1 },
+  { self:'geneExtractor',    neighbor:'proteinFactory',   bonus:0.12, name:'蛋白质直供', icon:'🧪', stackable:true, maxStack:1 },
+  { self:'biofilmReactor',   neighbor:'glucoseCollector', bonus:0.08, name:'碳源直通', icon:'🌱', stackable:true, maxStack:1 },
+  { self:'biofilmReactor',   neighbor:'nitrogenFixer',    bonus:0.10, name:'氮源直通', icon:'🔵', stackable:true, maxStack:1 },
+  { self:'nanoAssembler',    neighbor:'qsController',     bonus:0.15, name:'QS直连', icon:'📡', stackable:true, maxStack:1 },
+
+  // === 特殊增益邻接 ===
+  // 菌丝运输网/代谢回路 紧邻生产建筑 → 额外加成（鼓励把增益建筑放在产线中心）
+  { self:'*',                neighbor:'transport',        bonus:0.05, name:'菌丝渗透', icon:'🕸️', stackable:true, maxStack:2 },
+  { self:'*',                neighbor:'metabolicLoop',    bonus:0.04, name:'代谢催化', icon:'♻️', stackable:true, maxStack:2 },
+
+  // === 跨阶段协同 ===
+  // 高级建筑旁放低级建筑获得微弱协同（鼓励混合布局而非纯高级集群）
+  { self:'qsController',    neighbor:'energyStation',    bonus:0.08, name:'能量共鸣', icon:'⚡', stackable:true, maxStack:1 },
+  { self:'sporeSower',      neighbor:'biofilmReactor',   bonus:0.12, name:'生物质通道', icon:'🧱', stackable:true, maxStack:1 },
+  { self:'ribosomeCluster', neighbor:'proteinFactory',   bonus:0.10, name:'核糖体协同', icon:'🫧', stackable:true, maxStack:1 },
+  { self:'aminoSynth',      neighbor:'nitrogenFixer',    bonus:0.10, name:'氨基酸捷径', icon:'🧬', stackable:true, maxStack:1 },
+
+  // === 能量缓冲池特殊 ===
+  { self:'energyBuffer',    neighbor:'energyStation',    bonus:0.15, name:'能量回路', icon:'🪫', stackable:true, maxStack:1 },
+  { self:'*',               neighbor:'energyBuffer',     bonus:0.03, name:'缓冲增益', icon:'🪫', stackable:true, maxStack:1 },
+
+  // === 新旁路建筑邻接 ===
+  { self:'biomassConverter', neighbor:'proteinFactory',  bonus:0.12, name:'蛋白直供', icon:'🧪', stackable:true, maxStack:1 },
+  { self:'biomassConverter', neighbor:'biofilmReactor',  bonus:0.08, name:'生物质共振', icon:'🧫', stackable:true, maxStack:1 },
+  { self:'quantumExtractor', neighbor:'nitrogenFixer',   bonus:0.12, name:'氮源直通', icon:'🔵', stackable:true, maxStack:1 },
+  { self:'quantumExtractor', neighbor:'geneExtractor',   bonus:0.08, name:'DNA协同', icon:'🧬', stackable:true, maxStack:1 },
+  { self:'resonanceChamber', neighbor:'qsController',    bonus:0.15, name:'QS共振', icon:'📡', stackable:true, maxStack:1 },
+  { self:'resonanceChamber', neighbor:'resonanceChamber', bonus:0.10, name:'共振叠加', icon:'🌀', stackable:true, maxStack:2 },
+];
+
 // ===== TECHS =====
 const TECHS = {
   pureCulture: {
@@ -694,17 +768,17 @@ const TECHS = {
     d:'单菌株纯化', ef:'全局效率+10%',
     fn: s => { s.gEff += 0.1 },
   },
-  // Phase 1 分支：二选一路线
+  // Phase 1 分支：二选一路线（互斥）
   efficientHarvest: {
     n:'高效采集', phase:1, cost:{ dna:8 }, time:20,
     d:'优化碳源吸收通路', ef:'碳源采集器产出+30%',
-    req:['pureCulture'],
+    req:['pureCulture'], exclusive:['rapidMetabolism'],
     fn: s => { s._collectorBonus = (s._collectorBonus || 0) + 0.3 },
   },
   rapidMetabolism: {
     n:'快速代谢', phase:1, cost:{ dna:8, energy:15 }, time:20,
     d:'加速ATP合成反应', ef:'ATP合成酶产出+25%，消耗+15%',
-    req:['pureCulture'],
+    req:['pureCulture'], exclusive:['efficientHarvest'],
     fn: s => { s._energyBonus = (s._energyBonus || 0) + 0.25; s._energyCostPenalty = (s._energyCostPenalty || 0) + 0.15 },
   },
   basicMetab: {
@@ -716,13 +790,13 @@ const TECHS = {
   nitrogenCycle: {
     n:'氮循环工程', phase:2, cost:{ dna:15, nitrogen:8 }, time:30,
     d:'闭合氮循环回路', ef:'固氮装置效率+40%',
-    req:['basicMetab'],
+    req:['basicMetab'], exclusive:['proteinEngineering'],
     fn: s => { s._nitrogenBonus = (s._nitrogenBonus || 0) + 0.4 },
   },
   proteinEngineering: {
     n:'蛋白质工程', phase:2, cost:{ dna:15, protein:5 }, time:30,
     d:'定向蛋白质折叠', ef:'蛋白质工厂产出+35%',
-    req:['basicMetab'],
+    req:['basicMetab'], exclusive:['nitrogenCycle'],
     fn: s => { s._proteinBonus = (s._proteinBonus || 0) + 0.35 },
   },
   biofilmTech: {
@@ -734,13 +808,13 @@ const TECHS = {
   adaptiveLogistics: {
     n:'自适应物流', phase:3, cost:{ dna:22, biomass:8 }, time:30,
     d:'智能物流路径规划', ef:'菌丝运输网加成从10%提升到15%',
-    req:['biofilmTech'],
+    req:['biofilmTech'], exclusive:['symbioticNetwork'],
     fn: s => { s._transportBonus = (s._transportBonus || 0) + 0.05 },
   },
   symbioticNetwork: {
     n:'共生网络', phase:3, cost:{ protein:18, biomass:10 }, time:35,
     d:'建立跨种群共生体系', ef:'人口上限+200，人口加成效率翻倍',
-    req:['biofilmTech'],
+    req:['biofilmTech'], exclusive:['adaptiveLogistics'],
     fn: s => { s._popCapBonus = (s._popCapBonus || 0) + 200; s._popEffMult = (s._popEffMult || 1) * 2 },
   },
   quorumSensing: {
@@ -752,13 +826,13 @@ const TECHS = {
   signalAmplifier: {
     n:'信号增幅器', phase:4, cost:{ dna:30, protein:20, qs:5 }, time:35,
     d:'QS信号衰减减缓', ef:'QS衰减速度-60%，加成上限提升到80%',
-    req:['quorumSensing'],
+    req:['quorumSensing'], exclusive:['evolutionCatalyst'],
     fn: s => { s._qsDecayMult = (s._qsDecayMult || 1) * 0.4; s._qsCapBonus = (s._qsCapBonus || 0) + 0.2 },
   },
   evolutionCatalyst: {
     n:'进化催化剂', phase:4, cost:{ dna:35, protein:25 }, time:40,
     d:'加速生物进化过程', ef:'进化效率奖励翻倍',
-    req:['quorumSensing'],
+    req:['quorumSensing'], exclusive:['signalAmplifier'],
     fn: s => { s._evoBoostMult = (s._evoBoostMult || 1) * 2 },
   },
   dysonTheory: {
@@ -787,6 +861,10 @@ const SVG = {
   metabolicLoop:`<svg viewBox="0 0 64 64" fill="none"><rect x="10" y="12" width="44" height="40" rx="3" fill="#051218" stroke="#06b6d4" stroke-width="1.5"/><circle cx="32" cy="32" r="12" fill="none" stroke="#06b6d4" stroke-width="1.2" opacity="0.3"/><path d="M32 20 A12 12 0 0 1 44 32" fill="none" stroke="#06b6d4" stroke-width="1.5" opacity="0.6"><animateTransform attributeName="transform" type="rotate" from="0 32 32" to="360 32 32" dur="4s" repeatCount="indefinite"/></path><path d="M38 28l2 4-4 0z" fill="#06b6d4" opacity="0.5"><animateTransform attributeName="transform" type="rotate" from="0 32 32" to="360 32 32" dur="4s" repeatCount="indefinite"/></path></svg>`,
   nanoAssembler:`<svg viewBox="0 0 64 64" fill="none"><rect x="10" y="12" width="44" height="40" rx="3" fill="#0a1208" stroke="#a3e635" stroke-width="1.5"/><rect x="18" y="22" width="10" height="10" rx="1" fill="none" stroke="#a3e635" stroke-width="0.8" opacity="0.5"/><rect x="36" y="22" width="10" height="10" rx="1" fill="none" stroke="#a3e635" stroke-width="0.8" opacity="0.5"/><rect x="27" y="36" width="10" height="10" rx="1" fill="#a3e635" opacity="0.1" stroke="#a3e635" stroke-width="0.8"/><circle cx="32" cy="41" r="2" fill="#a3e635" opacity="0.5"><animate attributeName="r" values="1.5;3;1.5" dur="2s" repeatCount="indefinite"/></circle><path d="M28 27 L22 27M46 27 L40 27M32 36 L32 33" fill="none" stroke="#a3e635" stroke-width="0.8" opacity="0.4"/></svg>`,
   pheromoneStation:`<svg viewBox="0 0 64 64" fill="none"><rect x="10" y="12" width="44" height="40" rx="3" fill="#151208" stroke="#facc15" stroke-width="1.5"/><circle cx="32" cy="28" r="5" fill="#facc15" opacity="0.15" stroke="#facc15" stroke-width="1"/><path d="M26 28 A8 8 0 0 0 22 36" fill="none" stroke="#facc15" stroke-width="0.8" opacity="0.3"><animate attributeName="opacity" values="0.1;0.5;0.1" dur="2s" repeatCount="indefinite"/></path><path d="M38 28 A8 8 0 0 1 42 36" fill="none" stroke="#facc15" stroke-width="0.8" opacity="0.3"><animate attributeName="opacity" values="0.1;0.5;0.1" dur="2s" begin="0.5s" repeatCount="indefinite"/></path><text x="32" y="44" text-anchor="middle" fill="#facc15" font-size="7" opacity="0.4">📢</text></svg>`,
+  // 新旁路建筑 SVG
+  biomassConverter:`<svg viewBox="0 0 64 64" fill="none"><rect x="10" y="12" width="44" height="40" rx="3" fill="#051210" stroke="#2dd4bf" stroke-width="1.5"/><path d="M22 25 L32 20 L42 25 L42 38 L32 43 L22 38 Z" fill="#2dd4bf" opacity="0.08" stroke="#2dd4bf" stroke-width="1"/><circle cx="32" cy="32" r="5" fill="#2dd4bf" opacity="0.2"><animate attributeName="r" values="4;6;4" dur="2s" repeatCount="indefinite"/></circle><path d="M28 32 L36 32M32 28 L32 36" stroke="#2dd4bf" stroke-width="1.5" opacity="0.4"/></svg>`,
+  quantumExtractor:`<svg viewBox="0 0 64 64" fill="none"><rect x="10" y="12" width="44" height="40" rx="3" fill="#0a0818" stroke="#818cf8" stroke-width="1.5"/><circle cx="32" cy="30" r="10" fill="none" stroke="#818cf8" stroke-width="0.8" opacity="0.3"/><circle cx="32" cy="30" r="5" fill="none" stroke="#818cf8" stroke-width="1.2" opacity="0.5"><animate attributeName="r" values="4;7;4" dur="2.5s" repeatCount="indefinite"/></circle><circle cx="32" cy="30" r="2" fill="#818cf8" opacity="0.6"/><path d="M24 42 L32 38 L40 42" fill="none" stroke="#818cf8" stroke-width="1" opacity="0.4"/></svg>`,
+  resonanceChamber:`<svg viewBox="0 0 64 64" fill="none"><rect x="10" y="12" width="44" height="40" rx="3" fill="#0f0520" stroke="#c084fc" stroke-width="1.5"/><circle cx="32" cy="30" r="12" fill="none" stroke="#c084fc" stroke-width="0.8" opacity="0.2"/><circle cx="32" cy="30" r="8" fill="none" stroke="#c084fc" stroke-width="1" opacity="0.3"><animateTransform attributeName="transform" type="rotate" from="0 32 30" to="360 32 30" dur="5s" repeatCount="indefinite"/></circle><circle cx="32" cy="30" r="3" fill="#c084fc" opacity="0.4"><animate attributeName="opacity" values="0.2;0.6;0.2" dur="2s" repeatCount="indefinite"/></circle><text x="32" y="46" text-anchor="middle" fill="#c084fc" font-size="6" opacity="0.4">QS</text></svg>`,
 };
 
 // ===== ACHIEVEMENTS =====
@@ -977,6 +1055,20 @@ const FLOW_MAP = [
   // Phase 4 — 信息素广播站（需要蛋白质+能量）
   { from:'proteinFactory',   to:'pheromoneStation',  res:'protein',  icon:'🧪', color:'#ec4899', label:'蛋白质' },
   { from:'energyStation',    to:'pheromoneStation',  res:'energy',   icon:'⚡', color:'#f97316', label:'ATP' },
+  // Phase 3 — 生物质转化炉（需要蛋白质+能量）
+  { from:'proteinFactory',   to:'biomassConverter',   res:'protein',  icon:'🧪', color:'#ec4899', label:'蛋白质' },
+  { from:'aminoSynth',       to:'biomassConverter',   res:'protein',  icon:'🧪', color:'#f472b6', label:'蛋白质' },
+  { from:'energyStation',    to:'biomassConverter',   res:'energy',   icon:'⚡', color:'#f97316', label:'ATP' },
+  { from:'energyBuffer',     to:'biomassConverter',   res:'energy',   icon:'⚡', color:'#fb923c', label:'ATP' },
+  // Phase 3 — 量子提取器（需要氮源+能量）
+  { from:'nitrogenFixer',    to:'quantumExtractor',   res:'nitrogen', icon:'🔵', color:'#3b82f6', label:'氮源' },
+  { from:'energyStation',    to:'quantumExtractor',   res:'energy',   icon:'⚡', color:'#f97316', label:'ATP' },
+  { from:'energyBuffer',     to:'quantumExtractor',   res:'energy',   icon:'⚡', color:'#fb923c', label:'ATP' },
+  // Phase 4 — 共振培养箱（需要QS+能量）
+  { from:'qsController',     to:'resonanceChamber',   res:'qs',       icon:'📡', color:'#eab308', label:'QS信号' },
+  { from:'pheromoneStation',  to:'resonanceChamber',   res:'qs',       icon:'📡', color:'#facc15', label:'QS信号' },
+  { from:'energyStation',    to:'resonanceChamber',   res:'energy',   icon:'⚡', color:'#f97316', label:'ATP' },
+  { from:'energyBuffer',     to:'resonanceChamber',   res:'energy',   icon:'⚡', color:'#fb923c', label:'ATP' },
 ];
 
 // ===== CHALLENGE MISSIONS =====
@@ -1864,23 +1956,54 @@ const G = {
       const done = this.techs[key]?.done;
       const isResearching = this.rTech === key;
 
+      // 互斥锁定检查
+      let exclusiveLocked = false;
+      let exclusiveBy = '';
+      if (t.exclusive) {
+        for (const exKey of t.exclusive) {
+          if (this.techs[exKey]?.done) {
+            exclusiveLocked = true;
+            exclusiveBy = TECHS[exKey].n;
+            break;
+          }
+        }
+      }
+      // 互斥分支标记（未锁定时显示"二选一"提示）
+      let branchTag = '';
+      if (t.exclusive && !done && !exclusiveLocked) {
+        branchTag = '<span style="display:inline-block;margin-left:4px;font-size:0.6em;color:#eab308;border:1px solid #eab30840;background:#eab30810;padding:0 3px;border-radius:2px;vertical-align:middle">⚡二选一</span>';
+      }
+
       const btn = document.createElement('button');
-      btn.className = 'action-btn' + (locked ? ' locked' : '') + (done ? ' done' : '');
+      btn.className = 'action-btn' + (locked || exclusiveLocked ? ' locked' : '') + (done ? ' done' : '');
       btn.id = 'tech-' + key;
       if (done) btn.style.borderColor = 'var(--color-muted-dark)';
+      if (exclusiveLocked) {
+        btn.style.opacity = '0.4';
+        btn.style.borderColor = 'rgba(239,68,68,0.3)';
+      }
 
       const costStr = Object.entries(t.cost).map(([k,v]) => `${v} ${RES[k]?.icon||k}`).join(' + ');
 
+      let statusStr;
+      if (done) {
+        statusStr = '<span style="color:var(--green)">已完成 ✦ 效果生效中</span>';
+      } else if (exclusiveLocked) {
+        statusStr = `<span style="color:#ef4444">🔒 已被「${exclusiveBy}」互斥锁定</span>`;
+      } else {
+        statusStr = `▸ ${costStr} | ${t.time}秒`;
+      }
+
       btn.innerHTML = `
         <div style="flex:1">
-          <div class="act-name">${done ? '✓ ' : ''}${t.n}</div>
+          <div class="act-name">${done ? '✓ ' : ''}${t.n}${branchTag}</div>
           <div class="act-desc">${t.d} — ${t.ef}</div>
-          <div class="act-cost">${done ? '<span style="color:var(--green)">已完成 ✦ 效果生效中</span>' : `▸ ${costStr} | ${t.time}秒`}</div>
+          <div class="act-cost">${statusStr}</div>
           ${isResearching ? `<div class="prog-wrap"><div class="prog-bar"><div class="prog-fill" id="techFill-${key}" style="width:0%;background:var(--cyan)"></div></div></div>` : ''}
         </div>
       `;
 
-      if (!locked && !done) {
+      if (!locked && !done && !exclusiveLocked) {
         btn.onclick = () => this.startResearch(key);
       }
       list.appendChild(btn);
@@ -2210,6 +2333,13 @@ const G = {
         label.textContent = bd.n;
         cell.appendChild(label);
 
+        // 邻接加成 badge（空间协同指示器）
+        const adjBadge = document.createElement('div');
+        adjBadge.className = 'cell-adj-badge';
+        adjBadge.id = 'adjBadge-' + i;
+        adjBadge.style.display = 'none';
+        cell.appendChild(adjBadge);
+
         // （产出速率改为 hover tooltip 显示，不再叠加在格子上）
 
         // 输入端口（消耗的资源）
@@ -2403,8 +2533,18 @@ const G = {
             }
           }
 
+          // 邻接加成详情
+          let adjStr = '';
+          const adjResult = this.getAdjacencyBonus(idx);
+          if (adjResult.bonus > 0) {
+            adjStr = `<br><span style="color:#06d6a0;font-weight:700">🔗 邻接加成: +${Math.round(adjResult.bonus * 100)}%</span>`;
+            adjResult.details.forEach(d => {
+              adjStr += `<br><span style="color:#06d6a080;font-size:0.85em">  ${d.icon} ${d.name} +${Math.round(d.bonus * 100)}%${d.count > 1 ? ' ×'+d.count : ''}</span>`;
+            });
+          }
+
           document.getElementById('ttName').innerHTML = `${bd.emoji||''} ${bd.n}${lvlStr} <span style="color:${bd.color};font-size:0.85em">[T${bd.tier||1}]</span>`;
-          document.getElementById('ttDesc').innerHTML = `${bd.d}${multStr}${rateStr}${beltStr}<br><span style="color:var(--color-info);font-family:'Share Tech Mono',monospace">${bd.ratio}</span><br><span style="color:var(--color-muted-dark);font-size:0.85em">拖拽移动 · 双击升级 · 右键回收 · 空白拖拽框选</span>`;
+          document.getElementById('ttDesc').innerHTML = `${bd.d}${multStr}${rateStr}${beltStr}${adjStr}<br><span style="color:var(--color-info);font-family:'Share Tech Mono',monospace">${bd.ratio}</span><br><span style="color:var(--color-muted-dark);font-size:0.85em">拖拽移动 · 双击升级 · 右键回收 · 空白拖拽框选</span>`;
           tt.classList.add('show');
           tt.style.left = Math.min(e.clientX + 12, window.innerWidth - 240) + 'px';
           tt.style.top = Math.min(e.clientY + 12, window.innerHeight - 100) + 'px';
@@ -2538,6 +2678,22 @@ const G = {
         }
         if (overlayEl) overlayEl.style.display = isBlocked ? 'block' : 'none';
         if (badgeEl) badgeEl.style.display = isBlocked ? 'block' : 'none';
+      }
+
+      // 更新邻接加成badge
+      const adjEl = document.getElementById('adjBadge-' + idx);
+      if (adjEl) {
+        const adj = this.getAdjacencyBonus(idx);
+        if (adj.bonus > 0) {
+          adjEl.style.display = 'block';
+          adjEl.textContent = '🔗+' + Math.round(adj.bonus * 100) + '%';
+          // 加成越高颜色越亮
+          const intensity = Math.min(adj.bonus / 0.5, 1);
+          adjEl.style.color = intensity > 0.5 ? '#fbbf24' : '#06d6a0';
+          adjEl.style.textShadow = `0 0 4px ${adjEl.style.color}`;
+        } else {
+          adjEl.style.display = 'none';
+        }
       }
     });
 
@@ -4103,6 +4259,61 @@ const G = {
     return (d.getMonth() + 1) + '/' + d.getDate();
   },
 
+  // ===== ADJACENCY SYSTEM =====
+  // 获取格子idx的四方向邻居（上下左右）
+  getNeighbors(idx) {
+    const cols = this.gridCols;
+    const rows = this.gridRows;
+    const r = Math.floor(idx / cols);
+    const c = idx % cols;
+    const neighbors = [];
+    if (r > 0)        neighbors.push(idx - cols); // 上
+    if (r < rows - 1) neighbors.push(idx + cols); // 下
+    if (c > 0)        neighbors.push(idx - 1);    // 左
+    if (c < cols - 1) neighbors.push(idx + 1);    // 右
+    return neighbors;
+  },
+
+  // 计算某个格子的邻接加成总乘数
+  // 返回 { bonus: 总加成值, details: [{name, icon, bonus, count}] }
+  getAdjacencyBonus(idx) {
+    const g = this.grid[idx];
+    if (!g) return { bonus: 0, details: [] };
+    const selfType = g.type;
+    const bd = BLDS[selfType];
+    if (!bd || bd.isBoost || bd.isWonder) return { bonus: 0, details: [] }; // 增益型/奇观建筑不享受邻接加成
+
+    const neighbors = this.getNeighbors(idx);
+    const neighborTypes = {};
+    for (const ni of neighbors) {
+      const ng = this.grid[ni];
+      if (ng && ng.type) {
+        neighborTypes[ng.type] = (neighborTypes[ng.type] || 0) + 1;
+      }
+    }
+
+    let totalBonus = 0;
+    const details = [];
+
+    for (const rule of ADJACENCY_RULES) {
+      // 检查 self 匹配
+      if (rule.self !== '*' && rule.self !== selfType) continue;
+      // self='*' 但排除增益型建筑自身（已在上方排除）
+
+      const nCount = neighborTypes[rule.neighbor] || 0;
+      if (nCount === 0) continue;
+
+      const stacks = rule.stackable ? Math.min(nCount, rule.maxStack || 1) : (nCount > 0 ? 1 : 0);
+      if (stacks === 0) continue;
+
+      const ruleBonus = rule.bonus * stacks;
+      totalBonus += ruleBonus;
+      details.push({ name: rule.name, icon: rule.icon, bonus: ruleBonus, count: stacks });
+    }
+
+    return { bonus: totalBonus, details };
+  },
+
   // ===== UTILITY =====
   checkRes(cost) { for (let k in cost) if ((this.res[k]||0) < cost[k]) return false; return true; },
   spend(cost) { for (let k in cost) this.res[k] -= cost[k]; },
@@ -4184,7 +4395,10 @@ const G = {
       }
       if (g.type === 'nitrogenFixer' && this._nitrogenBonus) techBonus += this._nitrogenBonus;
       if (g.type === 'proteinFactory' && this._proteinBonus) techBonus += this._proteinBonus;
-      const mult = this.gEff * popMult * bldMult * beltMult * techBonus * this._foodPowerLevel;
+      // 邻接加成 — 相邻建筑的空间协同效应
+      const adjResult = this.getAdjacencyBonus(idx);
+      const adjBonus = 1 + adjResult.bonus;
+      const mult = this.gEff * popMult * bldMult * beltMult * techBonus * adjBonus * this._foodPowerLevel;
       for (let k in bd.prod) r[k] = (r[k]||0) + bd.prod[k] * mult;
       // 【修复】消耗乘建筑等级和传送带效率（升级建筑=吞吐量同步提升）
       const consMult = bldMult * beltMult * techConsPenalty;
@@ -4219,6 +4433,18 @@ const G = {
     if (this.rTech) { this.log('已有研究进行中', 'w'); SFX.buildFail(); return; }
     const t = TECHS[key];
     if (t.phase > this.phase) { this.log('需要先进入阶段 ' + t.phase, 'e'); SFX.buildFail(); return; }
+    // 互斥分支检查 — 如果对立分支已完成，则不能研究
+    if (t.exclusive) {
+      for (const exKey of t.exclusive) {
+        if (this.techs[exKey]?.done) {
+          const exTech = TECHS[exKey];
+          this.log(`⛔ 已研究「${exTech.n}」，与「${t.n}」互斥！`, 'e');
+          this.showEvent('互斥路线', `「${t.n}」与已研究的「${exTech.n}」互斥，每个阶段只能选择一个分支路线。\n\n💡 转生后可以选择另一条路线！`, 'var(--orange)');
+          SFX.buildFail();
+          return;
+        }
+      }
+    }
     if (!this.checkRes(t.cost)) { this.log('研究资源不足', 'e'); SFX.buildFail(); return; }
     this.spend(t.cost);
     this.rTech = key;
@@ -4819,7 +5045,7 @@ const G = {
       const clickY = e.clientY - rect.top;
       
       // 检查点击是否命中某条传送带（使用更大的命中区域）
-      const result = findNearestBelt(clickX, clickY, 24);
+      const result = findNearestBelt(clickX, clickY, 36);
       
       if (result) {
         e.stopPropagation();
@@ -4889,7 +5115,7 @@ const G = {
       const rect = dishView.getBoundingClientRect();
       const mx = e.clientX - rect.left;
       const my = e.clientY - rect.top;
-      const result = findNearestBelt(mx, my, 24);
+      const result = findNearestBelt(mx, my, 36);
       const newKey = result ? result.key : null;
       if (newKey !== this._hoverBeltKey) {
         this._hoverBeltKey = newKey;
@@ -5171,8 +5397,8 @@ const G = {
         const beltLv = this.getBeltLevel(beltKey);
         const beltEff = this.getBeltEfficiency(beltKey);
         const lvScale = 0.7 + beltLv * 0.15; // Lv1=0.85, Lv5=1.45
-        const trackW = (isMulti ? 6 : 4) * lvScale;  // 轨道宽度随等级增长
-        const innerW = (isMulti ? 4 : 2.5) * lvScale;
+        const trackW = (isMulti ? 10 : 8) * lvScale;  // 轨道宽度随等级增长（加粗）
+        const innerW = (isMulti ? 7 : 5) * lvScale;
 
         // 判断是否需要 L 形拐弯（非直线方向）
         const adx = Math.abs(dx), ady = Math.abs(dy);

@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>微生物帝国 — 产线关系图</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0f1a;color:#c8d6e5;font-family:'Segoe UI','Microsoft YaHei',sans-serif;overflow:hidden}
+#canvas{display:block}
+.legend{position:fixed;top:16px;right:16px;background:rgba(10,15,26,0.92);border:1px solid #1e3a5f;border-radius:8px;padding:12px 16px;font-size:12px;z-index:10;max-height:90vh;overflow-y:auto}
+.legend h3{color:#06d6a0;margin-bottom:8px;font-size:14px}
+.legend-item{display:flex;align-items:center;gap:6px;margin:4px 0;opacity:0.85}
+.legend-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.phase-label{color:#06d6a0;font-weight:700;margin-top:8px;margin-bottom:4px;font-size:11px;letter-spacing:1px}
+.title{position:fixed;top:16px;left:16px;z-index:10}
+.title h1{font-size:20px;color:#06d6a0;text-shadow:0 0 12px rgba(6,214,160,0.3)}
+.title p{font-size:11px;color:#5a7a9a;margin-top:4px}
+.controls{position:fixed;bottom:16px;left:16px;z-index:10;display:flex;gap:8px}
+.controls button{background:rgba(10,15,26,0.85);border:1px solid #1e3a5f;color:#c8d6e5;padding:6px 12px;border-radius:4px;cursor:pointer;font-size:12px;transition:all 0.2s}
+.controls button:hover{border-color:#06d6a0;color:#06d6a0}
+.controls button.active{background:rgba(6,214,160,0.15);border-color:#06d6a0;color:#06d6a0}
+.tooltip{position:fixed;background:rgba(10,15,26,0.95);border:1px solid #1e3a5f;border-radius:6px;padding:10px 14px;font-size:12px;pointer-events:none;z-index:20;display:none;max-width:280px}
+.tooltip .tt-name{font-weight:700;font-size:14px;margin-bottom:4px}
+.tooltip .tt-ratio{font-family:'Courier New',monospace;color:#06d6a0;font-size:11px}
+.tooltip .tt-adj{color:#fbbf24;font-size:11px;margin-top:4px}
+.new-badge{display:inline-block;font-size:9px;color:#fbbf24;border:1px solid #fbbf2440;background:#fbbf2410;padding:0 3px;border-radius:2px;margin-left:4px;vertical-align:middle}
+</style>
+</head>
+<body>
+<div class="title">
+  <h1>🧬 微生物帝国 · 产线关系图</h1>
+  <p>鼠标悬停查看详情 · 点击阶段按钮筛选 · 拖拽平移 · 滚轮缩放</p>
+</div>
+<div class="controls" id="controls">
+  <button class="active" data-phase="0">全部</button>
+  <button data-phase="1">🌱 P1 采集</button>
+  <button data-phase="2">⚗️ P2 代谢</button>
+  <button data-phase="3">🔗 P3 物流</button>
+  <button data-phase="4">🤖 P4 自动化</button>
+  <button data-phase="5">🏛️ P5 奇观</button>
+</div>
+<div class="tooltip" id="tooltip"></div>
+<div class="legend" id="legend"></div>
+<canvas id="canvas"></canvas>
+
+<script>
+// ===== DATA (from game.js) =====
+const BLDS = {
+  glucoseCollector:{n:'碳源采集器',phase:1,emoji:'🌱',color:'#22c55e',ratio:'核心供能 → 1.5🟢/s',prod:{glucose:1.5},cons:{},tier:1,corePowered:true},
+  energyStation:{n:'ATP合成酶',phase:1,emoji:'🔋',color:'#f97316',ratio:'1🟢 → 2.5⚡/s',prod:{energy:2.5},cons:{glucose:1},tier:1},
+  simpleExtractor:{n:'简易提取器',phase:1,emoji:'🔬',color:'#a855f7',ratio:'2🟢+1.5⚡ → 0.4🧬/s',prod:{dna:0.4},cons:{glucose:2,energy:1.5},tier:1},
+  energyBuffer:{n:'能量缓冲池',phase:1,emoji:'🪫',color:'#fb923c',ratio:'0.6🟢 → 1.8⚡/s',prod:{energy:1.8},cons:{glucose:0.6},tier:1},
+  nitrogenFixer:{n:'固氮装置',phase:2,emoji:'💨',color:'#3b82f6',ratio:'0.3⚡ → 1🔵/s',prod:{nitrogen:1},cons:{energy:0.3},tier:2},
+  proteinFactory:{n:'蛋白质工厂',phase:2,emoji:'⚗️',color:'#ec4899',ratio:'0.8🔵+0.5⚡ → 0.6🧪/s',prod:{protein:0.6},cons:{nitrogen:0.8,energy:0.5},tier:2},
+  geneExtractor:{n:'DNA提取器',phase:2,emoji:'🏭',color:'#a855f7',ratio:'0.5🧪+1⚡ → 0.8🧬/s',prod:{dna:0.8},cons:{protein:0.5,energy:1},tier:2},
+  aminoSynth:{n:'氨基酸合成仪',phase:2,emoji:'🧬',color:'#f472b6',ratio:'0.5🔵+0.8🟢 → 0.45🧪/s',prod:{protein:0.45},cons:{nitrogen:0.5,glucose:0.8},tier:2},
+  ribosomeCluster:{n:'核糖体集群',phase:2,emoji:'🫧',color:'#c084fc',ratio:'0.3🧪+0.5⚡ → 0.6🧬+0.1🟢/s',prod:{dna:0.6,glucose:0.1},cons:{protein:0.3,energy:0.5},tier:2},
+  biofilmReactor:{n:'生物膜反应器',phase:3,emoji:'🧫',color:'#14b8a6',ratio:'1🟢+0.3🔵+1⚡ → 0.8🧱+0.2🧪/s',prod:{biomass:0.8,protein:0.2},cons:{glucose:1,nitrogen:0.3,energy:1},tier:3},
+  transport:{n:'菌丝运输网',phase:3,emoji:'🕸️',color:'#4a6080',ratio:'全局产出+10%',prod:{},cons:{},tier:3,isBoost:true},
+  sporeSower:{n:'孢子播种器',phase:3,emoji:'🍄',color:'#34d399',ratio:'0.4🧱+0.5⚡ → 0.3🧬+0.5🔵/s',prod:{dna:0.3,nitrogen:0.5},cons:{biomass:0.4,energy:0.5},tier:3},
+  metabolicLoop:{n:'代谢回路',phase:3,emoji:'♻️',color:'#06b6d4',ratio:'全局+8%,消耗-5%',prod:{},cons:{},tier:3,isBoost:true},
+  biomassConverter:{n:'生物质转化炉',phase:3,emoji:'🔥',color:'#2dd4bf',ratio:'0.6🧪+0.8⚡ → 0.5🧱+0.1🧬/s',prod:{biomass:0.5,dna:0.1},cons:{protein:0.6,energy:0.8},tier:3,isNew:true},
+  quantumExtractor:{n:'量子提取器',phase:3,emoji:'💎',color:'#818cf8',ratio:'0.6🔵+1.2⚡ → 0.7🧬/s',prod:{dna:0.7},cons:{nitrogen:0.6,energy:1.2},tier:3,isNew:true},
+  qsController:{n:'群体感应塔',phase:4,emoji:'🗼',color:'#eab308',ratio:'2⚡ → 0.8📡/s',prod:{qs:0.8},cons:{energy:2},tier:4},
+  nanoAssembler:{n:'纳米组装线',phase:4,emoji:'🔩',color:'#a3e635',ratio:'0.3📡+1.5⚡ → 1.2🧱+0.4🧪/s',prod:{biomass:1.2,protein:0.4},cons:{qs:0.3,energy:1.5},tier:4},
+  pheromoneStation:{n:'信息素广播站',phase:4,emoji:'📢',color:'#facc15',ratio:'0.6🧪+0.5⚡ → 0.5📡/s',prod:{qs:0.5},cons:{protein:0.6,energy:0.5},tier:4},
+  resonanceChamber:{n:'共振培养箱',phase:4,emoji:'🌀',color:'#c084fc',ratio:'0.2📡+1⚡ → 0.4🟢+0.3🔵+0.2🧪/s',prod:{glucose:0.4,nitrogen:0.3,protein:0.2},cons:{qs:0.2,energy:1},tier:4,isNew:true},
+  microDyson:{n:'微型戴森球',phase:5,emoji:'☀️',color:'#a855f7',ratio:'0 → 12⚡+8🟢+2🧱/s',prod:{energy:12,glucose:8,biomass:2},cons:{},tier:5,isWonder:true},
+};
+
+const FLOW_MAP = [
+  {from:'glucoseCollector',to:'energyStation',res:'glucose',color:'#22c55e',label:'葡萄糖'},
+  {from:'glucoseCollector',to:'simpleExtractor',res:'glucose',color:'#22c55e',label:'葡萄糖'},
+  {from:'energyStation',to:'simpleExtractor',res:'energy',color:'#f97316',label:'ATP'},
+  {from:'glucoseCollector',to:'energyBuffer',res:'glucose',color:'#22c55e',label:'葡萄糖'},
+  {from:'energyBuffer',to:'simpleExtractor',res:'energy',color:'#fb923c',label:'ATP'},
+  {from:'energyBuffer',to:'nitrogenFixer',res:'energy',color:'#fb923c',label:'ATP'},
+  {from:'energyBuffer',to:'proteinFactory',res:'energy',color:'#fb923c',label:'ATP'},
+  {from:'energyBuffer',to:'geneExtractor',res:'energy',color:'#fb923c',label:'ATP'},
+  {from:'energyBuffer',to:'ribosomeCluster',res:'energy',color:'#fb923c',label:'ATP'},
+  {from:'energyBuffer',to:'biofilmReactor',res:'energy',color:'#fb923c',label:'ATP'},
+  {from:'energyBuffer',to:'sporeSower',res:'energy',color:'#fb923c',label:'ATP'},
+  {from:'energyBuffer',to:'qsController',res:'energy',color:'#fb923c',label:'ATP'},
+  {from:'energyBuffer',to:'nanoAssembler',res:'energy',color:'#fb923c',label:'ATP'},
+  {from:'energyBuffer',to:'pheromoneStation',res:'energy',color:'#fb923c',label:'ATP'},
+  {from:'energyStation',to:'nitrogenFixer',res:'energy',color:'#f97316',label:'ATP'},
+  {from:'nitrogenFixer',to:'proteinFactory',res:'nitrogen',color:'#3b82f6',label:'氮源'},
+  {from:'energyStation',to:'proteinFactory',res:'energy',color:'#f97316',label:'ATP'},
+  {from:'proteinFactory',to:'geneExtractor',res:'protein',color:'#ec4899',label:'蛋白质'},
+  {from:'energyStation',to:'geneExtractor',res:'energy',color:'#f97316',label:'ATP'},
+  {from:'nitrogenFixer',to:'aminoSynth',res:'nitrogen',color:'#3b82f6',label:'氮源'},
+  {from:'glucoseCollector',to:'aminoSynth',res:'glucose',color:'#22c55e',label:'葡萄糖'},
+  {from:'proteinFactory',to:'ribosomeCluster',res:'protein',color:'#ec4899',label:'蛋白质'},
+  {from:'energyStation',to:'ribosomeCluster',res:'energy',color:'#f97316',label:'ATP'},
+  {from:'glucoseCollector',to:'biofilmReactor',res:'glucose',color:'#22c55e',label:'葡萄糖'},
+  {from:'nitrogenFixer',to:'biofilmReactor',res:'nitrogen',color:'#3b82f6',label:'氮源'},
+  {from:'energyStation',to:'biofilmReactor',res:'energy',color:'#f97316',label:'ATP'},
+  {from:'biofilmReactor',to:'sporeSower',res:'biomass',color:'#14b8a6',label:'生物质'},
+  {from:'energyStation',to:'sporeSower',res:'energy',color:'#f97316',label:'ATP'},
+  {from:'energyStation',to:'qsController',res:'energy',color:'#f97316',label:'ATP'},
+  {from:'qsController',to:'nanoAssembler',res:'qs',color:'#eab308',label:'QS信号'},
+  {from:'energyStation',to:'nanoAssembler',res:'energy',color:'#f97316',label:'ATP'},
+  {from:'proteinFactory',to:'pheromoneStation',res:'protein',color:'#ec4899',label:'蛋白质'},
+  {from:'energyStation',to:'pheromoneStation',res:'energy',color:'#f97316',label:'ATP'},
+  // New buildings
+  {from:'proteinFactory',to:'biomassConverter',res:'protein',color:'#ec4899',label:'蛋白质'},
+  {from:'aminoSynth',to:'biomassConverter',res:'protein',color:'#f472b6',label:'蛋白质'},
+  {from:'energyStation',to:'biomassConverter',res:'energy',color:'#f97316',label:'ATP'},
+  {from:'nitrogenFixer',to:'quantumExtractor',res:'nitrogen',color:'#3b82f6',label:'氮源'},
+  {from:'energyStation',to:'quantumExtractor',res:'energy',color:'#f97316',label:'ATP'},
+  {from:'qsController',to:'resonanceChamber',res:'qs',color:'#eab308',label:'QS信号'},
+  {from:'pheromoneStation',to:'resonanceChamber',res:'qs',color:'#facc15',label:'QS信号'},
+  {from:'energyStation',to:'resonanceChamber',res:'energy',color:'#f97316',label:'ATP'},
+];
+
+const RES_COLORS = {
+  glucose:'#22c55e',energy:'#f97316',dna:'#a855f7',nitrogen:'#3b82f6',protein:'#ec4899',biomass:'#14b8a6',qs:'#eab308'
+};
+const RES_ICONS = {glucose:'🟢',energy:'⚡',dna:'🧬',nitrogen:'🔵',protein:'🧪',biomass:'🧱',qs:'📡'};
+
+// ===== LAYOUT =====
+// Position buildings in a nice hierarchical layout by phase
+const LAYOUT = {};
+const PHASE_Y = {1:120, 2:280, 3:440, 4:600, 5:750};
+const PHASE_COLORS = {1:'#22c55e',2:'#f97316',3:'#14b8a6',4:'#eab308',5:'#a855f7'};
+
+function layoutBuildings() {
+  const byPhase = {};
+  for (const [k,b] of Object.entries(BLDS)) {
+    if (!byPhase[b.phase]) byPhase[b.phase] = [];
+    byPhase[b.phase].push(k);
+  }
+  for (const [phase, keys] of Object.entries(byPhase)) {
+    const y = PHASE_Y[phase];
+    const total = keys.length;
+    const spacing = 140;
+    const startX = 600 - (total - 1) * spacing / 2;
+    keys.forEach((k, i) => {
+      LAYOUT[k] = { x: startX + i * spacing, y: y + (i % 2 === 0 ? 0 : 20) };
+    });
+  }
+}
+layoutBuildings();
+
+// ===== CANVAS SETUP =====
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+let W, H;
+let panX = 0, panY = 0, zoom = 1;
+let activePhase = 0;
+let hoverNode = null;
+let animT = 0;
+
+function resize() {
+  W = window.innerWidth;
+  H = window.innerHeight;
+  canvas.width = W * devicePixelRatio;
+  canvas.height = H * devicePixelRatio;
+  canvas.style.width = W + 'px';
+  canvas.style.height = H + 'px';
+  ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+}
+window.addEventListener('resize', resize);
+resize();
+
+// Center the view
+panX = W / 2 - 600;
+panY = H / 2 - 420;
+
+// ===== INTERACTION =====
+let isDragging = false, lastMouse = {x:0,y:0};
+
+canvas.addEventListener('mousedown', e => {
+  isDragging = true;
+  lastMouse = {x: e.clientX, y: e.clientY};
+});
+canvas.addEventListener('mousemove', e => {
+  if (isDragging) {
+    panX += e.clientX - lastMouse.x;
+    panY += e.clientY - lastMouse.y;
+    lastMouse = {x: e.clientX, y: e.clientY};
+  }
+  // Hit test nodes
+  const mx = (e.clientX - panX) / zoom;
+  const my = (e.clientY - panY) / zoom;
+  hoverNode = null;
+  for (const [k, pos] of Object.entries(LAYOUT)) {
+    const b = BLDS[k];
+    if (activePhase > 0 && b.phase !== activePhase) continue;
+    const dx = mx - pos.x, dy = my - pos.y;
+    if (Math.sqrt(dx*dx+dy*dy) < 32) {
+      hoverNode = k;
+      break;
+    }
+  }
+  // Tooltip
+  const tip = document.getElementById('tooltip');
+  if (hoverNode) {
+    const b = BLDS[hoverNode];
+    const incoming = FLOW_MAP.filter(f => f.to === hoverNode).map(f => `${BLDS[f.from]?.emoji||''} ${BLDS[f.from]?.n||f.from} → ${f.label}`);
+    const outgoing = FLOW_MAP.filter(f => f.from === hoverNode).map(f => `${f.label} → ${BLDS[f.to]?.emoji||''} ${BLDS[f.to]?.n||f.to}`);
+    let html = `<div class="tt-name" style="color:${b.color}">${b.emoji} ${b.n}${b.isNew?'<span class="new-badge">NEW</span>':''}${b.isBoost?' <span style="color:#4a6080;font-size:11px">[增益]</span>':''}${b.isWonder?' <span style="color:#a855f7;font-size:11px">[奇观]</span>':''}</div>`;
+    html += `<div class="tt-ratio">${b.ratio}</div>`;
+    if (incoming.length > 0) html += `<div style="margin-top:6px;color:#06d6a0;font-size:11px">📥 输入:</div>` + incoming.map(s => `<div style="color:#8aa;font-size:11px;margin-left:8px">${s}</div>`).join('');
+    if (outgoing.length > 0) html += `<div style="margin-top:4px;color:#f97316;font-size:11px">📤 输出:</div>` + outgoing.map(s => `<div style="color:#a88;font-size:11px;margin-left:8px">${s}</div>`).join('');
+    tip.innerHTML = html;
+    tip.style.display = 'block';
+    tip.style.left = Math.min(e.clientX + 12, W - 300) + 'px';
+    tip.style.top = Math.min(e.clientY + 12, H - 200) + 'px';
+  } else {
+    tip.style.display = 'none';
+  }
+});
+canvas.addEventListener('mouseup', () => { isDragging = false; });
+canvas.addEventListener('wheel', e => {
+  e.preventDefault();
+  const factor = e.deltaY < 0 ? 1.1 : 0.9;
+  const mx = e.clientX, my = e.clientY;
+  panX = mx - (mx - panX) * factor;
+  panY = my - (my - panY) * factor;
+  zoom *= factor;
+  zoom = Math.max(0.3, Math.min(3, zoom));
+}, {passive: false});
+
+// Phase filter buttons
+document.querySelectorAll('.controls button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.controls button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    activePhase = parseInt(btn.dataset.phase);
+  });
+});
+
+// ===== LEGEND =====
+function buildLegend() {
+  const el = document.getElementById('legend');
+  let html = '<h3>📋 建筑列表</h3>';
+  for (let p = 1; p <= 5; p++) {
+    const pNames = {1:'P1 采集',2:'P2 代谢',3:'P3 物流',4:'P4 自动化',5:'P5 奇观'};
+    html += `<div class="phase-label" style="color:${PHASE_COLORS[p]}">${pNames[p]}</div>`;
+    for (const [k,b] of Object.entries(BLDS)) {
+      if (b.phase !== p) continue;
+      html += `<div class="legend-item"><span class="legend-dot" style="background:${b.color}"></span>${b.emoji} ${b.n}${b.isNew?'<span class="new-badge">NEW</span>':''}${b.isBoost?' <span style="color:#4a6080">[增益]</span>':''}</div>`;
+    }
+  }
+  html += '<div class="phase-label" style="color:#5a7a9a;margin-top:12px">资源颜色</div>';
+  for (const [k,c] of Object.entries(RES_COLORS)) {
+    const names = {glucose:'葡萄糖',energy:'ATP能量',dna:'DNA',nitrogen:'氮源',protein:'蛋白质',biomass:'生物质',qs:'QS信号'};
+    html += `<div class="legend-item"><span class="legend-dot" style="background:${c}"></span>${RES_ICONS[k]} ${names[k]}</div>`;
+  }
+  el.innerHTML = html;
+}
+buildLegend();
+
+// ===== DRAW =====
+function drawArrow(x1,y1,x2,y2,color,alpha,width,animated) {
+  const dx = x2-x1, dy = y2-y1;
+  const dist = Math.sqrt(dx*dx+dy*dy);
+  if (dist < 1) return;
+  const ux = dx/dist, uy = dy/dist;
+  // Shorten to avoid overlap with nodes
+  const sx = x1 + ux*30, sy = y1 + uy*30;
+  const ex = x2 - ux*30, ey = y2 - uy*30;
+
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.strokeStyle = color;
+  ctx.lineWidth = width;
+
+  // Animated dashes
+  if (animated) {
+    ctx.setLineDash([6,4]);
+    ctx.lineDashOffset = -animT * 0.5;
+  }
+
+  ctx.beginPath();
+  ctx.moveTo(sx, sy);
+  ctx.lineTo(ex, ey);
+  ctx.stroke();
+
+  // Arrowhead
+  const aLen = 8;
+  const ax = ex - ux*aLen, ay = ey - uy*aLen;
+  ctx.fillStyle = color;
+  ctx.globalAlpha = alpha * 0.8;
+  ctx.beginPath();
+  ctx.moveTo(ex, ey);
+  ctx.lineTo(ax - uy*4, ay + ux*4);
+  ctx.lineTo(ax + uy*4, ay - ux*4);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.setLineDash([]);
+  ctx.restore();
+}
+
+function drawNode(key, pos, highlight) {
+  const b = BLDS[key];
+  const x = pos.x, y = pos.y;
+  const r = highlight ? 30 : 26;
+
+  // Glow
+  if (highlight) {
+    ctx.save();
+    const grad = ctx.createRadialGradient(x,y,r,x,y,r+20);
+    grad.addColorStop(0, b.color + '40');
+    grad.addColorStop(1, b.color + '00');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(x,y,r+20,0,Math.PI*2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  // Circle
+  ctx.save();
+  ctx.fillStyle = '#0a0f1a';
+  ctx.strokeStyle = b.color;
+  ctx.lineWidth = highlight ? 2.5 : 1.5;
+  ctx.globalAlpha = highlight ? 1 : 0.8;
+  ctx.beginPath();
+  ctx.arc(x,y,r,0,Math.PI*2);
+  ctx.fill();
+  ctx.stroke();
+
+  // NEW badge ring
+  if (b.isNew) {
+    ctx.strokeStyle = '#fbbf24';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([3,3]);
+    ctx.lineDashOffset = -animT * 0.3;
+    ctx.beginPath();
+    ctx.arc(x,y,r+4,0,Math.PI*2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  // Emoji
+  ctx.fillStyle = '#fff';
+  ctx.font = `${highlight ? 20 : 16}px 'Segoe UI Emoji','Apple Color Emoji',sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(b.emoji, x, y - 1);
+
+  // Name below
+  ctx.fillStyle = b.color;
+  ctx.font = `${highlight ? 11 : 10}px 'Microsoft YaHei','Segoe UI',sans-serif`;
+  ctx.globalAlpha = highlight ? 1 : 0.7;
+  ctx.fillText(b.n, x, y + r + 12);
+
+  // Phase badge
+  ctx.font = '8px monospace';
+  ctx.fillStyle = PHASE_COLORS[b.phase];
+  ctx.globalAlpha = 0.5;
+  ctx.fillText('P'+b.phase, x, y - r - 6);
+
+  ctx.restore();
+}
+
+function draw() {
+  animT++;
+  ctx.clearRect(0, 0, W, H);
+
+  ctx.save();
+  ctx.translate(panX, panY);
+  ctx.scale(zoom, zoom);
+
+  // Phase background bands
+  for (let p = 1; p <= 5; p++) {
+    if (activePhase > 0 && p !== activePhase) continue;
+    const y = PHASE_Y[p];
+    ctx.fillStyle = PHASE_COLORS[p] + '05';
+    ctx.fillRect(-200, y - 55, 1600, 110);
+    ctx.fillStyle = PHASE_COLORS[p] + '15';
+    ctx.font = '12px monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText(`━━ Phase ${p} ━━`, -150, y - 40);
+  }
+
+  // Draw edges (connections)
+  const visibleNodes = new Set();
+  for (const [k,b] of Object.entries(BLDS)) {
+    if (activePhase === 0 || b.phase === activePhase) visibleNodes.add(k);
+  }
+
+  // Group flows between same pair
+  const edgeMap = {};
+  for (const flow of FLOW_MAP) {
+    if (!visibleNodes.has(flow.from) || !visibleNodes.has(flow.to)) continue;
+    const key = flow.from + '->' + flow.to;
+    if (!edgeMap[key]) edgeMap[key] = [];
+    edgeMap[key].push(flow);
+  }
+
+  for (const [key, flows] of Object.entries(edgeMap)) {
+    const from = flows[0].from, to = flows[0].to;
+    const p1 = LAYOUT[from], p2 = LAYOUT[to];
+    if (!p1 || !p2) continue;
+    const isHighlight = hoverNode === from || hoverNode === to;
+    const mainColor = flows[0].color;
+    drawArrow(p1.x,p1.y,p2.x,p2.y, mainColor, isHighlight ? 0.9 : 0.25, isHighlight ? 2 : 1, isHighlight);
+
+    // Resource label on edge
+    if (isHighlight) {
+      const mx = (p1.x+p2.x)/2, my = (p1.y+p2.y)/2;
+      const labels = [...new Set(flows.map(f=>f.label))].join('+');
+      ctx.save();
+      ctx.font = '9px sans-serif';
+      ctx.fillStyle = mainColor;
+      ctx.globalAlpha = 0.9;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(labels, mx + 8, my - 8);
+      ctx.restore();
+    }
+  }
+
+  // Draw nodes
+  for (const [k, pos] of Object.entries(LAYOUT)) {
+    if (!visibleNodes.has(k)) continue;
+    const isHover = hoverNode === k;
+    const isConnected = hoverNode && FLOW_MAP.some(f => (f.from === hoverNode && f.to === k) || (f.to === hoverNode && f.from === k));
+    drawNode(k, pos, isHover || isConnected);
+  }
+
+  ctx.restore();
+  requestAnimationFrame(draw);
+}
+draw();
+</script>
+</body>
+</html>

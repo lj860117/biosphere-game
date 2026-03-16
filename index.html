@@ -577,6 +577,21 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
   50%{border-color:rgba(239,68,68,0.8);box-shadow:0 0 12px rgba(239,68,68,0.25),inset 0 0 8px rgba(239,68,68,0.06)}
 }
 
+/* 邻接加成badge */
+.cell-adj-badge{
+  position:absolute;bottom:0;left:0;right:0;z-index:10;pointer-events:none;
+  text-align:center;font-size:0.42em;font-weight:800;
+  color:#06d6a0;background:rgba(6,78,59,0.75);
+  padding:1px 0;letter-spacing:0.3px;
+  border-radius:0 0 3px 3px;
+  text-shadow:0 0 4px rgba(6,214,160,0.5);
+  animation:adjGlow 2.5s ease-in-out infinite;
+}
+@keyframes adjGlow{
+  0%,100%{background:rgba(6,78,59,0.65)}
+  50%{background:rgba(6,78,59,0.85);text-shadow:0 0 6px rgba(6,214,160,0.8)}
+}
+
 /* 主题色左侧竖条 */
 .cell-stripe{
   position:absolute;left:0;top:10%;bottom:10%;width:2px;border-radius:0 2px 2px 0;
