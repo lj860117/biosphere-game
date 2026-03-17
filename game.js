@@ -1109,6 +1109,15 @@ const FLOW_MAP = [
   { from:'pheromoneStation',  to:'resonanceChamber',   res:'qs',       icon:'📡', color:'#facc15', label:'QS信号' },
   { from:'energyStation',    to:'resonanceChamber',   res:'energy',   icon:'⚡', color:'#f97316', label:'ATP' },
   { from:'energyBuffer',     to:'resonanceChamber',   res:'energy',   icon:'⚡', color:'#fb923c', label:'ATP' },
+  // Phase 4 — 共振培养箱作为上游（产出 glucose/nitrogen/protein）
+  { from:'resonanceChamber', to:'energyStation',       res:'glucose',  icon:'🟢', color:'#c084fc', label:'葡萄糖' },
+  { from:'resonanceChamber', to:'energyBuffer',        res:'glucose',  icon:'🟢', color:'#c084fc', label:'葡萄糖' },
+  { from:'resonanceChamber', to:'simpleExtractor',     res:'glucose',  icon:'🟢', color:'#c084fc', label:'葡萄糖' },
+  { from:'resonanceChamber', to:'proteinFactory',      res:'nitrogen', icon:'🔵', color:'#c084fc', label:'氮源' },
+  { from:'resonanceChamber', to:'aminoSynth',          res:'nitrogen', icon:'🔵', color:'#c084fc', label:'氮源' },
+  { from:'resonanceChamber', to:'biofilmReactor',      res:'nitrogen', icon:'🔵', color:'#c084fc', label:'氮源' },
+  { from:'resonanceChamber', to:'geneExtractor',       res:'protein',  icon:'🧪', color:'#c084fc', label:'蛋白质' },
+  { from:'resonanceChamber', to:'biomassConverter',    res:'protein',  icon:'🧪', color:'#c084fc', label:'蛋白质' },
 ];
 
 // ===== CHALLENGE MISSIONS =====
@@ -1376,7 +1385,7 @@ const G = {
     // 初始加载迷你排行榜 (延迟 2 秒等 Supabase 就绪)
     setTimeout(() => this.refreshMiniLeaderboard(), 2000);
     // 每 60 秒自动刷新迷你排行榜
-    setInterval(() => this.refreshMiniLeaderboard(), 60000);
+    this._leaderboardIntervalId = setInterval(() => this.refreshMiniLeaderboard(), 60000);
     // 初始加载建议列表已移除（功能已去掉）
     this._initTouchEvents();
     this.log('▸ 系统在线 — 微生物帝国启动', 's');
@@ -1938,7 +1947,7 @@ const G = {
     return Object.values(beltGroups).map(grp => {
       const count = grp.keys.length;
       const minLv = Math.min(...grp.keys.map(k => this.getBeltLevel(k)));
-      const avgEff = grp.keys.reduce((s, k) => s + this.getBeltEfficiency(k), 0) / count;
+      const avgEff = count > 0 ? grp.keys.reduce((s, k) => s + this.getBeltEfficiency(k), 0) / count : 0;
       const effPct = Math.round(avgEff * 100);
       const allMax = minLv >= 5;
       return { ...grp, count, minLv, effPct, allMax };
@@ -2308,6 +2317,8 @@ const G = {
     this._chainsDirty = true;
   },
 
+  // ===== 增量更新 renderGrid =====
+  // 首次调用创建 cell DOM + 事件委托，后续调用只更新 cell 内容
   renderGrid() {
     this._chainsDirty = true;  // 网格变了，传送带列表需要更新
     const gridEl = document.getElementById('grid');
@@ -2318,12 +2329,26 @@ const G = {
     } else {
       gridEl.style.gridTemplateColumns = `repeat(${this.gridCols}, 1fr)`;
     }
-    gridEl.innerHTML = '';
+
+    const totalCells = this.gridCols * this.gridRows;
+
+    // ★ 首次渲染：创建空 cell 框架 + 事件委托
+    if (!this._gridInitialized) {
+      gridEl.innerHTML = '';
+      for (let i = 0; i < totalCells; i++) {
+        const cell = document.createElement('div');
+        cell.className = 'cell';
+        cell.dataset.i = i;
+        gridEl.appendChild(cell);
+      }
+      this._initGridDelegation(gridEl);
+      this._gridInitialized = true;
+    }
 
     // 预计算每种建筑类型的序号映射: idx → seq number (1-based)
     const seqCounters = {};
     const seqMap = {};
-    for (let i = 0; i < this.gridCols * this.gridRows; i++) {
+    for (let i = 0; i < totalCells; i++) {
       if (this.grid[i] && this.grid[i].type && BLDS[this.grid[i].type]) {
         const t = this.grid[i].type;
         if (!seqCounters[t]) seqCounters[t] = 0;
@@ -2332,15 +2357,30 @@ const G = {
       }
     }
 
-    for (let i = 0; i < this.gridCols * this.gridRows; i++) {
-      const cell = document.createElement('div');
-      cell.className = 'cell';
-      cell.dataset.i = i;
+    // ★ 增量更新：只更新每个 cell 的内容
+    for (let i = 0; i < totalCells; i++) {
+      const cell = gridEl.children[i];
+      if (!cell) continue;
 
       // 清除无效的格子数据（旧存档残留，含旧版核心菌落）
       if (this.grid[i] && (this.grid[i].type === '_coreColony' || !this.grid[i].type || !BLDS[this.grid[i].type])) {
         this.grid[i] = null;
       }
+
+      // 快速脏检查：避免不必要的 DOM 操作
+      const curType = this.grid[i]?.type || '';
+      const curLv = this.grid[i] ? (this.buildingLevels[i] || 1) : 0;
+      const curSeq = seqMap[i] || 0;
+      const prevKey = cell._rkey || '';
+      const newKey = curType + '|' + curLv + '|' + curSeq + '|' + (seqCounters[curType] || 0);
+      if (prevKey === newKey) continue; // 无变化，跳过
+      cell._rkey = newKey;
+
+      // 重置 cell class 和内容
+      // 保留 cell 和 data-i，去掉 occupied/bg-*/upgraded/max-level 等
+      cell.className = 'cell';
+      cell.innerHTML = '';
+      delete cell.dataset.btype;
 
       if (this.grid[i]) {
         const bd = BLDS[this.grid[i].type];
@@ -2442,8 +2482,6 @@ const G = {
         adjBadge.style.display = 'none';
         cell.appendChild(adjBadge);
 
-        // （产出速率改为 hover tooltip 显示，不再叠加在格子上）
-
         // 输入端口（消耗的资源）
         const consKeys = Object.keys(bd.cons || {});
         if (consKeys.length > 0 && !bd.isBoost && !bd.isWonder) {
@@ -2485,300 +2523,289 @@ const G = {
         // Hover tooltip数据
         cell.dataset.btype = btype;
       }
-
-      // === 拖拽 + 点击 + 框选事件系统 ===
-      cell.onmousedown = ((idx) => {
-        return (e) => {
-          if (e.button !== 0) return;
-          if (this._beltConnectMode) return;
-
-          // 如果已有框选，且点击的是已选中的有建筑的格子 → 启动多选拖拽
-          if (this._selectedCells.size > 0 && this._selectedCells.has(idx) && this.grid[idx] && !this.sel) {
-            this._multiDragStart = { x: e.clientX, y: e.clientY };
-            this._isMultiDragging = false;
-            e.preventDefault();
-            return;
-          }
-
-          // 点击非选中区域，清除框选
-          if (this._selectedCells.size > 0 && !this._selectedCells.has(idx)) {
-            this._clearBoxSelection();
-          }
-
-          // 正常单个建筑拖拽
-          if (this.grid[idx] && !this.sel) {
-            this._dragStartPos = { x: e.clientX, y: e.clientY };
-            this._dragIdx = idx;
-            this._isDragging = false;
-          }
-          // 空格子 + 无建造模式 → 准备框选
-          if (!this.grid[idx] && !this.sel) {
-            this._boxSelectStart = { x: e.clientX, y: e.clientY, idx: idx };
-            this._boxSelectMode = false;
-            e.preventDefault();
-          }
-        };
-      })(i);
-      cell.onclick = (() => {
-        const idx = i;
-        return (e) => {
-          if (this._isDragging || this._isMultiDragging || this._boxSelectMode) {
-            this._isDragging = false;
-            this._isMultiDragging = false;
-            this._boxSelectMode = false;
-            return;
-          }
-          this.cellClick(idx);
-        };
-      })();
-      cell.ondblclick = ((idx) => {
-        return () => {
-          if (this._isDragging || this._isMultiDragging) return;
-          if (this.grid[idx]) this.showUpgradePopup(idx);
-        };
-      })(i);
-      cell.oncontextmenu = ((idx) => {
-        return (e) => {
-          e.preventDefault();
-          if (this._beltConnectMode) {
-            this.cancelBeltConnect();
-            this.showCursorTooltip('已取消传送带连接');
-            return;
-          }
-          // 框选中右键取消框选
-          if (this._selectedCells.size > 0) {
-            this._clearBoxSelection();
-            this.showCursorTooltip('已取消框选');
-            return;
-          }
-          if (this.sel) {
-            this.selectBuilding(this.sel);
-            this.showCursorTooltip('已取消建造');
-            return;
-          }
-          if (this.grid[idx]) this.showRecycle(idx);
-        };
-      })(i);
-
-      // Hover tooltip + belt preview tracking + drag over
-      cell.onmouseenter = ((idx) => {
-        return (e) => {
-          this._hoverIdx = idx;
-          // 拖拽悬停高亮
-          if (this._isDragging && this._dragIdx != null && this._dragIdx !== idx) {
-            this._dragOverIdx = idx;
-            const targetCell = document.querySelector(`.cell[data-i="${idx}"]`);
-            if (targetCell && !this.grid[idx]) {
-              targetCell.style.boxShadow = 'inset 0 0 12px rgba(6,214,160,0.3)';
-              targetCell.style.borderColor = '#06d6a0';
-            } else if (targetCell && this.grid[idx]) {
-              targetCell.style.boxShadow = 'inset 0 0 12px rgba(59,130,246,0.3)';
-              targetCell.style.borderColor = '#3b82f6';
-            }
-          }
-          // 多选拖拽悬停高亮
-          if (this._isMultiDragging && !this._selectedCells.has(idx)) {
-            this._dragOverIdx = idx;
-          }
-          if (!this.grid[idx]) return;
-          if (this._isDragging || this._isMultiDragging) return;
-          const bd = BLDS[this.grid[idx].type];
-          if (!bd) return;
-          const tt = document.getElementById('tooltip');
-          const lvl = this.buildingLevels[idx] || 1;
-          const lvlStr = lvl >= 5 ? ' <span style="color:var(--color-max)">★MAX</span>' : ` <span style="color:var(--color-upgrade)">Lv.${lvl}</span>`;
-          const multStr = lvl > 1 ? `<br><span style="color:var(--color-upgrade)">产出倍率: ${this.getUpgradeMultiplier(idx).toFixed(1)}x</span>` : '';
-          const beltMult = this.getBeltMultiplierForBuilding(idx);
-          // 计算容量状态信息
-          let capInfo = '';
-          if (bd.cons && Object.keys(bd.cons).length > 0 && FLOW_MAP.some(f => f.to === bd.key || f.to === this.grid[idx]?.type)) {
-            const belts = this._activeBelts || [];
-            let totalCap = 0;
-            const selfType = this.grid[idx]?.type;
-            for (const belt of belts) {
-              if (belt.ti !== idx && belt.fi !== idx) continue;
-              const otherIdx = belt.fi === idx ? belt.ti : belt.fi;
-              const otherG = this.grid[otherIdx];
-              if (!otherG) continue;
-              if (FLOW_MAP.some(f => f.from === otherG.type && f.to === selfType)) {
-                const key = Math.min(belt.fi, belt.ti) + '-' + Math.max(belt.fi, belt.ti);
-                totalCap += this.getBeltCapacity(key);
-              }
-            }
-            const bldM = this.getUpgradeMultiplier(idx);
-            let demand = 0;
-            for (const k in bd.cons) demand += bd.cons[k] * bldM;
-            if (demand > 0 && totalCap > 0) {
-              const ratio = Math.min(100, Math.round(totalCap / demand * 100));
-              const capColor = ratio >= 100 ? 'var(--cyan)' : ratio >= 60 ? 'var(--yellow)' : 'var(--orange)';
-              capInfo = ` <span style="color:${capColor};font-size:0.85em">📦${totalCap.toFixed(1)}/${demand.toFixed(1)} (${ratio}%)</span>`;
-            }
-          }
-          const beltStr = beltMult === 0 ? `<br><span style="color:#ef4444;font-weight:700">🚫 资源阻塞 — 需要传送带连接输入资源！</span>` : beltMult < 1 ? `<br><span style="color:var(--orange)">⚠ 传送带效率: ${Math.round(beltMult*100)}%${capInfo} — 升级传送带或增加并行管线</span>` : (beltMult > 1 ? `<br><span style="color:var(--cyan)">✦ 传送带加成: ${Math.round(beltMult*100)}%${capInfo}</span>` : (capInfo ? `<br><span style="color:var(--color-info)">⛓ 传送带${capInfo}</span>` : ''));
-
-          // 产出速率详情
-          let rateStr = '';
-          if (bd.isBoost) {
-            rateStr = `<br><span style="color:${bd.color}">✦ 增益: +12%</span>`;
-          } else if (bd.isWonder && this.wonderComplete) {
-            rateStr = `<br><span style="color:${bd.color}">✦ 运行中</span>`;
-          } else if (!bd.isWonder) {
-            const coreConfig = CORE_COLONY[this.phase] || CORE_COLONY[1];
-            const maxC = (coreConfig.maxCollectors || 2) + (this._coreBonus || 0);
-            if (bd.corePowered) {
-              let seq = 0;
-              for (let ci = 0; ci <= idx; ci++) {
-                if (this.grid[ci] && BLDS[this.grid[ci].type]?.corePowered) seq++;
-              }
-              if (seq > maxC) {
-                rateStr = `<br><span style="color:var(--red)">⚠ 闲置（核心供能上限 ${maxC}）</span>`;
-              }
-            }
-            // 各项产出
-            const prodEntries = Object.entries(bd.prod || {});
-            if (prodEntries.length > 0 && !rateStr.includes('闲置')) {
-              const bldMult = this.getUpgradeMultiplier(idx);
-              const hPop = Math.min(this.pop, this._popCap()) * (this.popAlloc.harvest / 100);
-              const popMult = 1 + hPop * 0.003 * (this._popEffMult || 1);
-              const _gProdMult = this._prodMult || 1;
-              const mult = this.gEff * popMult * this.lEff * bldMult * beltMult * _gProdMult;
-              const prodParts = prodEntries.map(([res, base]) => {
-                const actual = (base * mult).toFixed(1);
-                return `<span style="color:${RES[res]?.c || bd.color}">+${actual} ${RES[res]?.icon||''} ${RES[res]?.n||res}/s</span>`;
-              });
-              rateStr = `<br>${prodParts.join('  ')}`;
-            }
-            // 各项消耗
-            const consEntries = Object.entries(bd.cons || {});
-            if (consEntries.length > 0 && !rateStr.includes('闲置')) {
-              const bldMult = this.getUpgradeMultiplier(idx);
-              const hPop = Math.min(this.pop, this._popCap()) * (this.popAlloc.harvest / 100);
-              const popMult = 1 + hPop * 0.003 * (this._popEffMult || 1);
-              const mult = this.gEff * popMult * this.lEff * bldMult * beltMult;
-              const consParts = consEntries.map(([res, base]) => {
-                const actual = (base * mult).toFixed(1);
-                return `<span style="color:${RES[res]?.c || '#f97316'}">-${actual} ${RES[res]?.icon||''} ${RES[res]?.n||res}/s</span>`;
-              });
-              rateStr += `<br>${consParts.join('  ')}`;
-            }
-          }
-
-          // 邻接加成详情
-          let adjStr = '';
-          const adjResult = this.getAdjacencyBonus(idx);
-          if (adjResult.bonus > 0) {
-            adjStr = `<br><span style="color:#06d6a0;font-weight:700">🔗 邻接加成: +${Math.round(adjResult.bonus * 100)}%</span>`;
-            adjResult.details.forEach(d => {
-              adjStr += `<br><span style="color:#06d6a080;font-size:0.85em">  ${d.icon} ${d.name} +${Math.round(d.bonus * 100)}%${d.count > 1 ? ' ×'+d.count : ''}</span>`;
-            });
-          }
-
-          document.getElementById('ttName').innerHTML = `${bd.emoji||''} ${bd.n}${lvlStr} <span style="color:${bd.color};font-size:0.85em">[T${bd.tier||1}]</span>`;
-          document.getElementById('ttDesc').innerHTML = `${bd.d}${multStr}${rateStr}${beltStr}${adjStr}<br><span style="color:var(--color-info);font-family:'Share Tech Mono',monospace">${bd.ratio}</span><br><span style="color:var(--color-muted-dark);font-size:0.85em">拖拽移动 · 双击升级 · 右键回收 · 空白拖拽框选</span>`;
-          tt.classList.add('show');
-          tt.style.left = Math.min(e.clientX + 12, window.innerWidth - 240) + 'px';
-          tt.style.top = Math.min(e.clientY + 12, window.innerHeight - 100) + 'px';
-        };
-      })(i);
-      cell.onmouseleave = ((idx) => {
-        return () => {
-          this._hoverIdx = null;
-          document.getElementById('tooltip').classList.remove('show');
-          if (this._isDragging) {
-            const targetCell = document.querySelector(`.cell[data-i="${idx}"]`);
-            if (targetCell) {
-              targetCell.style.boxShadow = '';
-              targetCell.style.borderColor = '';
-            }
-            this._dragOverIdx = null;
-          }
-        };
-      })(i);
-      cell.onmousemove = (e) => {
-        const tt = document.getElementById('tooltip');
-        if (tt.classList.contains('show')) {
-          tt.style.left = Math.min(e.clientX + 12, window.innerWidth - 240) + 'px';
-          tt.style.top = Math.min(e.clientY + 12, window.innerHeight - 100) + 'px';
-        }
-        // 检测拖拽开始（移动超过5px阈值）
-        if (this._dragIdx != null && !this._isDragging && this._dragStartPos) {
-          const dx = e.clientX - this._dragStartPos.x;
-          const dy = e.clientY - this._dragStartPos.y;
-          if (Math.sqrt(dx*dx + dy*dy) > 5) {
-            this._isDragging = true;
-            document.getElementById('tooltip').classList.remove('show');
-            this._createDragGhost(this._dragIdx, e);
-            const srcCell = document.querySelector(`.cell[data-i="${this._dragIdx}"]`);
-            if (srcCell) {
-              srcCell.style.opacity = '0.4';
-              srcCell.style.filter = 'grayscale(0.5)';
-            }
-          }
-        }
-        // 更新幽灵位置
-        if (this._isDragging && this._dragGhost) {
-          this._dragGhost.style.left = (e.clientX - 20) + 'px';
-          this._dragGhost.style.top = (e.clientY - 20) + 'px';
-        }
-        // 框选：从空格子开始拖拽
-        if (this._boxSelectStart && !this._boxSelectMode) {
-          const dx = e.clientX - this._boxSelectStart.x;
-          const dy = e.clientY - this._boxSelectStart.y;
-          if (Math.sqrt(dx*dx + dy*dy) > 5) {
-            this._boxSelectMode = true;
-            this._clearBoxSelection();
-            // 创建选框矩形
-            this._boxSelectRect = document.createElement('div');
-            this._boxSelectRect.className = 'box-select-rect';
-            document.getElementById('grid').parentElement.appendChild(this._boxSelectRect);
-          }
-        }
-        if (this._boxSelectMode && this._boxSelectRect) {
-          this._updateBoxSelectRect(e);
-        }
-        // 多选拖拽检测
-        if (this._multiDragStart && !this._isMultiDragging) {
-          const dx = e.clientX - this._multiDragStart.x;
-          const dy = e.clientY - this._multiDragStart.y;
-          if (Math.sqrt(dx*dx + dy*dy) > 5) {
-            this._isMultiDragging = true;
-            document.getElementById('tooltip').classList.remove('show');
-            this._createMultiDragGhost(e);
-            // 半透明已选格子
-            this._selectedCells.forEach(si => {
-              const sc = document.querySelector(`.cell[data-i="${si}"]`);
-              if (sc && this.grid[si]) { sc.style.opacity = '0.4'; sc.style.filter = 'grayscale(0.5)'; }
-            });
-          }
-        }
-        if (this._isMultiDragging && this._multiDragGhost) {
-          this._multiDragGhost.style.left = (e.clientX - 20) + 'px';
-          this._multiDragGhost.style.top = (e.clientY - 20) + 'px';
-        }
-      };
-      cell.onmouseup = ((idx) => {
-        return (e) => {
-          if (e.button !== 0) return;
-          if (this._isDragging && this._dragIdx != null && this._dragIdx !== idx) {
-            this._completeDrag(this._dragIdx, idx);
-          }
-          // 多选拖拽完成
-          if (this._isMultiDragging && this._selectedCells.size > 0) {
-            this._completeMultiDrag(idx);
-          }
-          // 框选结束
-          if (this._boxSelectMode) {
-            this._finalizeBoxSelect();
-          }
-          this._boxSelectStart = null;
-          this._multiDragStart = null;
-        };
-      })(i);
-
-      gridEl.appendChild(cell);
     }
     // 渲染完毕后刷新滚动指示器
     if (this._updateScrollHints) setTimeout(this._updateScrollHints, 50);
+  },
+
+  // ===== 事件委托：统一在 gridEl 上监听，通过 dataset.i 获取 idx =====
+  _initGridDelegation(gridEl) {
+    const self = this;
+    // 辅助：从事件 target 找到 .cell 元素并返回 idx
+    function cellIdx(e) {
+      const c = e.target.closest('.cell');
+      if (!c || c.dataset.i == null) return -1;
+      return +c.dataset.i;
+    }
+
+    gridEl.addEventListener('mousedown', (e) => {
+      if (e.button !== 0) return;
+      const idx = cellIdx(e);
+      if (idx < 0) return;
+      if (self._beltConnectMode) return;
+      if (self._selectedCells.size > 0 && self._selectedCells.has(idx) && self.grid[idx] && !self.sel) {
+        self._multiDragStart = { x: e.clientX, y: e.clientY };
+        self._isMultiDragging = false;
+        e.preventDefault();
+        return;
+      }
+      if (self._selectedCells.size > 0 && !self._selectedCells.has(idx)) {
+        self._clearBoxSelection();
+      }
+      if (self.grid[idx] && !self.sel) {
+        self._dragStartPos = { x: e.clientX, y: e.clientY };
+        self._dragIdx = idx;
+        self._isDragging = false;
+      }
+      if (!self.grid[idx] && !self.sel) {
+        self._boxSelectStart = { x: e.clientX, y: e.clientY, idx: idx };
+        self._boxSelectMode = false;
+        e.preventDefault();
+      }
+    });
+
+    gridEl.addEventListener('click', (e) => {
+      const idx = cellIdx(e);
+      if (idx < 0) return;
+      if (self._isDragging || self._isMultiDragging || self._boxSelectMode) {
+        self._isDragging = false;
+        self._isMultiDragging = false;
+        self._boxSelectMode = false;
+        return;
+      }
+      self.cellClick(idx);
+    });
+
+    gridEl.addEventListener('dblclick', (e) => {
+      const idx = cellIdx(e);
+      if (idx < 0) return;
+      if (self._isDragging || self._isMultiDragging) return;
+      if (self.grid[idx]) self.showUpgradePopup(idx);
+    });
+
+    gridEl.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      const idx = cellIdx(e);
+      if (idx < 0) return;
+      if (self._beltConnectMode) {
+        self.cancelBeltConnect();
+        self.showCursorTooltip('已取消传送带连接');
+        return;
+      }
+      if (self._selectedCells.size > 0) {
+        self._clearBoxSelection();
+        self.showCursorTooltip('已取消框选');
+        return;
+      }
+      if (self.sel) {
+        self.selectBuilding(self.sel);
+        self.showCursorTooltip('已取消建造');
+        return;
+      }
+      if (self.grid[idx]) self.showRecycle(idx);
+    });
+
+    gridEl.addEventListener('mouseenter', (e) => {
+      const idx = cellIdx(e);
+      if (idx < 0) return;
+      self._hoverIdx = idx;
+      // 拖拽悬停高亮
+      if (self._isDragging && self._dragIdx != null && self._dragIdx !== idx) {
+        self._dragOverIdx = idx;
+        const targetCell = e.target.closest('.cell');
+        if (targetCell && !self.grid[idx]) {
+          targetCell.style.boxShadow = 'inset 0 0 12px rgba(6,214,160,0.3)';
+          targetCell.style.borderColor = '#06d6a0';
+        } else if (targetCell && self.grid[idx]) {
+          targetCell.style.boxShadow = 'inset 0 0 12px rgba(59,130,246,0.3)';
+          targetCell.style.borderColor = '#3b82f6';
+        }
+      }
+      // 多选拖拽悬停高亮
+      if (self._isMultiDragging && !self._selectedCells.has(idx)) {
+        self._dragOverIdx = idx;
+      }
+      if (!self.grid[idx]) return;
+      if (self._isDragging || self._isMultiDragging) return;
+      const bd = BLDS[self.grid[idx].type];
+      if (!bd) return;
+      const tt = document.getElementById('tooltip');
+      const lvl = self.buildingLevels[idx] || 1;
+      const lvlStr = lvl >= 5 ? ' <span style="color:var(--color-max)">★MAX</span>' : ` <span style="color:var(--color-upgrade)">Lv.${lvl}</span>`;
+      const multStr = lvl > 1 ? `<br><span style="color:var(--color-upgrade)">产出倍率: ${self.getUpgradeMultiplier(idx).toFixed(1)}x</span>` : '';
+      const beltMult = self.getBeltMultiplierForBuilding(idx);
+      let capInfo = '';
+      if (bd.cons && Object.keys(bd.cons).length > 0 && FLOW_MAP.some(f => f.to === bd.key || f.to === self.grid[idx]?.type)) {
+        const belts = self._activeBelts || [];
+        let totalCap = 0;
+        const selfType = self.grid[idx]?.type;
+        for (const belt of belts) {
+          if (belt.ti !== idx && belt.fi !== idx) continue;
+          const otherIdx = belt.fi === idx ? belt.ti : belt.fi;
+          const otherG = self.grid[otherIdx];
+          if (!otherG) continue;
+          if (FLOW_MAP.some(f => f.from === otherG.type && f.to === selfType)) {
+            const key = Math.min(belt.fi, belt.ti) + '-' + Math.max(belt.fi, belt.ti);
+            totalCap += self.getBeltCapacity(key);
+          }
+        }
+        const bldM = self.getUpgradeMultiplier(idx);
+        let demand = 0;
+        for (const k in bd.cons) demand += bd.cons[k] * bldM;
+        if (demand > 0 && totalCap > 0) {
+          const ratio = Math.min(100, Math.round(totalCap / demand * 100));
+          const capColor = ratio >= 100 ? 'var(--cyan)' : ratio >= 60 ? 'var(--yellow)' : 'var(--orange)';
+          capInfo = ` <span style="color:${capColor};font-size:0.85em">📦${totalCap.toFixed(1)}/${demand.toFixed(1)} (${ratio}%)</span>`;
+        }
+      }
+      const beltStr = beltMult === 0 ? `<br><span style="color:#ef4444;font-weight:700">🚫 资源阻塞 — 需要传送带连接输入资源！</span>` : beltMult < 1 ? `<br><span style="color:var(--orange)">⚠ 传送带效率: ${Math.round(beltMult*100)}%${capInfo} — 升级传送带或增加并行管线</span>` : (beltMult > 1 ? `<br><span style="color:var(--cyan)">✦ 传送带加成: ${Math.round(beltMult*100)}%${capInfo}</span>` : (capInfo ? `<br><span style="color:var(--color-info)">⛓ 传送带${capInfo}</span>` : ''));
+      let rateStr = '';
+      if (bd.isBoost) {
+        rateStr = `<br><span style="color:${bd.color}">✦ 增益: +12%</span>`;
+      } else if (bd.isWonder && self.wonderComplete) {
+        rateStr = `<br><span style="color:${bd.color}">✦ 运行中</span>`;
+      } else if (!bd.isWonder) {
+        const coreConfig = CORE_COLONY[self.phase] || CORE_COLONY[1];
+        const maxC = (coreConfig.maxCollectors || 2) + (self._coreBonus || 0);
+        if (bd.corePowered) {
+          let seq = 0;
+          for (let ci = 0; ci <= idx; ci++) {
+            if (self.grid[ci] && BLDS[self.grid[ci].type]?.corePowered) seq++;
+          }
+          if (seq > maxC) {
+            rateStr = `<br><span style="color:var(--red)">⚠ 闲置（核心供能上限 ${maxC}）</span>`;
+          }
+        }
+        const prodEntries = Object.entries(bd.prod || {});
+        if (prodEntries.length > 0 && !rateStr.includes('闲置')) {
+          const bldMult = self.getUpgradeMultiplier(idx);
+          const hPop = Math.min(self.pop, self._popCap()) * (self.popAlloc.harvest / 100);
+          const popMult = 1 + hPop * 0.003 * (self._popEffMult || 1);
+          const _gProdMult = self._prodMult || 1;
+          const mult = self.gEff * popMult * (self.lEff || 1) * bldMult * beltMult * _gProdMult;
+          const prodParts = prodEntries.map(([res, base]) => {
+            const actual = (base * mult).toFixed(1);
+            return `<span style="color:${RES[res]?.c || bd.color}">+${actual} ${RES[res]?.icon||''} ${RES[res]?.n||res}/s</span>`;
+          });
+          rateStr = `<br>${prodParts.join('  ')}`;
+        }
+        const consEntries = Object.entries(bd.cons || {});
+        if (consEntries.length > 0 && !rateStr.includes('闲置')) {
+          const bldMult = self.getUpgradeMultiplier(idx);
+          const hPop = Math.min(self.pop, self._popCap()) * (self.popAlloc.harvest / 100);
+          const popMult = 1 + hPop * 0.003 * (self._popEffMult || 1);
+          const mult = self.gEff * popMult * (self.lEff || 1) * bldMult * beltMult;
+          const consParts = consEntries.map(([res, base]) => {
+            const actual = (base * mult).toFixed(1);
+            return `<span style="color:${RES[res]?.c || '#f97316'}">-${actual} ${RES[res]?.icon||''} ${RES[res]?.n||res}/s</span>`;
+          });
+          rateStr += `<br>${consParts.join('  ')}`;
+        }
+      }
+      let adjStr = '';
+      const adjResult = self.getAdjacencyBonus(idx);
+      if (adjResult.bonus > 0) {
+        adjStr = `<br><span style="color:#06d6a0;font-weight:700">🔗 邻接加成: +${Math.round(adjResult.bonus * 100)}%</span>`;
+        adjResult.details.forEach(d => {
+          adjStr += `<br><span style="color:#06d6a080;font-size:0.85em">  ${d.icon} ${d.name} +${Math.round(d.bonus * 100)}%${d.count > 1 ? ' ×'+d.count : ''}</span>`;
+        });
+      }
+      document.getElementById('ttName').innerHTML = `${bd.emoji||''} ${bd.n}${lvlStr} <span style="color:${bd.color};font-size:0.85em">[T${bd.tier||1}]</span>`;
+      document.getElementById('ttDesc').innerHTML = `${bd.d}${multStr}${rateStr}${beltStr}${adjStr}<br><span style="color:var(--color-info);font-family:'Share Tech Mono',monospace">${bd.ratio}</span><br><span style="color:var(--color-muted-dark);font-size:0.85em">拖拽移动 · 双击升级 · 右键回收 · 空白拖拽框选</span>`;
+      tt.classList.add('show');
+      tt.style.left = Math.min(e.clientX + 12, window.innerWidth - 240) + 'px';
+      tt.style.top = Math.min(e.clientY + 12, window.innerHeight - 100) + 'px';
+    }, true); // useCapture for mouseenter delegation
+
+    gridEl.addEventListener('mouseleave', (e) => {
+      const idx = cellIdx(e);
+      if (idx < 0) return;
+      self._hoverIdx = null;
+      document.getElementById('tooltip').classList.remove('show');
+      if (self._isDragging) {
+        const targetCell = e.target.closest('.cell');
+        if (targetCell) {
+          targetCell.style.boxShadow = '';
+          targetCell.style.borderColor = '';
+        }
+        self._dragOverIdx = null;
+      }
+    }, true); // useCapture for mouseleave delegation
+
+    gridEl.addEventListener('mousemove', (e) => {
+      const tt = document.getElementById('tooltip');
+      if (tt.classList.contains('show')) {
+        tt.style.left = Math.min(e.clientX + 12, window.innerWidth - 240) + 'px';
+        tt.style.top = Math.min(e.clientY + 12, window.innerHeight - 100) + 'px';
+      }
+      // 检测拖拽开始（移动超过5px阈值）
+      if (self._dragIdx != null && !self._isDragging && self._dragStartPos) {
+        const dx = e.clientX - self._dragStartPos.x;
+        const dy = e.clientY - self._dragStartPos.y;
+        if (Math.sqrt(dx*dx + dy*dy) > 5) {
+          self._isDragging = true;
+          document.getElementById('tooltip').classList.remove('show');
+          self._createDragGhost(self._dragIdx, e);
+          const srcCell = gridEl.children[self._dragIdx];
+          if (srcCell) {
+            srcCell.style.opacity = '0.4';
+            srcCell.style.filter = 'grayscale(0.5)';
+          }
+        }
+      }
+      if (self._isDragging && self._dragGhost) {
+        self._dragGhost.style.left = (e.clientX - 20) + 'px';
+        self._dragGhost.style.top = (e.clientY - 20) + 'px';
+      }
+      if (self._boxSelectStart && !self._boxSelectMode) {
+        const dx = e.clientX - self._boxSelectStart.x;
+        const dy = e.clientY - self._boxSelectStart.y;
+        if (Math.sqrt(dx*dx + dy*dy) > 5) {
+          self._boxSelectMode = true;
+          self._clearBoxSelection();
+          self._boxSelectRect = document.createElement('div');
+          self._boxSelectRect.className = 'box-select-rect';
+          gridEl.parentElement.appendChild(self._boxSelectRect);
+        }
+      }
+      if (self._boxSelectMode && self._boxSelectRect) {
+        self._updateBoxSelectRect(e);
+      }
+      if (self._multiDragStart && !self._isMultiDragging) {
+        const dx = e.clientX - self._multiDragStart.x;
+        const dy = e.clientY - self._multiDragStart.y;
+        if (Math.sqrt(dx*dx + dy*dy) > 5) {
+          self._isMultiDragging = true;
+          document.getElementById('tooltip').classList.remove('show');
+          self._createMultiDragGhost(e);
+          self._selectedCells.forEach(si => {
+            const sc = gridEl.children[si];
+            if (sc && self.grid[si]) { sc.style.opacity = '0.4'; sc.style.filter = 'grayscale(0.5)'; }
+          });
+        }
+      }
+      if (self._isMultiDragging && self._multiDragGhost) {
+        self._multiDragGhost.style.left = (e.clientX - 20) + 'px';
+        self._multiDragGhost.style.top = (e.clientY - 20) + 'px';
+      }
+    });
+
+    gridEl.addEventListener('mouseup', (e) => {
+      if (e.button !== 0) return;
+      const idx = cellIdx(e);
+      if (idx < 0) return;
+      if (self._isDragging && self._dragIdx != null && self._dragIdx !== idx) {
+        self._completeDrag(self._dragIdx, idx);
+      }
+      if (self._isMultiDragging && self._selectedCells.size > 0) {
+        self._completeMultiDrag(idx);
+      }
+      if (self._boxSelectMode) {
+        self._finalizeBoxSelect();
+      }
+      self._boxSelectStart = null;
+      self._multiDragStart = null;
+    });
   },
 
   // 更新格子内的警告标签（产出速率已移至 hover tooltip）
@@ -4612,7 +4639,7 @@ const G = {
       const adjResult = this.getAdjacencyBonus(idx);
       const adjBonus = 1 + adjResult.bonus;
       const globalProdMult = this._prodMult || 1; // 转生产出加成
-      const mult = this.gEff * popMult * bldMult * beltMult * techBonus * adjBonus * this._foodPowerLevel * globalProdMult;
+      const mult = this.gEff * popMult * bldMult * beltMult * techBonus * adjBonus * (this._foodPowerLevel || 1) * globalProdMult;
       for (let k in bd.prod) r[k] = (r[k]||0) + bd.prod[k] * mult;
       // 【修复】消耗乘建筑等级和传送带效率（升级建筑=吞吐量同步提升）
       const consMult = bldMult * beltMult * techConsPenalty;
@@ -5048,7 +5075,9 @@ const G = {
 
   // ===== MAIN LOOP =====
   startLoop() {
-    setInterval(() => {
+    // 幂等保护：防止多次调用叠加多个 setInterval
+    if (this._loopId) return;
+    this._loopId = setInterval(() => {
       if (this.paused) return;
 
       for (let s = 0; s < this.spd; s++) {
@@ -7188,7 +7217,7 @@ const G = {
         const count = grp.keys.length;
         // 取最低等级（决定整组升级费用）
         const minLv = Math.min(...grp.keys.map(k => this.getBeltLevel(k)));
-        const avgEff2 = grp.keys.reduce((s, k) => s + this.getBeltEfficiency(k), 0) / count;
+        const avgEff2 = count > 0 ? grp.keys.reduce((s, k) => s + this.getBeltEfficiency(k), 0) / count : 0;
         const effPct = Math.round(avgEff2 * 100);
         const allMax = minLv >= 5;
         const resIcons = grp.icons.join('');
@@ -7203,7 +7232,7 @@ const G = {
         row.style.cssText = `padding:4px 6px;margin:2px 0;border-radius:3px;
           background:var(--color-panel-bg);border:1px solid ${minLv >= 5 ? 'rgba(74,26,106,0.25)' : minLv >= 3 ? 'rgba(26,58,58,0.25)' : 'rgba(58,42,26,0.25)'};
           cursor:pointer;transition:all 0.15s`;
-        const avgCap = grp.keys.reduce((s, k) => s + this.getBeltCapacity(k), 0) / count;
+        const avgCap = count > 0 ? grp.keys.reduce((s, k) => s + this.getBeltCapacity(k), 0) / count : 0;
         const capStr = avgCap.toFixed(1);
         row.innerHTML = `
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px">
@@ -7936,7 +7965,7 @@ const G = {
     }
 
     // 基础效率 = 所有有效传送带的平均效率
-    const baseEff = totalEff / validBeltCount;
+    const baseEff = validBeltCount > 0 ? totalEff / validBeltCount : 0;
 
     // ★ 容量钳制：计算建筑的总资源需求量
     const bldMult = this.getUpgradeMultiplier(idx);
