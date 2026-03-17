@@ -186,6 +186,24 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
   border-radius:var(--r-md);position:relative;overflow:hidden;transition:all 0.3s;
 }
 .res-card:hover{border-color:#2a4a6a}
+/* ★ Q1：资源收支明细 tooltip */
+.res-breakdown-tip{
+  position:fixed;z-index:9500;background:rgba(8,14,28,0.97);border:1px solid #2a4a6a;
+  border-radius:8px;padding:10px 14px;min-width:200px;max-width:260px;pointer-events:none;
+  font-size:0.72em;color:var(--text);box-shadow:0 4px 24px rgba(0,0,0,0.6);
+  display:none;backdrop-filter:blur(6px);
+}
+.res-breakdown-tip.show{display:block;animation:ttIn .15s ease-out}
+.rb-title{font-weight:700;color:var(--bright);font-size:1.05em;margin-bottom:4px}
+.rb-sep{height:1px;background:rgba(255,255,255,0.08);margin:5px 0}
+.rb-row{display:flex;justify-content:space-between;align-items:center;padding:2px 0;font-family:'Share Tech Mono',monospace;font-size:0.95em}
+.rb-row.rb-sub{opacity:0.7;font-size:0.9em}
+.rb-row.rb-pos .rb-val{color:#22c55e}
+.rb-row.rb-neg .rb-val{color:#f97316}
+.rb-row.rb-warn .rb-val{color:#ef4444}
+.rb-label{color:#8aa0c0}
+.rb-val{font-weight:600}
+.rb-net{display:flex;justify-content:space-between;align-items:center;padding:3px 0;font-weight:700;font-family:'Share Tech Mono',monospace;font-size:1.05em}
 .res-card.hidden{display:none}
 .res-icon{font-size:1.4em;line-height:1}
 .res-name{font-size:0.88em;color:var(--dim);margin-top:var(--sp-2xs)}
@@ -1738,6 +1756,30 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 .belt-action-close:hover{color:var(--bright)}
 
 /* Belt connect mode highlights */
+/* ★ Q2：传送带模式浮动Banner */
+.belt-mode-banner{
+  position:fixed;top:8px;left:50%;transform:translateX(-50%);z-index:8500;
+  display:none;align-items:center;gap:8px;padding:6px 16px;
+  background:rgba(6,214,160,0.15);border:1px solid rgba(6,214,160,0.4);
+  border-radius:20px;font-size:0.78em;color:#06d6a0;cursor:pointer;
+  backdrop-filter:blur(8px);box-shadow:0 2px 16px rgba(6,214,160,0.15);
+  transition:all 0.3s;white-space:nowrap;
+}
+.belt-mode-banner.show{display:flex;animation:bmbIn 0.3s ease-out}
+.belt-mode-banner:hover{background:rgba(6,214,160,0.25);border-color:#06d6a0}
+@keyframes bmbIn{0%{opacity:0;transform:translateX(-50%) translateY(-12px)}100%{opacity:1;transform:translateX(-50%) translateY(0)}}
+.bmb-icon{font-size:1.2em}
+.bmb-text{font-weight:700;letter-spacing:0.5px}
+.bmb-hint{color:rgba(6,214,160,0.6);font-size:0.9em;margin-left:4px}
+.bmb-idle{display:block;color:#fbbf24;font-size:0.85em;margin-left:8px;animation:bmbIdlePulse 1.5s ease-in-out infinite}
+@keyframes bmbIdlePulse{0%,100%{opacity:0.7}50%{opacity:1}}
+.belt-mode-banner.idle-warning{border-color:#fbbf24;background:rgba(251,191,36,0.12);box-shadow:0 2px 16px rgba(251,191,36,0.2)}
+.belt-mode-banner.conflict-flash{animation:bmbConflict 0.6s ease-out}
+@keyframes bmbConflict{
+  0%{border-color:#ef4444;background:rgba(239,68,68,0.2);box-shadow:0 0 20px rgba(239,68,68,0.3)}
+  100%{border-color:rgba(6,214,160,0.4);background:rgba(6,214,160,0.15);box-shadow:0 2px 16px rgba(6,214,160,0.15)}
+}
+
 .cell.belt-connect-from{
   border-color:var(--cyan);
   box-shadow:0 0 12px rgba(6,214,160,0.4);
@@ -1787,12 +1829,84 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
   box-shadow:inset 0 0 12px rgba(20,184,166,0.5), 0 0 8px rgba(20,184,166,0.3);
   border-color:#14b8a6;
 }
+/* 培养皿实验buff期间 — 参与实验的格子持续发光 */
+.cell.petri-active{
+  --petri-color:#14b8a6;
+  border-color:rgba(20,184,166,0.5) !important;
+  box-shadow:inset 0 0 8px rgba(20,184,166,0.25),
+             0 0 6px rgba(20,184,166,0.2);
+  animation:petriGlow 2s ease-in-out infinite;
+  position:relative;
+}
+@supports (color: color-mix(in srgb, red, blue)) {
+  .cell.petri-active{
+    border-color:color-mix(in srgb, var(--petri-color) 50%, transparent) !important;
+    box-shadow:inset 0 0 8px color-mix(in srgb, var(--petri-color) 25%, transparent),
+               0 0 6px color-mix(in srgb, var(--petri-color) 20%, transparent);
+  }
+}
+.cell.petri-active::after{
+  content:'🧫';
+  position:absolute;
+  top:2px;right:2px;
+  font-size:0.55em;
+  opacity:0.7;
+  z-index:5;
+  filter:drop-shadow(0 0 2px rgba(20,184,166,0.5));
+  animation:petriIcon 2s ease-in-out infinite;
+}
+@keyframes petriGlow{
+  0%,100%{box-shadow:inset 0 0 6px rgba(20,184,166,0.2),
+                      0 0 4px rgba(20,184,166,0.15)}
+  50%{box-shadow:inset 0 0 12px rgba(20,184,166,0.35),
+                 0 0 10px rgba(20,184,166,0.25)}
+}
+@keyframes petriIcon{
+  0%,100%{opacity:0.5;transform:scale(1)}
+  50%{opacity:0.9;transform:scale(1.1)}
+}
 .petri-start-btn{
   font-size:0.72em;padding:var(--sp-sm-md) var(--sp-lg);
   background:linear-gradient(180deg,rgba(20,184,166,0.10),rgba(20,184,166,0.04));
   border:1px solid rgba(20,184,166,0.3);border-radius:5px;
   color:#14b8a6;cursor:pointer;transition:all 0.2s;
   font-weight:600;font-family:'Share Tech Mono',monospace;
+}
+
+/* ★ 方案F教学：供给同步建筑格子视觉反馈 */
+.cell.sync-active{
+  border-color:rgba(34,197,94,0.45) !important;
+  box-shadow:inset 0 0 6px rgba(34,197,94,0.2),
+             0 0 4px rgba(34,197,94,0.15);
+  animation:syncGlow 2.5s ease-in-out infinite;
+}
+.cell.sync-perfect{
+  border-color:rgba(251,191,36,0.5) !important;
+  box-shadow:inset 0 0 8px rgba(251,191,36,0.25),
+             0 0 6px rgba(251,191,36,0.2);
+  animation:syncPerfectGlow 2s ease-in-out infinite;
+}
+.cell.sync-perfect::before{
+  content:'⚡';
+  position:absolute;
+  bottom:1px;left:1px;
+  font-size:0.5em;
+  opacity:0.7;
+  z-index:5;
+  filter:drop-shadow(0 0 3px rgba(251,191,36,0.6));
+  animation:syncIcon 1.5s ease-in-out infinite;
+}
+@keyframes syncGlow{
+  0%,100%{box-shadow:inset 0 0 4px rgba(34,197,94,0.15),0 0 3px rgba(34,197,94,0.1)}
+  50%{box-shadow:inset 0 0 10px rgba(34,197,94,0.3),0 0 8px rgba(34,197,94,0.2)}
+}
+@keyframes syncPerfectGlow{
+  0%,100%{box-shadow:inset 0 0 6px rgba(251,191,36,0.2),0 0 4px rgba(251,191,36,0.15)}
+  50%{box-shadow:inset 0 0 14px rgba(251,191,36,0.4),0 0 10px rgba(251,191,36,0.3)}
+}
+@keyframes syncIcon{
+  0%,100%{opacity:0.5;transform:scale(1)}
+  50%{opacity:1;transform:scale(1.15)}
 }
 .petri-start-btn:hover:not([disabled]){
   background:rgba(20,184,166,0.15);border-color:#14b8a6;
@@ -2709,6 +2823,7 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
     <div class="spacer"></div>
     <div class="phase-badge" id="phaseBadge" style="color:var(--green);border-color:var(--green)30">阶段 1 · 采集</div>
     <div id="phaseEvoHint" style="font-size:0.78em;text-align:center;margin:-2px 0 2px;opacity:0.8"></div>
+    <div id="adjRuleHint" style="font-size:0.72em;text-align:center;margin:-2px 0 2px;opacity:0.8"></div>
     <div id="saveIndicator" style="font-size:0.78em;color:var(--dim);opacity:0;transition:opacity 0.3s;white-space:nowrap">💾 已保存</div>
     <div id="noSaveHint" style="font-size:0.7em;color:#f59e0b;opacity:0.85;white-space:nowrap;animation:noSavePulse 2s ease-in-out infinite">⚠ 阶段3前不保存</div>
     <div class="ctrl-btns">
@@ -2825,6 +2940,8 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
                 <div class="stat-item"><span class="s-label">🦠 种群</span><span class="s-val" id="statPop">0</span></div>
                 <div class="stat-item" id="rowPopFood"><span class="s-label">🍽️ 食耗</span><span class="s-val" id="statPopFood" style="color:var(--dim)">—</span></div>
                 <div class="stat-item" id="rowPowerLevel"><span class="s-label">🔋 功率</span><span class="s-val" id="statPowerLevel" style="font-weight:700;color:var(--dim)">—</span></div>
+                <div class="stat-item" id="rowMaintenance" style="display:none"><span class="s-label">🔧 维护</span><span class="s-val" id="statMaintenance" style="color:var(--dim)">—</span></div>
+                <div class="stat-item" id="rowCompetition" style="display:none"><span class="s-label">⚖️ 供需</span><span class="s-val" id="statCompetition" style="color:var(--dim)">—</span></div>
                 <div class="stat-item"><span class="s-label">⚡ 效率</span><span class="s-val" id="statEff">100%</span></div>
                 <div class="stat-item" title="物流效率"><span class="s-label">🚚 物流</span><span class="s-val" id="statLog">100%</span></div>
                 <div class="stat-item" id="rowQS" style="display:none"><span class="s-label">📡 QS信号</span><span class="s-val" id="statQS">0</span></div>
