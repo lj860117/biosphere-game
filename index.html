@@ -366,6 +366,14 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
   animation:cursorTipIn 0.15s ease-out;
   transform:translate(12px,-100%);
 }
+/* 警告(橙色) */
+.cursor-tooltip.ct-w{background:rgba(249,115,22,0.92);box-shadow:0 2px 12px rgba(249,115,22,0.3)}
+/* 成功(绿色) */
+.cursor-tooltip.ct-s{background:rgba(34,197,94,0.88);box-shadow:0 2px 12px rgba(34,197,94,0.3)}
+/* 错误(红色) — 默认就是红色 */
+.cursor-tooltip.ct-e{background:rgba(220,38,38,0.92);box-shadow:0 2px 12px rgba(220,38,38,0.3)}
+/* 信息(蓝色) */
+.cursor-tooltip.ct-i{background:rgba(59,130,246,0.88);box-shadow:0 2px 12px rgba(59,130,246,0.3)}
 @keyframes cursorTipIn{0%{opacity:0;transform:translate(12px,-80%) scale(0.9)}100%{opacity:1;transform:translate(12px,-100%) scale(1)}}
 
 /* Belt connect button in build panel */
@@ -496,6 +504,118 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 .prog-bar{height:3px;background:rgba(255,255,255,0.04);border-radius:2px;overflow:hidden}
 .prog-fill{height:100%;transition:width 0.3s;border-radius:2px}
 
+/* ===== TECH TREE ===== */
+.tech-tree{display:flex;flex-direction:column;align-items:center;gap:0;padding:4px 0}
+
+/* 阶段行 */
+.tt-phase{display:flex;flex-direction:column;align-items:center;width:100%;position:relative}
+.tt-phase-tag{
+  font-family:'Orbitron',monospace;font-size:0.55em;color:var(--dim);letter-spacing:1px;
+  margin-bottom:2px;opacity:0.5;
+}
+
+/* 主干节点 */
+.tt-trunk{width:100%;max-width:320px}
+
+/* 分叉连线：主干到分支 */
+.tt-fork{
+  display:flex;align-items:stretch;width:100%;max-width:320px;
+  position:relative;margin:0;
+}
+.tt-fork::before{
+  content:'';position:absolute;left:50%;top:0;width:1px;height:10px;
+  background:rgba(6,214,160,0.2);
+}
+.tt-fork::after{
+  content:'';position:absolute;top:10px;left:25%;width:50%;height:1px;
+  background:rgba(6,214,160,0.2);
+}
+
+/* 分支容器 */
+.tt-branches{
+  display:flex;gap:4px;width:100%;max-width:320px;
+  padding-top:14px;position:relative;
+}
+.tt-branches .tt-branch{flex:1;min-width:0;position:relative}
+.tt-branches .tt-branch::before{
+  content:'';position:absolute;left:50%;top:-14px;width:1px;height:14px;
+  background:rgba(6,214,160,0.2);
+}
+
+/* 阶段间连线 */
+.tt-connector{
+  width:1px;height:12px;background:rgba(6,214,160,0.15);
+  margin:0 auto;
+}
+.tt-connector.done{background:rgba(6,214,160,0.4)}
+
+/* 科技节点 */
+.tt-node{
+  width:100%;padding:7px 9px;
+  border:1px solid var(--bdr);border-radius:4px;
+  background:linear-gradient(135deg,rgba(8,16,28,0.9),rgba(6,12,22,0.9));
+  color:var(--text);cursor:pointer;transition:all 0.25s;text-align:left;
+  position:relative;overflow:hidden;
+}
+.tt-node:hover:not(.locked):not(.exclusive-locked){
+  background:rgba(6,214,160,0.04);border-color:#1a4a50;
+  transform:scale(1.02);
+}
+.tt-node.done{
+  border-color:rgba(6,214,160,0.3);
+  background:linear-gradient(135deg,rgba(6,214,160,0.06),rgba(6,214,160,0.02));
+}
+.tt-node.done::after{
+  content:'';position:absolute;inset:0;
+  background:radial-gradient(ellipse at 30% 30%,rgba(6,214,160,0.08),transparent 70%);
+  pointer-events:none;
+}
+.tt-node.locked{opacity:0.25;cursor:not-allowed;pointer-events:none}
+.tt-node.exclusive-locked{
+  opacity:0.35;cursor:not-allowed;pointer-events:none;
+  border-color:rgba(239,68,68,0.25);
+  background:linear-gradient(135deg,rgba(239,68,68,0.03),rgba(6,12,22,0.9));
+}
+.tt-node.researching{
+  border-color:var(--cyan);
+  box-shadow:0 0 12px rgba(6,214,160,0.12);
+  animation:techPulse 2s ease-in-out infinite;
+}
+@keyframes techPulse{0%,100%{box-shadow:0 0 8px rgba(6,214,160,0.08)}50%{box-shadow:0 0 16px rgba(6,214,160,0.2)}}
+
+/* 节点内容 */
+.tt-name{font-weight:700;font-size:0.88em;line-height:1.2;display:flex;align-items:center;gap:4px}
+.tt-name .done-mark{color:var(--green);font-size:0.9em}
+.tt-desc{font-size:0.75em;color:var(--dim);margin-top:1px;line-height:1.2}
+.tt-cost{font-size:0.75em;color:var(--yellow);font-weight:600;margin-top:2px}
+.tt-cost .status-done{color:var(--green)}
+.tt-cost .status-locked{color:#ef4444}
+.tt-exclusive-tag{
+  display:inline-block;font-size:0.6em;color:#eab308;
+  border:1px solid #eab30840;background:#eab30810;
+  padding:0 3px;border-radius:2px;vertical-align:middle;margin-left:3px;
+}
+/* 分支 vs 字样 */
+.tt-vs{
+  position:absolute;top:10px;left:50%;transform:translateX(-50%);
+  font-size:0.55em;color:#eab308;font-weight:700;
+  background:var(--panel);padding:0 4px;z-index:2;
+  letter-spacing:1px;opacity:0.7;
+}
+
+/* 未解锁阶段整体变暗 */
+.tt-phase.future{opacity:0.15;pointer-events:none;filter:blur(1px)}
+.tt-phase.future .tt-node{border-style:dashed}
+
+/* 连线已完成状态 */
+.tt-connector.done,.tt-fork.done::before,.tt-fork.done::after,
+.tt-branches.done .tt-branch::before{
+  background:rgba(6,214,160,0.4);
+}
+/* 分支选中高亮连线 */
+.tt-branches .tt-branch.chosen::before{background:rgba(6,214,160,0.4)}
+.tt-branches .tt-branch.rejected::before{background:rgba(239,68,68,0.2)}
+
 /* === CENTER: PETRI DISH === */
 .center{
   flex:1;display:flex;flex-direction:column;position:relative;overflow:hidden;
@@ -518,7 +638,7 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 .dish-env{display:flex;gap:8px;font-size:0.85em}
 .dish-env span{color:var(--dim)}
 .dish-env .val{font-family:'Orbitron',monospace;color:var(--color-info)}
-.dish-view{flex:1;position:relative;overflow:auto;scrollbar-width:thin;scrollbar-color:rgba(6,214,160,0.35) transparent}
+.dish-view{flex:1;position:relative;overflow:auto;min-height:0;scrollbar-width:thin;scrollbar-color:rgba(6,214,160,0.35) transparent}
 .dish-view::-webkit-scrollbar{width:8px;height:8px}
 .dish-view::-webkit-scrollbar-track{background:rgba(0,0,0,0.15);border-radius:4px}
 .dish-view::-webkit-scrollbar-thumb{background:rgba(6,214,160,0.35);border-radius:4px}
@@ -585,17 +705,21 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
   50%{border-color:rgba(239,68,68,0.8);box-shadow:0 0 12px rgba(239,68,68,0.25),inset 0 0 8px rgba(239,68,68,0.06)}
 }
 
-/* 滚动提示渐变阴影 — 网格超出可视区域时在边缘显示 */
-.dish-view.can-scroll-right:not(.scrolled-right)::after{
-  content:'';position:absolute;right:0;top:0;bottom:0;width:24px;z-index:20;pointer-events:none;
-  background:linear-gradient(to right,transparent,rgba(6,214,160,0.08) 40%,rgba(6,214,160,0.15));
+/* 滚动提示渐变阴影 — 在 dish-view-wrap 的伪元素上实现，不受 dish-view 滚动影响 */
+.dish-view-wrap{position:relative;flex:1;min-height:45vh;display:flex;flex-direction:column}
+.dish-view-wrap::after{
+  content:'';position:absolute;inset:0;z-index:20;pointer-events:none;
+  transition:box-shadow 0.3s;
 }
-.dish-view.can-scroll-down:not(.scrolled-down)::before{
-  content:'';position:absolute;bottom:0;left:0;right:0;height:24px;z-index:20;pointer-events:none;
-  background:linear-gradient(to bottom,transparent,rgba(6,214,160,0.08) 40%,rgba(6,214,160,0.15));
+.dish-view-wrap.can-scroll-right:not(.scrolled-right)::after{
+  box-shadow:inset -24px 0 18px -12px rgba(6,214,160,0.10);
 }
-.dish-view.scrolled-right::after{display:none}
-.dish-view.scrolled-down::before{display:none}
+.dish-view-wrap.can-scroll-down:not(.scrolled-down)::after{
+  box-shadow:inset 0 -24px 18px -12px rgba(6,214,160,0.10);
+}
+.dish-view-wrap.can-scroll-right:not(.scrolled-right).can-scroll-down:not(.scrolled-down)::after{
+  box-shadow:inset -24px 0 18px -12px rgba(6,214,160,0.10), inset 0 -24px 18px -12px rgba(6,214,160,0.10);
+}
 
 /* 邻接加成badge */
 .cell-adj-badge{
@@ -1151,7 +1275,7 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
   background:linear-gradient(135deg,rgba(10,16,30,0.85),rgba(8,14,26,0.9));
   border:1px solid rgba(6,214,160,0.15);border-radius:6px;
   margin:6px 8px 4px;padding:0;overflow:hidden;
-  transition:all 0.3s ease;flex-shrink:0;
+  transition:all 0.3s ease;flex-shrink:1;max-height:38vh;
 }
 .empire-overview-header{
   display:flex;align-items:center;gap:6px;padding:5px 10px;
@@ -1170,10 +1294,15 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
   transition:transform 0.2s;font-family:monospace;
 }
 .empire-overview .empire-overview-body{
-  max-height:600px;overflow:hidden;
+  max-height:280px;overflow-y:auto;
   transition:max-height 0.35s ease,opacity 0.25s ease;
   opacity:1;
+  scrollbar-width:thin;scrollbar-color:rgba(6,214,160,0.25) transparent;
 }
+.empire-overview .empire-overview-body::-webkit-scrollbar{width:5px}
+.empire-overview .empire-overview-body::-webkit-scrollbar-track{background:rgba(0,0,0,0.1);border-radius:3px}
+.empire-overview .empire-overview-body::-webkit-scrollbar-thumb{background:rgba(6,214,160,0.25);border-radius:3px}
+.empire-overview .empire-overview-body::-webkit-scrollbar-thumb:hover{background:rgba(6,214,160,0.45)}
 .empire-overview.collapsed .empire-overview-body{
   max-height:0!important;opacity:0;pointer-events:none;
   padding-top:0!important;padding-bottom:0!important;
@@ -1290,9 +1419,64 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
   display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;padding:5px 0;
   border-bottom:1px solid rgba(6,214,160,0.06);
 }
-.csb-score-item{display:flex;align-items:center;gap:4px;font-size:0.82em}
+.csb-score-item{display:flex;align-items:center;gap:4px;font-size:0.78em}
 .csb-score-item .s-label{color:var(--dim)}
 .csb-score-item .s-val{font-family:'Share Tech Mono',monospace;font-weight:600}
+
+/* === 荣誉区域增强样式 === */
+.honor-fieldset{
+  border-color:rgba(251,191,36,0.15)!important;
+  background:rgba(251,191,36,0.02);
+}
+.honor-fieldset legend{
+  color:rgba(251,191,36,0.55)!important;font-size:0.68em!important;letter-spacing:2px!important;
+}
+.honor-group{
+  gap:4px 0!important;flex-direction:column!important;padding:4px 0!important;
+}
+.honor-group .csb-score-item{
+  display:grid!important;grid-template-columns:auto 1fr auto;align-items:center;
+  font-size:0.88em!important;padding:4px 8px;border-radius:4px;
+  width:100%;transition:background 0.2s;gap:8px;
+}
+.honor-group .csb-score-item .s-label{font-size:0.88em;font-weight:600;white-space:nowrap}
+.honor-group .csb-score-item .s-val{font-size:0.92em;font-weight:700}
+/* 成就行 — 可点击 */
+.honor-achv-btn{
+  cursor:pointer!important;
+  background:rgba(251,191,36,0.04);border:1px solid rgba(251,191,36,0.1);
+}
+.honor-achv-btn:hover{
+  background:rgba(251,191,36,0.1)!important;
+  border-color:rgba(251,191,36,0.25);
+}
+.honor-achv-arrow{
+  font-size:1.1em;color:rgba(251,191,36,0.3);
+  font-weight:700;transition:all 0.2s;justify-self:end;
+}
+.honor-achv-btn:hover .honor-achv-arrow{
+  color:#fbbf24;transform:translateX(3px);
+}
+/* 总分行 */
+.honor-score-row{
+  background:rgba(251,191,36,0.03);border:1px solid rgba(251,191,36,0.08);
+  position:relative;
+}
+/* 评级徽章 */
+.honor-rank-badge{
+  font-family:'Orbitron',monospace;font-size:0.72em;font-weight:900;
+  padding:2px 7px;border-radius:4px;letter-spacing:1.5px;
+  background:rgba(251,191,36,0.12);border:1px solid rgba(251,191,36,0.25);
+  color:#fbbf24;justify-self:end;
+  transition:all 0.3s;
+}
+.honor-rank-badge.glow{
+  animation:honorRankGlow 2s ease-in-out infinite;
+}
+@keyframes honorRankGlow{
+  0%,100%{box-shadow:0 0 4px rgba(251,191,36,0.1);filter:brightness(1)}
+  50%{box-shadow:0 0 14px rgba(251,191,36,0.35);filter:brightness(1.2)}
+}
 /* 排行榜区块 */
 .csb-lb-group{
   display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:5px 0;
@@ -1430,8 +1614,9 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 }
 
 
-body::after{
-  content:'';position:fixed;inset:0;z-index:99999;pointer-events:none;
+/* CRT 扫描线效果 — 移到 dish-scroll-inner 上，跟随网格滚动 */
+.dish-scroll-inner::after{
+  content:'';position:absolute;inset:0;z-index:6;pointer-events:none;
   background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.012) 2px,rgba(0,0,0,0.012) 4px);
 }
 
@@ -1485,13 +1670,65 @@ body::after{
   animation:beltFromPulse 1s ease-in-out infinite;
 }
 @keyframes beltFromPulse{0%,100%{box-shadow:0 0 8px rgba(6,214,160,0.3)}50%{box-shadow:0 0 16px rgba(6,214,160,0.5)}}
-.cell.belt-connect-target{
-  border-color:#3b82f680 !important;
-  box-shadow:0 0 8px rgba(59,130,246,0.2) !important;
+/* 有效目标：亮绿色（FLOW_MAP 中有对应关系） */
+.cell.belt-target-valid{
+  border-color:rgba(34,197,94,0.6) !important;
+  box-shadow:0 0 10px rgba(34,197,94,0.25) !important;
 }
-.cell.belt-connect-target:hover{
-  border-color:#3b82f6 !important;
-  box-shadow:0 0 14px rgba(59,130,246,0.4) !important;
+.cell.belt-target-valid:hover{
+  border-color:#22c55e !important;
+  box-shadow:0 0 16px rgba(34,197,94,0.45) !important;
+}
+/* 无效目标：暗灰色（无 FLOW_MAP 对应关系） */
+.cell.belt-target-invalid{
+  border-color:rgba(100,116,139,0.3) !important;
+  box-shadow:0 0 4px rgba(100,116,139,0.1) !important;
+  opacity:0.6;
+}
+.cell.belt-target-invalid:hover{
+  border-color:rgba(249,115,22,0.5) !important;
+  box-shadow:0 0 10px rgba(249,115,22,0.15) !important;
+  opacity:0.85;
+}
+
+/* ===== Petri Dish Experiment ===== */
+.petri-exp-btn{
+  border-color:rgba(20,184,166,0.3) !important;
+  background:linear-gradient(180deg,rgba(20,184,166,0.06),rgba(20,184,166,0.02)) !important;
+}
+.petri-exp-btn:hover{
+  border-color:rgba(20,184,166,0.6) !important;
+  box-shadow:0 0 12px rgba(20,184,166,0.15) !important;
+}
+.petri-exp-btn.active{
+  border-color:#14b8a6 !important;
+  background:rgba(20,184,166,0.12) !important;
+  box-shadow:0 0 16px rgba(20,184,166,0.25) !important;
+}
+.cell.petri-zone{
+  box-shadow:inset 0 0 8px rgba(20,184,166,0.3) !important;
+  border-color:rgba(20,184,166,0.5) !important;
+}
+.cell.petri-center{
+  box-shadow:inset 0 0 12px rgba(20,184,166,0.5), 0 0 8px rgba(20,184,166,0.3) !important;
+  border-color:#14b8a6 !important;
+}
+.petri-start-btn{
+  font-size:0.72em;padding:5px 12px;
+  background:linear-gradient(180deg,rgba(20,184,166,0.10),rgba(20,184,166,0.04));
+  border:1px solid rgba(20,184,166,0.3);border-radius:5px;
+  color:#14b8a6;cursor:pointer;transition:all 0.2s;
+  font-weight:600;font-family:'Share Tech Mono',monospace;
+}
+.petri-start-btn:hover:not([disabled]){
+  background:rgba(20,184,166,0.15);border-color:#14b8a6;
+  box-shadow:0 0 12px rgba(20,184,166,0.2);transform:scale(1.02);
+}
+.petri-start-btn[disabled]{cursor:default}
+.petri-start-btn.active{
+  background:rgba(20,184,166,0.18) !important;
+  border-color:#14b8a6 !important;
+  box-shadow:0 0 12px rgba(20,184,166,0.3) !important;
 }
 
 /* Reset popup */
@@ -1650,6 +1887,75 @@ body::after{
 }
 .challenge-skip:hover{border-color:var(--red);color:var(--red)}
 
+/* ===== INTRO / WELCOME POPUP ===== */
+.intro-popup{
+  position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:10006;
+  background:linear-gradient(135deg,rgba(6,12,24,0.98),rgba(4,8,18,0.99));
+  border:1.5px solid var(--cyan);border-radius:12px;
+  padding:28px 32px;text-align:center;min-width:360px;max-width:480px;
+  box-shadow:0 0 60px rgba(6,214,160,0.15),0 0 120px rgba(6,214,160,0.05);
+  display:none;overflow:hidden;
+}
+.intro-popup.show{display:block;animation:introPopIn .5s cubic-bezier(.17,.67,.35,1.08)}
+@keyframes introPopIn{
+  0%{opacity:0;transform:translate(-50%,-50%) scale(0.85) translateY(20px)}
+  100%{opacity:1;transform:translate(-50%,-50%) scale(1) translateY(0)}
+}
+.intro-popup .intro-glow{
+  position:absolute;inset:-60%;pointer-events:none;
+  background:conic-gradient(from 0deg,transparent,rgba(6,214,160,0.04),transparent,rgba(168,85,247,0.03),transparent);
+  animation:achieveGlow 6s linear infinite;
+}
+.intro-title{
+  font-family:'Orbitron',monospace;font-size:1.1em;font-weight:900;
+  color:var(--bright);letter-spacing:2px;margin-bottom:4px;position:relative;
+}
+.intro-subtitle{
+  font-size:0.75em;color:var(--cyan);letter-spacing:3px;margin-bottom:16px;
+  font-family:'Orbitron',monospace;position:relative;
+}
+.intro-story{
+  font-size:0.82em;color:#8aa0c0;line-height:1.6;margin-bottom:16px;
+  text-align:left;padding:0 4px;position:relative;
+}
+.intro-story b{color:var(--bright);font-weight:700}
+.intro-goal{
+  background:rgba(168,85,247,0.08);border:1px solid rgba(168,85,247,0.25);
+  border-radius:8px;padding:10px 14px;margin-bottom:16px;position:relative;
+}
+.intro-goal-label{
+  font-family:'Orbitron',monospace;font-size:0.65em;color:var(--purple);
+  letter-spacing:2px;margin-bottom:4px;
+}
+.intro-goal-text{
+  font-size:0.9em;color:#d4b8ff;font-weight:700;
+}
+.intro-roadmap{
+  display:flex;align-items:center;justify-content:center;gap:4px;
+  margin-bottom:18px;flex-wrap:wrap;position:relative;
+}
+.intro-phase{
+  display:flex;flex-direction:column;align-items:center;gap:2px;
+  padding:6px 8px;border-radius:6px;min-width:52px;
+  background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);
+  transition:all 0.3s;
+}
+.intro-phase-icon{font-size:1.3em}
+.intro-phase-name{font-size:0.62em;font-weight:700;letter-spacing:0.5px}
+.intro-phase-arrow{color:var(--dim);font-size:0.7em;opacity:0.5}
+.intro-start-btn{
+  position:relative;padding:10px 36px;
+  background:linear-gradient(135deg,rgba(6,214,160,0.15),rgba(6,214,160,0.08));
+  border:1.5px solid var(--cyan);color:var(--cyan);border-radius:6px;
+  cursor:pointer;font-family:'Orbitron',monospace;font-weight:700;font-size:0.85em;
+  letter-spacing:2px;transition:all 0.3s;
+  box-shadow:0 0 20px rgba(6,214,160,0.1);
+}
+.intro-start-btn:hover{
+  background:linear-gradient(135deg,rgba(6,214,160,0.25),rgba(6,214,160,0.15));
+  box-shadow:0 0 30px rgba(6,214,160,0.2);transform:scale(1.03);
+}
+
 /* ===== OFFLINE POPUP ===== */
 .offline-popup{
   position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:10002;
@@ -1747,26 +2053,26 @@ body::after{
 }
 @keyframes blink{0%,100%{opacity:0.3}50%{opacity:1}}
 
-/* ===== BELT GUIDANCE TOOLTIP ===== */
+/* ===== BELT GUIDANCE TOOLTIP — 琥珀金色引导统一 ===== */
 .belt-guide-tooltip{
   position:absolute;z-index:100;
-  background:rgba(6,214,160,0.15);border:1px solid var(--cyan);border-radius:6px;
-  padding:4px 10px;font-size:0.6em;color:var(--cyan);font-weight:600;
+  background:rgba(251,191,36,0.12);border:1px solid rgba(251,191,36,0.5);border-radius:6px;
+  padding:4px 10px;font-size:0.6em;color:#fbbf24;font-weight:600;
   white-space:nowrap;pointer-events:auto;cursor:pointer;
   animation:guideFloat 2s ease-in-out infinite;
-  box-shadow:0 0 12px rgba(6,214,160,0.2);
+  box-shadow:0 0 12px rgba(251,191,36,0.18);
 }
-.belt-guide-tooltip:hover{background:rgba(6,214,160,0.25);transform:scale(1.05)}
+.belt-guide-tooltip:hover{background:rgba(251,191,36,0.22);transform:scale(1.05)}
 @keyframes guideFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
 
-/* ===== NEWBIE HAND GUIDE (一阶段虚幻小手引导) ===== */
+/* ===== NEWBIE HAND GUIDE (一阶段虚幻小手引导) — 琥珀金色，区别于建筑选中青绿色 ===== */
 .guide-hand-overlay{
   position:fixed;z-index:9999;pointer-events:none;
   transition:left 0.5s ease-in-out, top 0.5s ease-in-out, opacity 0.3s;
 }
 .guide-hand{
   width:52px;height:52px;
-  filter:drop-shadow(0 0 14px rgba(6,214,160,0.55)) drop-shadow(0 2px 6px rgba(0,0,0,0.5));
+  filter:drop-shadow(0 0 14px rgba(251,191,36,0.55)) drop-shadow(0 2px 6px rgba(0,0,0,0.5));
   animation:handTap 1.4s ease-in-out infinite;
   transform-origin:center center;
 }
@@ -1777,32 +2083,32 @@ body::after{
   65%{transform:translate(0,0) scale(1);opacity:0.8}
   100%{transform:translate(0,0) scale(1);opacity:0.8}
 }
-/* 小手旁边的文字提示气泡 */
+/* 小手旁边的文字提示气泡 — 琥珀金色 */
 .guide-hand-bubble{
   position:absolute;left:52px;top:4px;
-  background:rgba(6,214,160,0.12);border:1px solid rgba(6,214,160,0.35);
+  background:rgba(251,191,36,0.10);border:1px solid rgba(251,191,36,0.35);
   border-radius:8px;padding:6px 12px;
-  font-size:0.82em;color:#8cecc8;font-weight:600;font-family:'Rajdhani',sans-serif;
+  font-size:0.82em;color:#f0d060;font-weight:600;font-family:'Rajdhani',sans-serif;
   white-space:nowrap;pointer-events:none;
-  box-shadow:0 0 16px rgba(6,214,160,0.15);
+  box-shadow:0 0 16px rgba(251,191,36,0.12);
   animation:bubblePulse 2.5s ease-in-out infinite;
   max-width:180px;white-space:normal;line-height:1.3;
 }
 @keyframes bubblePulse{
-  0%,100%{opacity:0.8;border-color:rgba(6,214,160,0.2)}
-  50%{opacity:1;border-color:rgba(6,214,160,0.5)}
+  0%,100%{opacity:0.8;border-color:rgba(251,191,36,0.2)}
+  50%{opacity:1;border-color:rgba(251,191,36,0.5)}
 }
-/* 小手指向的目标高亮光圈 */
+/* 小手指向的目标高亮光圈 — 琥珀金色 */
 .guide-hand-ring{
   position:fixed;z-index:9998;pointer-events:none;
-  border:2px solid rgba(6,214,160,0.4);border-radius:8px;
-  box-shadow:0 0 20px rgba(6,214,160,0.15),inset 0 0 12px rgba(6,214,160,0.05);
+  border:2px solid rgba(251,191,36,0.4);border-radius:8px;
+  box-shadow:0 0 20px rgba(251,191,36,0.15),inset 0 0 12px rgba(251,191,36,0.05);
   animation:ringPulse 2s ease-in-out infinite;
   transition:left 0.5s ease-in-out, top 0.5s ease-in-out, width 0.3s, height 0.3s, opacity 0.3s;
 }
 @keyframes ringPulse{
-  0%,100%{border-color:rgba(6,214,160,0.25);box-shadow:0 0 12px rgba(6,214,160,0.08)}
-  50%{border-color:rgba(6,214,160,0.55);box-shadow:0 0 28px rgba(6,214,160,0.2)}
+  0%,100%{border-color:rgba(251,191,36,0.25);box-shadow:0 0 12px rgba(251,191,36,0.08)}
+  50%{border-color:rgba(251,191,36,0.55);box-shadow:0 0 28px rgba(251,191,36,0.2)}
 }
 
 /* ===== ACHIEVEMENT TIERS ===== */
@@ -2054,6 +2360,159 @@ body::after{
 }
 #gameTooltip .tt-detail span{display:block;margin:1px 0}
 
+/* ===== ACHIEVEMENT HALL PANEL ===== */
+.achv-hall-overlay{
+  position:fixed;inset:0;z-index:10008;
+  background:rgba(2,4,10,0.85);backdrop-filter:blur(6px);
+  display:none;justify-content:center;align-items:center;
+}
+.achv-hall-overlay.show{display:flex;animation:fadeIn 0.25s ease-out}
+.achv-hall{
+  width:min(700px,92vw);max-height:85vh;background:linear-gradient(135deg,rgba(6,12,24,0.98),rgba(4,8,18,0.99));
+  border:1px solid rgba(251,191,36,0.25);border-radius:12px;padding:20px 24px;
+  box-shadow:0 0 60px rgba(251,191,36,0.1),0 8px 30px rgba(0,0,0,0.5);
+  display:flex;flex-direction:column;overflow:hidden;
+}
+.achv-hall-header{
+  display:flex;align-items:center;gap:12px;margin-bottom:14px;padding-bottom:10px;
+  border-bottom:1px solid rgba(251,191,36,0.12);
+}
+.achv-hall-title{
+  font-family:'Orbitron',monospace;font-size:1.05em;font-weight:900;color:#fbbf24;
+  letter-spacing:2px;text-shadow:0 0 15px rgba(251,191,36,0.3);
+}
+.achv-hall-close{
+  margin-left:auto;background:none;border:1px solid rgba(255,255,255,0.1);color:var(--dim);
+  cursor:pointer;font-size:1.1em;padding:2px 8px;border-radius:4px;transition:all 0.2s;
+}
+.achv-hall-close:hover{border-color:var(--red);color:var(--red)}
+/* Progress bar */
+.achv-progress-wrap{
+  height:8px;background:rgba(255,255,255,0.04);border-radius:4px;overflow:hidden;margin-bottom:6px;
+}
+.achv-progress-fill{
+  height:100%;border-radius:4px;transition:width 0.6s ease;
+  background:linear-gradient(90deg,#22c55e,#fbbf24,#f97316);
+}
+.achv-progress-label{
+  font-family:'Share Tech Mono',monospace;font-size:0.72em;color:var(--dim);text-align:right;
+  margin-bottom:10px;
+}
+/* Filter tabs */
+.achv-filters{display:flex;gap:4px;margin-bottom:12px;flex-wrap:wrap}
+.achv-filter-btn{
+  padding:3px 10px;font-family:'Rajdhani',sans-serif;font-size:0.72em;font-weight:600;
+  background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);color:var(--dim);
+  border-radius:12px;cursor:pointer;transition:all 0.2s;
+}
+.achv-filter-btn:hover{border-color:rgba(255,255,255,0.2);color:var(--text)}
+.achv-filter-btn.active{border-color:#fbbf24;color:#fbbf24;background:rgba(251,191,36,0.08)}
+/* Scrollable body */
+.achv-hall-body{flex:1;overflow-y:auto;padding-right:4px;scrollbar-width:thin;scrollbar-color:#1a3050 transparent}
+.achv-hall-body::-webkit-scrollbar{width:5px}
+.achv-hall-body::-webkit-scrollbar-thumb{background:#1a3050;border-radius:3px}
+/* Category group */
+.achv-cat{margin-bottom:14px}
+.achv-cat-title{
+  font-family:'Orbitron',monospace;font-size:0.68em;color:var(--dim);letter-spacing:2px;
+  text-transform:uppercase;margin-bottom:6px;padding-bottom:3px;
+  border-bottom:1px solid rgba(255,255,255,0.04);
+  display:flex;align-items:center;gap:6px;
+}
+.achv-cat-count{
+  font-family:'Share Tech Mono',monospace;font-size:0.9em;color:rgba(255,255,255,0.2);margin-left:auto;
+}
+.achv-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+/* Achievement card */
+.achv-card{
+  padding:8px 10px;background:rgba(10,18,30,0.7);border:1px solid rgba(255,255,255,0.06);
+  border-radius:6px;cursor:default;transition:all 0.3s;position:relative;overflow:hidden;
+}
+.achv-card.unlocked{border-color:rgba(251,191,36,0.2);background:rgba(15,22,38,0.85)}
+.achv-card.unlocked:hover{border-color:rgba(251,191,36,0.35);box-shadow:0 0 10px rgba(251,191,36,0.08)}
+.achv-card.locked{opacity:0.4;filter:grayscale(0.7)}
+.achv-card.locked:hover{opacity:0.65;filter:grayscale(0.3)}
+.achv-card-top{display:flex;align-items:center;gap:6px;margin-bottom:3px}
+.achv-card-icon{font-size:1.1em;flex-shrink:0}
+.achv-card-name{font-size:0.78em;font-weight:700;color:var(--bright);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.achv-card.locked .achv-card-name{color:var(--dim)}
+.achv-card-desc{font-size:0.62em;color:#6a8aaa;line-height:1.3}
+.achv-card.locked .achv-card-desc{color:#3a5a6a}
+.achv-card-reward{
+  font-size:0.58em;font-weight:600;color:var(--green);margin-top:3px;
+  background:rgba(34,197,94,0.06);border-radius:2px;padding:1px 5px;display:inline-block;
+}
+.achv-card.locked .achv-card-reward{color:#2a4a3a;background:rgba(34,197,94,0.03)}
+.achv-card-tier{
+  position:absolute;top:4px;right:6px;font-size:0.5em;font-family:'Orbitron',monospace;
+  font-weight:700;letter-spacing:1px;text-transform:uppercase;
+}
+.achv-card-tier.tier-bronze{color:#cd7f32}
+.achv-card-tier.tier-silver{color:#c0c0c0}
+.achv-card-tier.tier-gold{color:#fbbf24}
+.achv-card-tier.tier-diamond{color:#a855f7}
+/* Locked tooltip */
+.achv-card-hint{
+  display:none;position:absolute;left:50%;bottom:calc(100% + 6px);transform:translateX(-50%);
+  background:rgba(6,10,18,0.97);border:1px solid rgba(251,191,36,0.25);border-radius:5px;
+  padding:5px 10px;font-size:0.65em;color:#fbbf24;white-space:nowrap;z-index:5;
+  box-shadow:0 4px 12px rgba(0,0,0,0.5);pointer-events:none;
+}
+.achv-card-hint::after{
+  content:'';position:absolute;top:100%;left:50%;transform:translateX(-50%);
+  border:5px solid transparent;border-top-color:rgba(251,191,36,0.25);
+}
+.achv-card.locked:hover .achv-card-hint{display:block;animation:fadeIn 0.2s}
+/* Milestones section in hall */
+.achv-milestones{
+  margin-top:12px;padding-top:10px;border-top:1px solid rgba(251,191,36,0.1);
+}
+.achv-ms-title{
+  font-family:'Orbitron',monospace;font-size:0.68em;color:#fbbf24;letter-spacing:2px;margin-bottom:8px;
+}
+.achv-ms-grid{display:flex;gap:6px;flex-wrap:wrap}
+.achv-ms-item{
+  padding:5px 10px;background:rgba(10,18,30,0.7);border:1px solid rgba(255,255,255,0.06);
+  border-radius:5px;font-size:0.65em;text-align:center;min-width:80px;transition:all 0.3s;
+}
+.achv-ms-item.claimed{border-color:rgba(251,191,36,0.3);background:rgba(251,191,36,0.05)}
+.achv-ms-item.unclaimed{opacity:0.4}
+.achv-ms-count{font-family:'Orbitron',monospace;font-weight:700;color:var(--bright);font-size:1.1em}
+.achv-ms-item.claimed .achv-ms-count{color:#fbbf24}
+.achv-ms-buff{color:var(--dim);font-size:0.9em;margin-top:2px}
+.achv-ms-item.claimed .achv-ms-buff{color:var(--green)}
+
+/* ===== SCORE FLOAT (score change flying number) ===== */
+.score-float{
+  position:fixed;pointer-events:none;z-index:10006;
+  font-family:'Orbitron',monospace;font-size:1em;font-weight:900;
+  color:#fbbf24;text-shadow:0 0 12px rgba(251,191,36,0.6),0 0 24px rgba(251,191,36,0.25);
+  white-space:nowrap;
+  animation:scoreFloatUp 1.8s ease-out forwards;
+}
+@keyframes scoreFloatUp{
+  0%{opacity:0;transform:translateY(0) scale(0.6)}
+  15%{opacity:1;transform:translateY(-8px) scale(1.15)}
+  30%{transform:translateY(-15px) scale(1)}
+  100%{opacity:0;transform:translateY(-60px) scale(0.9)}
+}
+
+/* responsive adjustments for honor section */
+@media (max-width:1100px){
+  .honor-group .csb-score-item{font-size:0.82em!important}
+  .honor-group .csb-score-item .s-label{font-size:0.82em}
+  .honor-group .csb-score-item .s-val{font-size:0.85em}
+  .honor-rank-badge{font-size:0.65em;padding:1px 5px}
+}
+@media (max-width:768px){
+  .honor-group .csb-score-item{font-size:0.78em!important;padding:3px 5px}
+  .honor-fieldset legend{font-size:0.58em!important}
+  .honor-rank-badge{font-size:0.6em;padding:1px 4px}
+  .achv-hall{width:96vw;max-height:90vh;padding:14px 12px}
+  .achv-grid{grid-template-columns:1fr}
+  .achv-ms-grid{flex-direction:column}
+}
+
 </style>
 </head>
 <body>
@@ -2086,6 +2545,8 @@ body::after{
       <span style="width:1px;height:16px;background:var(--bdr);margin:0 2px"></span>
       <button class="ctrl-btn audio-btn" id="sfxBtn" onclick="G.toggleSfx()" title="音效开关">🔊</button>
       <button class="ctrl-btn audio-btn" id="bgmBtn" onclick="G.toggleBgm()" title="背景音乐开关">🎵</button>
+      <span style="width:1px;height:16px;background:var(--bdr);margin:0 2px"></span>
+      <button class="ctrl-btn" onclick="G.showIntro()" title="游戏帮助 / 目标说明" style="color:var(--cyan)">❓</button>
     </div>
   </div>
 
@@ -2118,11 +2579,22 @@ body::after{
               <span class="belt-up-label" id="beltUpgradeInlineLabel">升级</span>
             </button>
           </div>
+          <!-- Petri Experiment Button -->
+          <div class="belt-action-row" id="petriExpRow" style="display:none">
+            <button class="belt-connect-action-btn petri-exp-btn" id="petriExpBtnLeft" onclick="G.startPetriMode()">
+              <span class="belt-connect-icon">🧫</span>
+              <span class="belt-connect-text">
+                <span class="belt-connect-name">培养皿实验</span>
+                <span class="belt-connect-desc" id="petriExpDesc">选择3×3区域，触发实验效果</span>
+              </span>
+            </button>
+          </div>
         </div>
       </div>
 
+      <!-- Tech Tree (科技树) -->
       <div class="section" id="techSection" style="display:none">
-        <div class="section-title">研究 <button class="sec-toggle" onclick="G.toggleSection('techSection')">▾</button></div>
+        <div class="section-title">科技树 <button class="sec-toggle" onclick="G.toggleSection('techSection')">▾</button></div>
         <div class="sec-body">
           <div id="techList"></div>
         </div>
@@ -2238,15 +2710,28 @@ body::after{
               </div>
             </fieldset>
             <!-- 荣誉 — 成就/称号/分数/排行 -->
-            <fieldset class="empire-fieldset">
+            <fieldset class="empire-fieldset honor-fieldset">
               <legend>荣誉</legend>
-              <div class="csb-score-group">
-                <div class="csb-score-item"><span class="s-label">🏅 成就</span><span class="s-val" id="statAchieve" style="color:#fbbf24">0/37</span></div>
-                <div class="csb-score-item"><span class="s-label">👑 称号</span><span class="s-val" id="empireTitleDisplay" style="color:var(--cyan);font-size:0.9em">🦠 初生细胞</span></div>
-                <div class="csb-score-item" id="scoreRow" style="cursor:default" oncontextmenu="event.preventDefault();G.showRatingTooltip(event)">
+              <div class="csb-score-group honor-group">
+                <!-- 成就 — 可点击打开成就殿堂 -->
+                <div class="csb-score-item honor-achv-btn" onclick="G.openAchievementHall()" title="点击查看成就殿堂">
+                  <span class="s-label">🏅 成就</span>
+                  <span class="s-val" id="statAchieve" style="color:#fbbf24">0/37</span>
+                  <span class="honor-achv-arrow">›</span>
+                </div>
+                <!-- 称号 -->
+                <div class="csb-score-item"><span class="s-label">👑 称号</span><span class="s-val" id="empireTitleDisplay" style="color:var(--cyan)">🦠 初生细胞</span></div>
+                <!-- 总分 + 评级徽章 -->
+                <div class="csb-score-item honor-score-row" id="scoreRow" style="cursor:default" oncontextmenu="event.preventDefault();G.showRatingTooltip(event)">
                   <span class="s-label" style="font-weight:600">🏆 总分</span>
                   <span class="s-val" id="statScore" style="color:#fbbf24;font-weight:800;letter-spacing:0.5px">0</span>
-                  <span id="statRank" style="font-size:0.72em;font-weight:700;padding:1px 5px;border-radius:3px;background:rgba(251,191,36,0.1);border:1px solid rgba(251,191,36,0.2);color:#fbbf24;font-family:'Orbitron',monospace;letter-spacing:1px">E</span>
+                  <span class="honor-rank-badge" id="statRank">E</span>
+                </div>
+                <!-- 历史最高分（重置后保留，只有自己能看见） -->
+                <div class="csb-score-item" id="highScoreRow" style="display:none">
+                  <span class="s-label" style="font-size:0.82em;color:var(--dim)">📜 历史最高</span>
+                  <span class="s-val" id="statHighScore" style="color:rgba(251,191,36,0.5);font-size:0.88em;font-weight:600">—</span>
+                  <span class="honor-rank-badge" id="statHighRank" style="opacity:0.5;font-size:0.6em">—</span>
                 </div>
               </div>
               <!-- 排行榜 mini (evo>=2后显示) -->
@@ -2269,6 +2754,7 @@ body::after{
       </div>
       <!-- 兼容旧ID: colonyStatusBar 指向总览面板 -->
       <div id="colonyStatusBar" style="display:none"></div>
+      <div class="dish-view-wrap">
       <div class="dish-view">
         <div class="pause-overlay" id="pauseOverlay">⏸ 已暂停</div>
         <div class="dish-scroll-inner" id="dishScrollInner">
@@ -2288,6 +2774,7 @@ body::after{
           </div>
         </div>
       </div>
+      </div><!-- /dish-view-wrap -->
     </div>
 
     <!-- RIGHT PANEL -->
@@ -2327,6 +2814,12 @@ body::after{
       <div class="section" id="chainSection" style="display:none">
         <div class="section-title">🏭 流水线 · 传送带</div>
         <div id="chainList" style="font-size:0.72em;color:var(--dim)"></div>
+      </div>
+
+      <!-- Petri Experiment -->
+      <div class="section" id="secPetri" style="display:none">
+        <div class="section-title">🧫 培养皿实验 <button class="sec-toggle" onclick="G.toggleSection('secPetri')">▾</button></div>
+        <div class="sec-body" id="petriResultPanel"></div>
       </div>
 
       <!-- Stats -->
@@ -2396,7 +2889,7 @@ body::after{
 <!-- Reset Confirm -->
 <div class="reset-popup" id="resetPopup">
   <div class="reset-title">⚠️ 重置游戏</div>
-  <div class="reset-msg">所有进度将被清除，从头开始！<br>（此操作不可撤销）</div>
+  <div class="reset-msg">所有进度将被清除，从头开始！<br><span style="color:var(--cyan);font-size:0.95em">📊 历史最高分会永久保留</span><br>（此操作不可撤销）</div>
   <div class="reset-btns">
     <button class="reset-yes" onclick="G.confirmReset()">确认重置</button>
     <button class="reset-no" onclick="G.cancelReset()">取消</button>
@@ -2538,6 +3031,51 @@ body::after{
   </div>
 </div>
 
+<!-- Intro / Welcome Popup -->
+<div class="intro-popup" id="introPopup">
+  <div class="intro-glow"></div>
+  <div style="font-size:2em;margin-bottom:6px;position:relative">🧬</div>
+  <div class="intro-title">BIOSPHERE</div>
+  <div class="intro-subtitle">微 生 物 帝 国</div>
+  <div class="intro-story">
+    你是一团刚刚诞生的<b>原始液泡</b>——宇宙中最微小的生命形式。<br>
+    通过<b>采集资源、研究科技、建造设施</b>，从一无所有逐步进化，<br>
+    经历 <b>5 个文明阶段</b>，最终建造出终极生物奇观！
+  </div>
+  <div class="intro-goal">
+    <div class="intro-goal-label">🏛️ 终极目标</div>
+    <div class="intro-goal-text">建造「微型戴森球」— 征服微生物宇宙！</div>
+  </div>
+  <div class="intro-roadmap">
+    <div class="intro-phase" style="border-color:var(--green)20">
+      <div class="intro-phase-icon">🌱</div>
+      <div class="intro-phase-name" style="color:var(--green)">采集</div>
+    </div>
+    <div class="intro-phase-arrow">▸</div>
+    <div class="intro-phase" style="border-color:var(--orange)20">
+      <div class="intro-phase-icon">⚗️</div>
+      <div class="intro-phase-name" style="color:var(--orange)">代谢</div>
+    </div>
+    <div class="intro-phase-arrow">▸</div>
+    <div class="intro-phase" style="border-color:var(--blue)20">
+      <div class="intro-phase-icon">🔗</div>
+      <div class="intro-phase-name" style="color:var(--blue)">物流</div>
+    </div>
+    <div class="intro-phase-arrow">▸</div>
+    <div class="intro-phase" style="border-color:var(--yellow)20">
+      <div class="intro-phase-icon">🤖</div>
+      <div class="intro-phase-name" style="color:var(--yellow)">自动化</div>
+    </div>
+    <div class="intro-phase-arrow">▸</div>
+    <div class="intro-phase" style="border-color:var(--purple)20">
+      <div class="intro-phase-icon">🏛️</div>
+      <div class="intro-phase-name" style="color:var(--purple)">奇观</div>
+    </div>
+  </div>
+  <button class="intro-start-btn" onclick="G.closeIntro()">▸ 开始冒险</button>
+  <div style="font-size:0.6em;color:var(--dim);margin-top:10px;position:relative">顶部栏 ❓ 按钮可重新查看</div>
+</div>
+
 <!-- Tooltip -->
 <div class="tooltip" id="tooltip">
   <div class="tt-name" id="ttName"></div>
@@ -2574,6 +3112,22 @@ body::after{
   <div style="display:flex;gap:8px;justify-content:center">
     <button onclick="G.confirmNickname()" style="padding:6px 24px;background:rgba(6,214,160,0.15);border:1px solid var(--cyan);color:var(--cyan);border-radius:4px;cursor:pointer;font-family:'Rajdhani',sans-serif;font-weight:700;font-size:0.85em;transition:all 0.2s">确认</button>
     <button onclick="G.closeNickname()" class="recycle-no">跳过</button>
+  </div>
+</div>
+
+<!-- Achievement Hall Panel -->
+<div class="achv-hall-overlay" id="achvHallOverlay" onclick="if(event.target===this)G.closeAchievementHall()">
+  <div class="achv-hall">
+    <div class="achv-hall-header">
+      <span style="font-size:1.3em">🏆</span>
+      <span class="achv-hall-title">成就殿堂</span>
+      <span id="achvHallProgress" style="font-family:'Share Tech Mono',monospace;font-size:0.78em;color:var(--dim);margin-left:8px">0/37</span>
+      <button class="achv-hall-close" onclick="G.closeAchievementHall()">✕</button>
+    </div>
+    <div class="achv-progress-wrap"><div class="achv-progress-fill" id="achvProgressBar" style="width:0%"></div></div>
+    <div class="achv-progress-label" id="achvProgressLabel">0%</div>
+    <div class="achv-filters" id="achvFilters"></div>
+    <div class="achv-hall-body" id="achvHallBody"></div>
   </div>
 </div>
 

@@ -968,6 +968,25 @@ const ACHIEVE = [
   { id:'prestige3', n:'♻️ 三度轮回', d:'转生3次', tier:'diamond', check: s => s.prestigeCount >= 3, reward:{ energy:200, dna:50, protein:30 } },
 ];
 
+// ===== ACHIEVEMENT CATEGORIES =====
+const ACHV_CATEGORIES = {
+  'building': { name:'建筑', icon:'🏗️', ids:['firstBuild','build5','build12','build20','balanced'] },
+  'resource': { name:'资源', icon:'💎', ids:['glucose100','energy200','dna50','protein30','glucose500','energy1000'] },
+  'evolution': { name:'进化', icon:'🧬', ids:['evo2','evo3','evo5'] },
+  'tech':     { name:'科技', icon:'📖', ids:['firstTech','allTech'] },
+  'phase':    { name:'阶段', icon:'🌍', ids:['phase2','phase3','phase4','phase5'] },
+  'efficiency':{ name:'效率', icon:'📈', ids:['eff150','eff200'] },
+  'population':{ name:'人口', icon:'🦠', ids:['pop100','pop500','pop1000','pop2000'] },
+  'upgrade':  { name:'升级', icon:'🔧', ids:['firstUpgrade','upgrade10','upgrade25'] },
+  'belt':     { name:'传送带', icon:'🔗', ids:['belt5','belt15','manualBelt3'] },
+  'survival': { name:'生存', icon:'🛡️', ids:['powerCrisis','neverLowPower'] },
+  'speed':    { name:'速度', icon:'⏱️', ids:['speedPhase2','speedBuild8'] },
+  'prestige': { name:'转生', icon:'♻️', ids:['firstPrestige','prestige3'] },
+};
+
+const ACHV_TIER_LABELS = { bronze:'铜', silver:'银', gold:'金', diamond:'钻石' };
+const ACHV_TIER_COLORS = { bronze:'#cd7f32', silver:'#c0c0c0', gold:'#fbbf24', diamond:'#a855f7' };
+
 // ===== ACHIEVEMENT MILESTONE SYSTEM =====
 // 每N个成就解锁一个永久buff
 const ACHIEVE_MILESTONES = [
@@ -1119,6 +1138,75 @@ const FLOW_MAP = [
   { from:'resonanceChamber', to:'geneExtractor',       res:'protein',  icon:'🧪', color:'#c084fc', label:'蛋白质' },
   { from:'resonanceChamber', to:'biomassConverter',    res:'protein',  icon:'🧪', color:'#c084fc', label:'蛋白质' },
 ];
+
+// ===== PETRI DISH EXPERIMENT RECIPES =====
+const PETRI_RECIPES = [
+  // Phase 2 — 基础配方
+  { id:'r_carbon', name:'碳源富集', icon:'🌱', desc:'碳源采集器的密集培养产生了意想不到的共振效应', phase:2,
+    requires:{ glucoseCollector:2 }, minBuildings:3,
+    buff:{ type:'resMult_glucose', value:0.20, duration:60, name:'碳源富集', icon:'🌱', color:'#22c55e' },
+    reward:{ glucose:30 } },
+  { id:'r_energy', name:'能量脉冲', icon:'⚡', desc:'ATP合成酶集群引发了短暂的能量风暴', phase:2,
+    requires:{ energyStation:2, glucoseCollector:1 }, minBuildings:3,
+    buff:{ type:'resMult_energy', value:0.20, duration:60, name:'能量脉冲', icon:'⚡', color:'#f97316' },
+    reward:{ energy:30 } },
+  { id:'r_gene', name:'基因萃取', icon:'🧬', desc:'提取器和合成酶的邻接形成了高效的基因链', phase:2,
+    requires:{ geneExtractor:1, energyStation:1, glucoseCollector:1 }, minBuildings:3,
+    buff:{ type:'resMult_dna', value:0.25, duration:45, name:'基因萃取', icon:'🧬', color:'#a855f7' },
+    reward:{ dna:8 } },
+  { id:'r_nitrogen', name:'氮源聚合', icon:'🔵', desc:'固氮装置的磁场在区域内形成了氮富集层', phase:2,
+    requires:{ nitrogenFixer:2, energyStation:1 }, minBuildings:3,
+    buff:{ type:'resMult_nitrogen', value:0.30, duration:45, name:'氮源聚合', icon:'🔵', color:'#3b82f6' },
+    reward:{ nitrogen:15 } },
+  { id:'r_protein', name:'蛋白质激增', icon:'🧪', desc:'蛋白质工厂在氮富集环境下效率倍增', phase:2,
+    requires:{ proteinFactory:1, nitrogenFixer:1, energyStation:1 }, minBuildings:3,
+    buff:{ type:'resMult_protein', value:0.25, duration:45, name:'蛋白质激增', icon:'🧪', color:'#ec4899' },
+    reward:{ protein:10 } },
+  { id:'r_supply', name:'供给链共振', icon:'🔗', desc:'完整的供给链路形成了协同增效', phase:2,
+    requires:{ glucoseCollector:1, energyStation:1, geneExtractor:1 }, minBuildings:3,
+    buff:{ type:'prodMult', value:0.08, duration:90, name:'供给链共振', icon:'🔗', color:'#06d6a0' },
+    reward:{ glucose:20, energy:20 } },
+  // Phase 3 — 中阶配方
+  { id:'r_biofilm', name:'生物膜培育', icon:'🧫', desc:'生物膜反应器在碳氮双源下快速扩增', phase:3,
+    requires:{ biofilmReactor:1, glucoseCollector:1, nitrogenFixer:1 }, minBuildings:3,
+    buff:{ type:'resMult_biomass', value:0.30, duration:60, name:'生物膜培育', icon:'🧫', color:'#14b8a6' },
+    reward:{ biomass:12 } },
+  { id:'r_mycelium', name:'菌丝渗透', icon:'🕸', desc:'运输网在密集建筑群中找到了最优通路', phase:3,
+    requires:{ transport:1 }, minBuildings:3,
+    buff:{ type:'logisticsBoost', value:0.12, duration:60, name:'菌丝渗透', icon:'🕸', color:'#4a6080' },
+    reward:{ biomass:8 } },
+  { id:'r_spore', name:'孢子扩散', icon:'🍄', desc:'孢子在生物膜基质上加速萌发', phase:3,
+    requires:{ sporeSower:1, biofilmReactor:1 }, minBuildings:3,
+    buff:{ type:'prodMult', value:0.10, duration:60, name:'孢子扩散', icon:'🍄', color:'#34d399' },
+    reward:{ dna:10, nitrogen:10 } },
+  { id:'r_metab', name:'代谢循环', icon:'♻️', desc:'代谢回路实现了接近零浪费的循环反应', phase:3,
+    requires:{ metabolicLoop:1 }, minBuildings:3,
+    buff:{ type:'consReduce', value:0.15, duration:90, name:'代谢循环', icon:'♻️', color:'#06b6d4' },
+    reward:{ glucose:25, energy:25 } },
+  // Phase 4 — 高阶配方
+  { id:'r_qs', name:'群体共振', icon:'📡', desc:'QS信号在密集建筑中产生了正反馈回路', phase:4,
+    requires:{ qsController:1 }, minBuildings:3,
+    buff:{ type:'qsDecay', value:0.40, duration:60, name:'群体共振', icon:'📡', color:'#eab308' },
+    reward:{ qs:5 } },
+  { id:'r_nano', name:'纳米协同', icon:'🔩', desc:'纳米线在QS场中实现了超精密自组装', phase:4,
+    requires:{ nanoAssembler:1, qsController:1 }, minBuildings:3,
+    buff:{ type:'prodMult', value:0.15, duration:45, name:'纳米协同', icon:'🔩', color:'#a3e635' },
+    reward:{ biomass:15, protein:10 } },
+  // 特殊配方
+  { id:'r_chaos', name:'混沌培养', icon:'🌀', desc:'不同类型的微生物产生了意料之外的化学反应', phase:2,
+    requires:{}, minBuildings:3, minTypes:3, // 特殊：3种不同类型
+    buff:{ type:'instant_random', value:2.0, duration:0, name:'混沌培养', icon:'🌀', color:'#f59e0b' },
+    reward:{} },
+  { id:'r_perfect', name:'完美反应', icon:'⚗️', desc:'高密度建筑群实现了完美的生化级联反应', phase:3,
+    requires:{}, minBuildings:5, // 特殊：区域内≥5个建筑
+    buff:{ type:'prodMult', value:0.12, duration:120, name:'完美反应', icon:'⚗️', color:'#8b5cf6' },
+    reward:{ glucose:30, energy:30, dna:10 } },
+  { id:'r_dyson', name:'戴森预演', icon:'🏛', desc:'在微观尺度预演了行星级能源采集', phase:5,
+    requires:{ microDyson:1 }, minBuildings:3,
+    buff:{ type:'prodMult', value:0.20, duration:120, name:'戴森预演', icon:'🏛', color:'#fbbf24' },
+    reward:{ glucose:50, energy:50, dna:20, protein:20 } },
+];
+const PETRI_COOLDOWN = 90; // 冷却时间(秒)
 
 // ===== CHALLENGE MISSIONS =====
 const CHALLENGES = [
@@ -1360,6 +1448,12 @@ const G = {
   pendingChoice: null,
   // Population allocation system — 菌群分工
   popAlloc: { harvest: 34, research: 33, logistics: 33 }, // 百分比分配 (总和=100)
+  // Petri Dish Experiment
+  _petriMode: false,       // 是否在选区模式
+  _petriHoverIdx: null,    // 悬停中心格
+  _petriCooldown: 0,       // 冷却剩余秒数
+  _petriBuff: null,        // 当前活跃 buff { id, name, icon, type, value, remaining, total, color }
+  _petriCount: 0,          // 累计实验次数（用于统计/成就）
 
   // ===== INIT =====
   init() {
@@ -1391,6 +1485,9 @@ const G = {
     this.log('▸ 系统在线 — 微生物帝国启动', 's');
     this.log('▸ 起始资源: 50🟢葡萄糖 + 35⚡能量', 'ev');
     this.log('▸ 帝国核心供能上限2台 — 建造「碳源采集器」开始吧！', '');
+
+    // 首次进入时显示开场引导（介绍游戏目标和阶段路线）
+    this._checkShowIntro();
 
     // 自动保存（每30秒）
     this.autoSaveInterval = setInterval(() => {
@@ -1523,16 +1620,25 @@ const G = {
     // 滚动指示器 — 当网格超出可视范围时在边缘显示渐变提示
     const dishView = document.querySelector('.dish-view');
     if (dishView) {
+      const dishWrap = document.querySelector('.dish-view-wrap');
       const updateScrollHints = () => {
         const el = dishView;
         const canRight = el.scrollWidth > el.clientWidth + 2;
         const canDown = el.scrollHeight > el.clientHeight + 2;
         const scrolledRight = el.scrollLeft >= el.scrollWidth - el.clientWidth - 2;
         const scrolledDown = el.scrollTop >= el.scrollHeight - el.clientHeight - 2;
+        // 旧 class 仍加在 dish-view 上（兼容其他可能的引用）
         el.classList.toggle('can-scroll-right', canRight);
         el.classList.toggle('can-scroll-down', canDown);
         el.classList.toggle('scrolled-right', scrolledRight);
         el.classList.toggle('scrolled-down', scrolledDown);
+        // 新 class 加在外层 wrap 上（用于不受滚动影响的渐变提示）
+        if (dishWrap) {
+          dishWrap.classList.toggle('can-scroll-right', canRight);
+          dishWrap.classList.toggle('can-scroll-down', canDown);
+          dishWrap.classList.toggle('scrolled-right', scrolledRight);
+          dishWrap.classList.toggle('scrolled-down', scrolledDown);
+        }
       };
       dishView.addEventListener('scroll', updateScrollHints, { passive: true });
       // 初始化和每次渲染后也更新
@@ -1672,7 +1778,7 @@ const G = {
   // ===== 弹窗遮罩管理 =====
   // 按优先级排列的弹窗ID列表（从高到低）
   _popupIds: [
-    'resetPopup', 'choicePopup', 'offlinePopup',
+    'introPopup', 'resetPopup', 'choicePopup', 'offlinePopup',
     'upgradePopup', 'beltUpgradePopup', 'recyclePopup',
     'bldTypeSelector', 'beltTypeSelector', 'eventPopup',
     'leaderboardPopup', 'nicknamePopup'
@@ -1711,6 +1817,10 @@ const G = {
     // 没有弹窗，取消传送带连接模式
     if (this._beltConnectMode) {
       this.cancelBeltConnect();
+    }
+    // 没有弹窗，取消培养皿实验模式
+    if (this._petriMode) {
+      this.cancelPetriMode();
     }
     // 清除框选
     if (this._selectedCells && this._selectedCells.size > 0) {
@@ -1780,6 +1890,33 @@ const G = {
 
   closeOffline() {
     document.getElementById('offlinePopup')?.classList.remove('show');
+  },
+
+  // ===== INTRO / WELCOME =====
+  showIntro() {
+    const pop = document.getElementById('introPopup');
+    if (!pop) return;
+    pop.classList.add('show');
+    this._showBackdrop();
+    SFX.milestone();
+  },
+
+  closeIntro() {
+    document.getElementById('introPopup')?.classList.remove('show');
+    this._hideBackdrop();
+    localStorage.setItem('bioIntroSeen', '1');
+    // 首次关闭开场弹窗后，触发音频初始化
+    SFX.initOnInteraction();
+    SFX.updateBGMPhase(this.phase);
+  },
+
+  // 检查是否需要显示开场引导（仅首次进入）
+  _checkShowIntro() {
+    const seen = localStorage.getItem('bioIntroSeen');
+    if (!seen) {
+      // 延迟一点让页面渲染完再弹
+      setTimeout(() => this.showIntro(), 600);
+    }
   },
 
   // ===== BUILD UI =====
@@ -2095,77 +2232,160 @@ const G = {
     document.getElementById('bldTypeSelector')?.classList.remove('show');
   },
 
-  // === Techs ===
+  // === Techs (树状图版本) ===
   renderTechs() {
     const section = document.getElementById('techSection');
     const list = document.getElementById('techList');
     list.innerHTML = '';
 
-    let hasVisible = false;
-    for (let key in TECHS) {
+    // 按阶段组织科技树数据
+    const phaseMap = {}; // { phase: { trunk: key, branches: [keyA, keyB] } }
+    for (const key in TECHS) {
       const t = TECHS[key];
-      // 只显示当前阶段及以内的科技，不提前泄露
-      if (t.phase > this.phase) continue;
-      hasVisible = true;
+      const p = t.phase;
+      if (!phaseMap[p]) phaseMap[p] = { trunk: null, branches: [] };
+      if (t.exclusive) {
+        phaseMap[p].branches.push(key);
+      } else {
+        phaseMap[p].trunk = key;
+      }
+    }
 
+    const phases = Object.keys(phaseMap).map(Number).sort((a, b) => a - b);
+    let hasVisible = false;
+
+    // 辅助：创建科技节点 DOM
+    const mkNode = (key) => {
+      const t = TECHS[key];
       const reqs = t.req || [];
       const locked = reqs.some(r => !this.techs[r]?.done);
       const done = this.techs[key]?.done;
       const isResearching = this.rTech === key;
 
-      // 互斥锁定检查
       let exclusiveLocked = false;
       let exclusiveBy = '';
       if (t.exclusive) {
         for (const exKey of t.exclusive) {
-          if (this.techs[exKey]?.done) {
-            exclusiveLocked = true;
-            exclusiveBy = TECHS[exKey].n;
-            break;
-          }
+          if (this.techs[exKey]?.done) { exclusiveLocked = true; exclusiveBy = TECHS[exKey].n; break; }
         }
       }
-      // 互斥分支标记（未锁定时显示"二选一"提示）
-      let branchTag = '';
-      if (t.exclusive && !done && !exclusiveLocked) {
-        branchTag = '<span style="display:inline-block;margin-left:4px;font-size:0.6em;color:#eab308;border:1px solid #eab30840;background:#eab30810;padding:0 3px;border-radius:2px;vertical-align:middle">⚡二选一</span>';
-      }
 
-      const btn = document.createElement('button');
-      btn.className = 'action-btn' + (locked || exclusiveLocked ? ' locked' : '') + (done ? ' done' : '');
-      btn.id = 'tech-' + key;
-      if (done) btn.style.borderColor = 'var(--color-muted-dark)';
-      if (exclusiveLocked) {
-        btn.style.opacity = '0.4';
-        btn.style.borderColor = 'rgba(239,68,68,0.3)';
-      }
+      const node = document.createElement('div');
+      let cls = 'tt-node';
+      if (done) cls += ' done';
+      else if (exclusiveLocked) cls += ' exclusive-locked';
+      else if (locked) cls += ' locked';
+      if (isResearching) cls += ' researching';
+      node.className = cls;
+      node.id = 'tech-' + key;
 
-      const costStr = Object.entries(t.cost).map(([k,v]) => `${v} ${RES[k]?.icon||k}`).join(' + ');
+      const costStr = Object.entries(t.cost).map(([k, v]) => `${v} ${RES[k]?.icon || k}`).join(' + ');
 
       let statusStr;
       if (done) {
-        statusStr = '<span style="color:var(--green)">已完成 ✦ 效果生效中</span>';
+        statusStr = '<span class="status-done">✦ 已生效</span>';
       } else if (exclusiveLocked) {
-        statusStr = `<span style="color:#ef4444">🔒 已被「${exclusiveBy}」互斥锁定</span>`;
+        statusStr = `<span class="status-locked">🔒 被「${exclusiveBy}」互斥</span>`;
       } else {
-        statusStr = `▸ ${costStr} | ${t.time}秒`;
+        statusStr = `${costStr} · ${t.time}s`;
       }
 
-      btn.innerHTML = `
-        <div style="flex:1">
-          <div class="act-name">${done ? '✓ ' : ''}${t.n}${branchTag}</div>
-          <div class="act-desc">${t.d} — ${t.ef}</div>
-          <div class="act-cost">${statusStr}</div>
-          ${isResearching ? `<div class="prog-wrap"><div class="prog-bar"><div class="prog-fill" id="techFill-${key}" style="width:0%;background:var(--cyan)"></div></div></div>` : ''}
-        </div>
+      let branchTag = '';
+      if (t.exclusive && !done && !exclusiveLocked) {
+        branchTag = '<span class="tt-exclusive-tag">⚡二选一</span>';
+      }
+
+      node.innerHTML = `
+        <div class="tt-name">${done ? '<span class="done-mark">✓</span>' : ''}${t.n}${branchTag}</div>
+        <div class="tt-desc">${t.d} — ${t.ef}</div>
+        <div class="tt-cost">${statusStr}</div>
+        ${isResearching ? `<div class="prog-wrap"><div class="prog-bar"><div class="prog-fill" id="techFill-${key}" style="width:0%;background:var(--cyan)"></div></div></div>` : ''}
       `;
 
       if (!locked && !done && !exclusiveLocked) {
-        btn.onclick = () => this.startResearch(key);
+        node.onclick = () => this.startResearch(key);
       }
-      list.appendChild(btn);
+
+      return { node, done, exclusiveLocked };
+    };
+
+    // 构建科技树 DOM
+    const tree = document.createElement('div');
+    tree.className = 'tech-tree';
+
+    for (let i = 0; i < phases.length; i++) {
+      const p = phases[i];
+      const data = phaseMap[p];
+      const isFuture = p > this.phase;
+
+      // 如果超出当前阶段：只显示下一阶段（模糊预览），更远的不显示
+      if (p > this.phase + 1) continue;
+      hasVisible = true;
+
+      const phaseDiv = document.createElement('div');
+      phaseDiv.className = 'tt-phase' + (isFuture ? ' future' : '');
+
+      // 阶段间连线（非第一阶段）
+      if (i > 0 && !isFuture) {
+        const prevData = phaseMap[phases[i - 1]];
+        const prevTrunkDone = prevData.trunk && this.techs[prevData.trunk]?.done;
+        const conn = document.createElement('div');
+        conn.className = 'tt-connector' + (prevTrunkDone ? ' done' : '');
+        phaseDiv.appendChild(conn);
+      }
+
+      // 阶段标签
+      const tag = document.createElement('div');
+      tag.className = 'tt-phase-tag';
+      tag.textContent = `— P${p} —`;
+      phaseDiv.appendChild(tag);
+
+      // 主干节点
+      if (data.trunk) {
+        const trunkWrap = document.createElement('div');
+        trunkWrap.className = 'tt-trunk';
+        const { node } = mkNode(data.trunk);
+        trunkWrap.appendChild(node);
+        phaseDiv.appendChild(trunkWrap);
+      }
+
+      // 分支节点（二选一）
+      if (data.branches.length === 2 && !isFuture) {
+        const trunkDone = data.trunk && this.techs[data.trunk]?.done;
+
+        // 分叉连线
+        const fork = document.createElement('div');
+        fork.className = 'tt-fork' + (trunkDone ? ' done' : '');
+        fork.style.height = '12px';
+        phaseDiv.appendChild(fork);
+
+        // VS 标记
+        const vs = document.createElement('div');
+        vs.className = 'tt-vs';
+        vs.textContent = 'VS';
+        fork.appendChild(vs);
+
+        // 分支容器
+        const branchesWrap = document.createElement('div');
+        branchesWrap.className = 'tt-branches' + (trunkDone ? ' done' : '');
+
+        for (const bKey of data.branches) {
+          const branchDiv = document.createElement('div');
+          branchDiv.className = 'tt-branch';
+          const { node, done: bDone, exclusiveLocked: bExcl } = mkNode(bKey);
+          if (bDone) branchDiv.classList.add('chosen');
+          else if (bExcl) branchDiv.classList.add('rejected');
+          branchDiv.appendChild(node);
+          branchesWrap.appendChild(branchDiv);
+        }
+
+        phaseDiv.appendChild(branchesWrap);
+      }
+
+      tree.appendChild(phaseDiv);
     }
 
+    list.appendChild(tree);
     section.style.display = hasVisible ? 'block' : 'none';
   },
 
@@ -2609,6 +2829,10 @@ const G = {
       const idx = cellIdx(e);
       if (idx < 0) return;
       self._hoverIdx = idx;
+      // 培养皿实验模式：更新悬停区域
+      if (self._petriMode) {
+        self._petriHoverIdx = idx;
+      }
       // 拖拽悬停高亮
       if (self._isDragging && self._dragIdx != null && self._dragIdx !== idx) {
         self._dragOverIdx = idx;
@@ -2721,6 +2945,8 @@ const G = {
       const idx = cellIdx(e);
       if (idx < 0) return;
       self._hoverIdx = null;
+      // 培养皿实验：清除悬停
+      if (self._petriMode) self._petriHoverIdx = null;
       document.getElementById('tooltip').classList.remove('show');
       if (self._isDragging) {
         const targetCell = e.target.closest('.cell');
@@ -2875,6 +3101,7 @@ const G = {
   selectBuilding(key) {
     // 如果在传送带连接模式中，退出
     if (this._beltConnectMode) this.cancelBeltConnect();
+    if (this._petriMode) this.cancelPetriMode();
     this.sel = (this.sel === key) ? null : key;
     SFX.select();
     document.querySelectorAll('.action-btn').forEach(b => {
@@ -3324,6 +3551,11 @@ const G = {
 
   // ===== CELL CLICK =====
   cellClick(idx) {
+    // 培养皿实验模式
+    if (this._petriMode) {
+      this.handlePetriClick(idx);
+      return;
+    }
     // 手动连接传送带模式
     if (this._beltConnectMode) {
       this.handleBeltConnectClick(idx);
@@ -3407,8 +3639,7 @@ const G = {
       const cc = CORE_COLONY[this.phase] || CORE_COLONY[1];
       const count = this.bldCount(this.sel);
       if (count > cc.maxCollectors) {
-        this.log(`⚠ 帝国核心供能上限 ${cc.maxCollectors} 台，多出的 ${count - cc.maxCollectors} 台将闲置！升级核心可扩容`, 'w');
-        this.showCursorTooltip(`核心供能上限 ${cc.maxCollectors}！`);
+        this.log(`⚠ 核心供能上限 ${cc.maxCollectors} 台，多出的 ${count - cc.maxCollectors} 台将闲置！升级核心可扩容`, 'w');
       } else if (count === cc.maxCollectors) {
         this.log(`⚡ 核心供能已满载 ${count}/${cc.maxCollectors}`, 'ev');
       }
@@ -3620,6 +3851,107 @@ const G = {
     // 如果顶栏有标题区域就更新
     const titleEl = document.getElementById('empireTitleDisplay');
     if (titleEl) titleEl.textContent = title;
+  },
+
+  // ===== ACHIEVEMENT HALL =====
+  _achvFilter: 'all',
+
+  openAchievementHall() {
+    this._achvFilter = 'all';
+    this._renderAchvHall();
+    document.getElementById('achvHallOverlay').classList.add('show');
+  },
+
+  closeAchievementHall() {
+    document.getElementById('achvHallOverlay').classList.remove('show');
+  },
+
+  _renderAchvHall() {
+    const count = Object.keys(this.achievements).length;
+    const total = ACHIEVE.length;
+    const pct = Math.round(count / total * 100);
+
+    // Update progress
+    document.getElementById('achvHallProgress').textContent = `${count}/${total}`;
+    document.getElementById('achvProgressBar').style.width = pct + '%';
+    document.getElementById('achvProgressLabel').textContent = pct + '%';
+
+    // Build filter tabs
+    const filterWrap = document.getElementById('achvFilters');
+    const tiers = ['all','bronze','silver','gold','diamond'];
+    const tierLabels = { all:'全部', bronze:'🥉 铜', silver:'🥈 银', gold:'🥇 金', diamond:'💎 钻石' };
+    filterWrap.innerHTML = tiers.map(t =>
+      `<button class="achv-filter-btn${this._achvFilter===t?' active':''}" onclick="G._achvFilter='${t}';G._renderAchvHall()">${tierLabels[t]}</button>`
+    ).join('');
+
+    // Build body content by category
+    const body = document.getElementById('achvHallBody');
+    let html = '';
+
+    for (const [catKey, cat] of Object.entries(ACHV_CATEGORIES)) {
+      const catAchievements = cat.ids.map(id => ACHIEVE.find(a => a.id === id)).filter(Boolean);
+      // Apply filter
+      const filtered = this._achvFilter === 'all' ? catAchievements : catAchievements.filter(a => a.tier === this._achvFilter);
+      if (filtered.length === 0) continue;
+
+      const catUnlocked = filtered.filter(a => this.achievements[a.id]).length;
+      html += `<div class="achv-cat">
+        <div class="achv-cat-title">${cat.icon} ${cat.name} <span class="achv-cat-count">${catUnlocked}/${filtered.length}</span></div>
+        <div class="achv-grid">`;
+
+      for (const a of filtered) {
+        const unlocked = !!this.achievements[a.id];
+        const tier = a.tier || 'bronze';
+        const rewardParts = [];
+        for (let k in a.reward) {
+          rewardParts.push(`+${a.reward[k]}${RES[k]?.icon||k}`);
+        }
+        const hintText = unlocked ? '' : `💡 ${a.d}`;
+
+        html += `<div class="achv-card ${unlocked?'unlocked':'locked'}">
+          ${!unlocked ? `<div class="achv-card-hint">${hintText}</div>` : ''}
+          <span class="achv-card-tier tier-${tier}">${ACHV_TIER_LABELS[tier]}</span>
+          <div class="achv-card-top">
+            <span class="achv-card-icon">${unlocked ? a.n.split(' ')[0] : '🔒'}</span>
+            <span class="achv-card-name">${unlocked ? a.n.replace(/^[^\s]+\s/,'') : '???'}</span>
+          </div>
+          <div class="achv-card-desc">${unlocked ? a.d : '未解锁'}</div>
+          <div class="achv-card-reward">${unlocked ? rewardParts.join(' ') : '---'}</div>
+        </div>`;
+      }
+      html += '</div></div>';
+    }
+
+    // Milestones section
+    html += `<div class="achv-milestones">
+      <div class="achv-ms-title">🎖️ 里程碑</div>
+      <div class="achv-ms-grid">`;
+    for (const ms of ACHIEVE_MILESTONES) {
+      const claimed = this._claimedMilestones && this._claimedMilestones[ms.count];
+      html += `<div class="achv-ms-item ${claimed?'claimed':'unclaimed'}">
+        <div class="achv-ms-count">${ms.count}</div>
+        <div class="achv-ms-buff">${claimed ? ms.buff : '???'}</div>
+      </div>`;
+    }
+    html += '</div></div>';
+
+    body.innerHTML = html;
+  },
+
+  // === 分数变化飘字 — 从荣誉区域分数行飘出 ===
+  _showScoreFloat(text, color) {
+    const anchor = document.getElementById('scoreRow');
+    if (!anchor) return;
+    const rect = anchor.getBoundingClientRect();
+    const el = document.createElement('div');
+    el.className = 'score-float';
+    el.textContent = text;
+    el.style.color = color || '#fbbf24';
+    el.style.textShadow = `0 0 12px ${color || '#fbbf24'}80, 0 0 24px ${color || '#fbbf24'}40`;
+    el.style.left = (rect.right + 6) + 'px';
+    el.style.top = (rect.top + rect.height / 2 - 10) + 'px';
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 2000);
   },
 
   showAchievement(name, desc, reward, tier) {
@@ -3905,6 +4237,14 @@ const G = {
     const sec = t % 60;
     const timeStr = hrs > 0 ? `${hrs}时${min}分${sec}秒` : `${min}分${sec}秒`;
 
+    const _resets = parseInt(localStorage.getItem('bioResetCount') || '0', 10);
+    const _highScore = parseInt(localStorage.getItem('bioHighScore') || '0', 10);
+    const historyRows = _resets > 0 ? `
+      <div style="border-top:1px solid rgba(251,191,36,0.1);margin-top:4px;padding-top:4px">
+        <div class="stat-row"><span class="stat-label">📜 历史最高分</span><span class="stat-value" style="color:#fbbf24">${Math.max(this.calcScore(), _highScore).toLocaleString()}</span></div>
+        <div class="stat-row"><span class="stat-label">🔄 重置次数</span><span class="stat-value">${_resets}</span></div>
+      </div>` : '';
+
     el.innerHTML = `
       <div class="stat-row"><span class="stat-label">⏱ 在线时长</span><span class="stat-value">${timeStr}</span></div>
       <div class="stat-row"><span class="stat-label">🏗️ 总建造数</span><span class="stat-value">${this.stats.totalBuilt}</span></div>
@@ -3916,7 +4256,7 @@ const G = {
       <div class="stat-row"><span class="stat-label">🧬 峰值DNA</span><span class="stat-value">${this.stats.peakDna}</span></div>
       <div class="stat-row"><span class="stat-label">🦠 峰值人口</span><span class="stat-value">${this.stats.peakPop || 0}</span></div>
       <div class="stat-row"><span class="stat-label">🏆 成就</span><span class="stat-value">${Object.keys(this.achievements).length}/${ACHIEVE.length}</span></div>
-      <div class="stat-row"><span class="stat-label">🎯 挑战完成</span><span class="stat-value">${Object.keys(this.completedChallenges).length}/${CHALLENGES.length}</span></div>
+      <div class="stat-row"><span class="stat-label">🎯 挑战完成</span><span class="stat-value">${Object.keys(this.completedChallenges).length}/${CHALLENGES.length}</span></div>${historyRows}
       <div style="text-align:center;padding:6px 0 2px;border-top:1px solid rgba(255,255,255,0.06);margin-top:4px">
         <button onclick="G.shareScore()" style="font-size:0.7em;padding:4px 14px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:4px;color:var(--blue);cursor:pointer;transition:all 0.2s" onmouseover="this.style.background='rgba(59,130,246,0.12)'" onmouseout="this.style.background='rgba(255,255,255,0.06)'">📋 复制分数卡片</button>
       </div>
@@ -3936,6 +4276,10 @@ const G = {
     const achieves = Object.keys(this.achievements).length;
     const challenges = Object.keys(this.completedChallenges).length;
 
+    const highScore = parseInt(localStorage.getItem('bioHighScore') || '0', 10);
+    const resets = parseInt(localStorage.getItem('bioResetCount') || '0', 10);
+    const highLine = resets > 0 ? `\n📜 历史最高: ${Math.max(score, highScore).toLocaleString()}  |  重置: ${resets}次` : '';
+
     const card = [
       `🧫 ═══ 微生物帝国 ═══ 🧫`,
       ``,
@@ -3944,7 +4288,7 @@ const G = {
       `🧬 进化: Lv.${this.eL}  |  📈 效率: ${(this.gEff*100).toFixed(0)}%`,
       `🏗️ 建筑: ${this.totalBuildings()}  |  🦠 峰值人口: ${this.stats.peakPop || 0}`,
       `📖 科技: ${techDone}/${Object.keys(TECHS).length}  |  🏆 成就: ${achieves}/${ACHIEVE.length}`,
-      `🎯 挑战: ${challenges}/${CHALLENGES.length}${this.wonderComplete ? '  |  ☀️ 戴森球已完成!' : ''}`,
+      `🎯 挑战: ${challenges}/${CHALLENGES.length}${this.wonderComplete ? '  |  ☀️ 戴森球已完成!' : ''}${highLine}`,
       ``,
       `═══════════════════════`,
     ].join('\n');
@@ -3977,12 +4321,20 @@ const G = {
     this._playerName = localStorage.getItem('bioPlayerName') || null;
 
     if (!this._playerName) {
-      setTimeout(() => this.showNicknamePopup(), 3000);
+      // 如果开场引导弹窗正在显示，延迟到关闭后再弹昵称
+      const delay = localStorage.getItem('bioIntroSeen') ? 3000 : 8000;
+      setTimeout(() => this.showNicknamePopup(), delay);
     }
   },
 
   // === 昵称弹窗 ===
   showNicknamePopup() {
+    // 如果开场引导还在显示，延迟再试
+    const intro = document.getElementById('introPopup');
+    if (intro && intro.classList.contains('show')) {
+      setTimeout(() => this.showNicknamePopup(), 2000);
+      return;
+    }
     const pop = document.getElementById('nicknamePopup');
     if (!pop) return;
     const input = document.getElementById('nicknameInput');
@@ -4669,6 +5021,24 @@ const G = {
       for (let k in r) if (r[k] > 0) r[k] *= (1 + qsBoost);
     }
 
+    // Petri Dish Experiment buff
+    if (this._petriBuff) {
+      const pb = this._petriBuff;
+      if (pb.type === 'prodMult') {
+        for (let k in r) if (r[k] > 0) r[k] *= (1 + pb.value);
+      } else if (pb.type.startsWith('resMult_')) {
+        const resKey = pb.type.split('_')[1];
+        if (r[resKey] > 0) r[resKey] *= (1 + pb.value);
+      } else if (pb.type === 'consReduce') {
+        for (let k in r) if (r[k] < 0) r[k] *= (1 - pb.value);
+      } else if (pb.type === 'logisticsBoost') {
+        // 物流效率加成
+        for (let k in r) if (r[k] > 0) r[k] *= (1 + pb.value);
+      } else if (pb.type === 'effBoost') {
+        for (let k in r) if (r[k] > 0) r[k] *= (1 + pb.value);
+      }
+    }
+
     this.rates = r;
   },
 
@@ -5145,7 +5515,9 @@ const G = {
         // 高QS时衰减显著，低QS时衰减平缓。受信号增幅器科技影响
         if ((this.res.qs || 0) > 0) {
           const decayMult = this._qsDecayMult || 1;
-          const proportionalDecay = this.res.qs * 0.03 * decayMult;
+          // Petri buff: QS衰减减缓
+          const petriQsReduce = (this._petriBuff && this._petriBuff.type === 'qsDecay') ? (1 - this._petriBuff.value) : 1;
+          const proportionalDecay = this.res.qs * 0.03 * decayMult * petriQsReduce;
           const minDecay = 0.02 * decayMult;
           const qsDecay = Math.max(proportionalDecay, minDecay);
           this.res.qs = Math.max(0, this.res.qs - qsDecay);
@@ -5154,6 +5526,7 @@ const G = {
         this.tickResearch();
         this.tickWonder();
         this.tickChallenge(); // Challenge system
+        this.tickPetri(); // Petri experiment cooldown & buff tick
         this.rt++;
       }
 
@@ -5221,6 +5594,7 @@ const G = {
         }
       }
 
+      this.updatePetriUI(); // 培养皿实验 冷却/buff 实时更新
       this.updateUI();
     }, 1000);
   },
@@ -5468,7 +5842,8 @@ const G = {
     });
 
     const drawBg = () => {
-      bgCtx.fillStyle = 'rgba(5,8,16,0.95)';
+      bgCtx.clearRect(0, 0, bgCanvas.width, bgCanvas.height);
+      bgCtx.fillStyle = 'rgba(5,8,16,1)';
       bgCtx.fillRect(0, 0, bgCanvas.width, bgCanvas.height);
       bgCtx.strokeStyle = 'rgba(60,90,120,0.08)';
       bgCtx.lineWidth = 0.5;
@@ -5651,10 +6026,11 @@ const G = {
         // 确保两端建筑仍然存在
         if (!this.grid[mb.fi] || !this.grid[mb.ti]) continue;
         if (!pairMap[key]) {
-          pairMap[key] = { fi: mb.fi, ti: mb.ti, flows: [], colors: mb.colors || [], icons: mb.icons || [], labels: mb.labels || [], isManual: true };
+          pairMap[key] = { fi: mb.fi, ti: mb.ti, flows: [], colors: mb.colors || [], icons: mb.icons || [], labels: mb.labels || [], isManual: true, invalid: !!mb.invalid };
           usedEdges.add(key);
         } else {
           pairMap[key].isManual = true; // 标记为也含手动
+          if (mb.invalid) pairMap[key].invalid = true;
         }
       }
 
@@ -5760,6 +6136,56 @@ const G = {
         const segments = isOrthogonal
           ? [[sx, sy, ex, ey]]
           : [[sx, sy, mx, my], [mx, my, ex, ey]];
+
+        // ★ 无效传送带（没有 FLOW_MAP 对应关系）→ 灰色虚线渲染
+        if (belt.invalid) {
+          const pulse = 0.25 + Math.sin(Date.now() / 600) * 0.1;
+          // 灰色虚线底色
+          ctx.lineWidth = 4;
+          ctx.strokeStyle = `rgba(80,90,100,${pulse})`;
+          ctx.setLineDash([6, 6]);
+          ctx.lineDashOffset = -(Date.now() / 200) % 12;
+          ctx.lineCap = 'butt';
+          ctx.lineJoin = 'miter';
+          drawLPath(); ctx.stroke();
+          // 暗灰色内线
+          ctx.lineWidth = 2;
+          ctx.strokeStyle = `rgba(50,60,70,${pulse + 0.15})`;
+          ctx.setLineDash([4, 4]);
+          drawLPath(); ctx.stroke();
+          ctx.setLineDash([]);
+          // 两端标记灰色小方块
+          const tSz = 3;
+          ctx.fillStyle = 'rgba(80,90,100,0.5)';
+          ctx.fillRect(sx - tSz, sy - tSz, tSz*2, tSz*2);
+          ctx.fillRect(ex - tSz, ey - tSz, tSz*2, tSz*2);
+          // 中间显示无效标记
+          const midX2 = isOrthogonal ? (sx+ex)/2 : mx;
+          const midY2 = isOrthogonal ? (sy+ey)/2 : my;
+          ctx.globalAlpha = 0.6;
+          ctx.font = 'bold 8px sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillStyle = '#f97316';
+          ctx.fillText('⚠', midX2, midY2 - 8);
+          ctx.font = '6px "Share Tech Mono", monospace';
+          ctx.fillStyle = '#6b7280';
+          ctx.fillText('无效', midX2, midY2 + 4);
+          ctx.globalAlpha = 1;
+
+          // 悬停高亮（即使无效也可以点击操作）
+          if (this._hoverBeltKey === beltKey) {
+            ctx.save();
+            ctx.lineWidth = 8;
+            ctx.strokeStyle = 'rgba(249,115,22,0.25)';
+            ctx.setLineDash([]);
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            drawLPath(); ctx.stroke();
+            ctx.restore();
+          }
+          continue; // 跳过正常渲染
+        }
 
         // -- 1) 轨道底板（深色钢板） --
         ctx.lineWidth = trackW + 4;
@@ -6698,6 +7124,22 @@ const G = {
       // 放置预览
       drawBeltPreview();
 
+      // 培养皿实验：3×3区域覆盖高亮
+      if (this._petriMode && this._petriHoverIdx != null) {
+        const zone = this._petriZone(this._petriHoverIdx);
+        const gridEl = document.getElementById('grid');
+        if (gridEl) {
+          document.querySelectorAll('.cell.petri-zone').forEach(c => c.classList.remove('petri-zone'));
+          document.querySelectorAll('.cell.petri-center').forEach(c => c.classList.remove('petri-center'));
+          for (const zIdx of zone) {
+            const cell = gridEl.children[zIdx];
+            if (cell) cell.classList.add('petri-zone');
+          }
+          const centerCell = gridEl.children[this._petriHoverIdx];
+          if (centerCell) centerCell.classList.add('petri-center');
+        }
+      }
+
       // 绘制原有的建筑产出粒子
       for (let i = this.particles.length - 1; i >= 0; i--) {
         const p = this.particles[i];
@@ -6861,6 +7303,34 @@ const G = {
         rankEl.style.background = rankColor + '15';
         rankEl.style.textShadow = glow ? `0 0 8px ${rankColor}` : 'none';
       }
+
+      // 实时追踪历史最高分（当前局也算）
+      const oldBest = parseInt(localStorage.getItem('bioHighScore') || '0', 10);
+      if (score > oldBest) {
+        localStorage.setItem('bioHighScore', String(score));
+      }
+
+      // 显示历史最高分（只有重置过至少一次才有意义）
+      const highScore = Math.max(score, parseInt(localStorage.getItem('bioHighScore') || '0', 10));
+      const resets = parseInt(localStorage.getItem('bioResetCount') || '0', 10);
+      const highRow = document.getElementById('highScoreRow');
+      if (highRow) {
+        if (resets > 0) {
+          highRow.style.display = '';
+          const hsEl = document.getElementById('statHighScore');
+          const hrEl = document.getElementById('statHighRank');
+          if (hsEl) hsEl.textContent = highScore.toLocaleString();
+          if (hrEl) {
+            const { rank: hRank, color: hColor } = this._scoreRank(highScore);
+            hrEl.textContent = hRank;
+            hrEl.style.color = hColor;
+            hrEl.style.borderColor = hColor + '40';
+            hrEl.style.background = hColor + '15';
+          }
+        } else {
+          highRow.style.display = 'none';
+        }
+      }
     }
 
     // 核心供给状态实时更新
@@ -6979,6 +7449,10 @@ const G = {
     // 3. 进化详情：进化 >= Lv.2 或者已经研究过纯培养技术
     const showEvo = evoLv2 || (this.techs.pureCulture && this.techs.pureCulture.done);
     this._unlockSection('evoSection', showEvo, '🧬 进化面板 已解锁');
+
+    // 4. 培养皿实验按钮：阶段2+ 显示
+    const petriRow = document.getElementById('petriExpRow');
+    if (petriRow) petriRow.style.display = this.phase >= 2 ? '' : 'none';
   },
 
   _unlockSection(id, condition, msg) {
@@ -7530,11 +8004,12 @@ const G = {
   },
 
   // ===== CURSOR TOOLTIP (mouse-follow hint) =====
-  showCursorTooltip(text) {
+  // type: 'w'=橙色警告, 's'=绿色成功, 'e'=红色错误, 默认=红色
+  showCursorTooltip(text, type) {
     // 移除旧的
     document.querySelectorAll('.cursor-tooltip').forEach(e => e.remove());
     const tip = document.createElement('div');
-    tip.className = 'cursor-tooltip';
+    tip.className = 'cursor-tooltip' + (type ? ' ct-' + type : '');
     tip.textContent = text;
     document.body.appendChild(tip);
     // 跟随鼠标位置
@@ -7569,6 +8044,10 @@ const G = {
     el.textContent = ts + ' ' + msg;
     log.insertBefore(el, log.firstChild);
     while (log.children.length > 40) log.removeChild(log.lastChild);
+    // ★ 警告/错误日志自动在鼠标旁显示提示，避免只写日志框看不见
+    if (type === 'w' || type === 'e') {
+      this.showCursorTooltip(msg, type);
+    }
   },
 
   // ===== CONTROLS =====
@@ -7641,6 +8120,10 @@ const G = {
         _recoveredFromCrisis: this._recoveredFromCrisis || false,
         // Population allocation
         popAlloc: this.popAlloc,
+        // Petri experiment
+        _petriCooldown: this._petriCooldown || 0,
+        _petriBuff: this._petriBuff || null,
+        _petriCount: this._petriCount || 0,
       };
       localStorage.setItem('bioSphereV3', JSON.stringify(s));
       if (!silent) this.log('▸ 已保存', 's');
@@ -7741,6 +8224,10 @@ const G = {
       this._recoveredFromCrisis = s._recoveredFromCrisis || false;
       // Population allocation
       if (s.popAlloc) this.popAlloc = s.popAlloc;
+      // Petri experiment
+      this._petriCooldown = s._petriCooldown || 0;
+      this._petriBuff = s._petriBuff || null;
+      this._petriCount = s._petriCount || 0;
       // Re-apply milestone buffs
       const achieveCount = Object.keys(this.achievements).length;
       for (const ms of ACHIEVE_MILESTONES) {
@@ -7789,9 +8276,29 @@ const G = {
   },
 
   confirmReset() {
+    // 重置前：保存历史最高分（跨存档永久保留）
+    const currentScore = this.calcScore();
+    const oldBest = parseInt(localStorage.getItem('bioHighScore') || '0', 10);
+    if (currentScore > oldBest) {
+      localStorage.setItem('bioHighScore', String(currentScore));
+    }
+    // 保存历史最高阶段和最高评级
+    const { rank } = this._scoreRank(Math.max(currentScore, oldBest));
+    const oldPhase = parseInt(localStorage.getItem('bioHighPhase') || '0', 10);
+    if (this.phase > oldPhase) {
+      localStorage.setItem('bioHighPhase', String(this.phase));
+    }
+    // 记录重置次数
+    const resets = parseInt(localStorage.getItem('bioResetCount') || '0', 10);
+    localStorage.setItem('bioResetCount', String(resets + 1));
+
     // 完全清除所有存档数据
     localStorage.removeItem('bioSphereV3');
     localStorage.removeItem('bioSpherePrestige');
+    // 清除开场引导标记 — 让新一轮从开场说明开始
+    localStorage.removeItem('bioIntroSeen');
+    // 清除折叠状态
+    localStorage.removeItem('bioSphereSecState');
     location.reload();
   },
 
@@ -8366,6 +8873,7 @@ const G = {
   // ===== MANUAL BELT CONNECTION =====
   startBeltConnect() {
     this.closeBeltActionMenu();
+    if (this._petriMode) this.cancelPetriMode();
     this._beltConnectMode = true;
     this._beltConnectFrom = null;
     this._hoverBeltKey = null; // 清除悬停状态
@@ -8387,7 +8895,7 @@ const G = {
     if (beltBtn) beltBtn.classList.remove('active');
     // 移除高亮
     document.querySelectorAll('.cell.belt-connect-from').forEach(c => c.classList.remove('belt-connect-from'));
-    document.querySelectorAll('.cell.belt-connect-target').forEach(c => c.classList.remove('belt-connect-target'));
+    document.querySelectorAll('.cell.belt-connect-target').forEach(c => c.classList.remove('belt-connect-target', 'belt-target-valid', 'belt-target-invalid'));
   },
 
   handleBeltConnectClick(idx) {
@@ -8396,7 +8904,7 @@ const G = {
     if (this._beltConnectFrom === null) {
       // 选择起点
       if (!this.grid[idx]) {
-        this.log('请选择一个有建筑的格子', 'w');
+        this.log('⬜ 空格子！请点有建筑的格子', 'w');
         return true;
       }
       this._beltConnectFrom = idx;
@@ -8414,11 +8922,11 @@ const G = {
       // 选择终点
       const fromIdx = this._beltConnectFrom;
       if (idx === fromIdx) {
-        this.log('不能连接到自身', 'w');
+        this.log('🚫 不能连接到自身', 'w');
         return true;
       }
       if (!this.grid[idx]) {
-        this.log('请选择一个有建筑的格子', 'w');
+        this.log('⬜ 空格子！请点有建筑的格子', 'w');
         return true;
       }
       // 检查距离
@@ -8427,7 +8935,7 @@ const G = {
       const tr = Math.floor(idx / SZ), tc = idx % SZ;
       const dist = Math.abs(fr - tr) + Math.abs(fc - tc);
       if (dist > 4) {
-        this.log('距离太远（最多4格）', 'w');
+        this.log('📏 距离太远！最多4格', 'w');
         return true;
       }
       // 检查是否已存在（先刷新缓存确保数据最新）
@@ -8437,7 +8945,7 @@ const G = {
         const bk = Math.min(b.fi, b.ti) + '-' + Math.max(b.fi, b.ti);
         return bk === key;
       })) {
-        this.log('这两个建筑之间已有传送带', 'w');
+        this.log('🔗 已有传送带！', 'w');
         return true;
       }
 
@@ -8469,6 +8977,14 @@ const G = {
         }
       }
 
+      // 检查 FLOW_MAP 是否有有效资源链路
+      const fromType = this.grid[fromIdx].type;
+      const toType = this.grid[idx].type;
+      const hasValidFlow = FLOW_MAP.some(f =>
+        (f.from === fromType && f.to === toType) ||
+        (f.from === toType && f.to === fromType)
+      );
+
       if (colors.length === 0) {
         // 没有匹配资源，用通用样式
         colors.push('#4a6a8a');
@@ -8482,11 +8998,30 @@ const G = {
       this.manualBelts[key] = {
         fi: fromIdx, ti: idx,
         colors, icons, labels,
+        invalid: !hasValidFlow, // 标记无效传送带
       };
 
-      this.log(`🔗 传送带已连接: ${fromBld?.emoji||''}${fromBld?.n||''} → ${toBld?.emoji||''}${toBld?.n||''}`, 's');
-      SFX.build();
-      this.cancelBeltConnect();
+      if (!hasValidFlow) {
+        // 无效连接：弹橙色警告但仍然创建
+        this.log(`⚠️ 无效链路！不会传输资源`, 'w');
+        this.showEvent('⚠️ 无效传送带',
+          `${fromBld?.emoji||''}${fromBld?.n||''} → ${toBld?.emoji||''}${toBld?.n||''}\n\n这两个建筑之间没有有效的资源供给关系\n传送带将不会传输任何资源\n\n💡 查看资源链面板了解正确的连接方式`,
+          '#f97316');
+        SFX.buildFail();
+      } else {
+        this.log(`✅ 已连接: ${fromBld?.emoji||''}${fromBld?.n||''} → ${toBld?.emoji||''}${toBld?.n||''}`, 's');
+        this.showCursorTooltip(`✅ 已连接！`, 's');
+        SFX.build();
+      }
+      // ★ 连续连接模式：不退出，重置起点让用户继续连接下一条
+      // 清除当前高亮
+      document.querySelectorAll('.cell.belt-connect-from').forEach(c => c.classList.remove('belt-connect-from'));
+      document.querySelectorAll('.cell.belt-connect-target').forEach(c => c.classList.remove('belt-connect-target', 'belt-target-valid', 'belt-target-invalid'));
+      // 重置起点但保持连接模式
+      this._beltConnectFrom = null;
+      document.getElementById('buildHint').textContent = '🔗 连接成功！继续选择下一个起点（ESC/右键退出）';
+      document.getElementById('buildHint').style.color = 'var(--cyan)';
+
       this.refreshBelts(); // 立即刷新传送带缓存
       this.updateRates();
       this.updateUI();
@@ -8499,13 +9034,25 @@ const G = {
     if (!gridEl) return;
     const SZ = this.gridSize;
     const fr = Math.floor(fromIdx / SZ), fc = fromIdx % SZ;
+    const fromType = this.grid[fromIdx]?.type;
     for (let i = 0; i < this.grid.length; i++) {
       if (i === fromIdx || !this.grid[i]) continue;
       const tr = Math.floor(i / SZ), tc = i % SZ;
       const dist = Math.abs(fr - tr) + Math.abs(fc - tc);
       if (dist <= 4) {
         const cell = gridEl.children[i];
-        if (cell) cell.classList.add('belt-connect-target');
+        if (!cell) continue;
+        const toType = this.grid[i].type;
+        // 检查 FLOW_MAP 中是否有有效的资源链路（双向都算）
+        const hasValidFlow = FLOW_MAP.some(f =>
+          (f.from === fromType && f.to === toType) ||
+          (f.from === toType && f.to === fromType)
+        );
+        if (hasValidFlow) {
+          cell.classList.add('belt-connect-target', 'belt-target-valid');
+        } else {
+          cell.classList.add('belt-connect-target', 'belt-target-invalid');
+        }
       }
     }
   },
@@ -8602,6 +9149,274 @@ const G = {
     document.getElementById('choicePopup')?.classList.remove('show');
     this._hideBackdrop();
     this.updateUI();
+  },
+
+  // ===== PETRI DISH EXPERIMENT =====
+  startPetriMode() {
+    if (this.phase < 2) { this.log('需要进入阶段2后解锁培养皿实验', 'w'); SFX.buildFail(); return; }
+    if (this._petriCooldown > 0) { this.log(`🧫 实验冷却中 (${this._petriCooldown}s)`, 'w'); SFX.buildFail(); return; }
+    if (this._beltConnectMode) this.cancelBeltConnect();
+    this._petriMode = true;
+    this._petriHoverIdx = null;
+    this.sel = null;
+    document.querySelectorAll('.action-btn').forEach(b => b.classList.remove('active'));
+    const petriBtn = document.getElementById('petriExpBtnLeft');
+    if (petriBtn) petriBtn.classList.add('active');
+    document.getElementById('buildHint').textContent = '🧫 选择实验区域中心（点击有建筑的格子）';
+    document.getElementById('buildHint').style.color = '#14b8a6';
+    this.log('🧫 培养皿实验模式 — 选择3×3区域中心', '');
+  },
+
+  cancelPetriMode() {
+    this._petriMode = false;
+    this._petriHoverIdx = null;
+    document.getElementById('buildHint').textContent = '';
+    document.getElementById('buildHint').style.color = '';
+    const petriBtn = document.getElementById('petriExpBtnLeft');
+    if (petriBtn) petriBtn.classList.remove('active');
+    // 移除高亮
+    document.querySelectorAll('.cell.petri-zone').forEach(c => c.classList.remove('petri-zone'));
+    document.querySelectorAll('.cell.petri-center').forEach(c => c.classList.remove('petri-center'));
+  },
+
+  // 获取3×3区域内的格子索引
+  _petriZone(centerIdx) {
+    const cols = this.gridCols, rows = this.gridRows;
+    const cr = Math.floor(centerIdx / cols), cc = centerIdx % cols;
+    const zone = [];
+    for (let dr = -1; dr <= 1; dr++) {
+      for (let dc = -1; dc <= 1; dc++) {
+        const r = cr + dr, c = cc + dc;
+        if (r >= 0 && r < rows && c >= 0 && c < cols) {
+          zone.push(r * cols + c);
+        }
+      }
+    }
+    return zone;
+  },
+
+  // 扫描区域内的建筑类型计数
+  _scanPetriZone(zone) {
+    const typeCounts = {};
+    let totalBuildings = 0;
+    const types = new Set();
+    for (const idx of zone) {
+      const g = this.grid[idx];
+      if (g && g.type && BLDS[g.type]) {
+        typeCounts[g.type] = (typeCounts[g.type] || 0) + 1;
+        totalBuildings++;
+        types.add(g.type);
+      }
+    }
+    return { typeCounts, totalBuildings, typeCount: types.size };
+  },
+
+  // 匹配最佳配方
+  _matchPetriRecipe(scan) {
+    // 按优先级排序：高阶段 > 低阶段，特殊条件 > 通用
+    const sorted = [...PETRI_RECIPES]
+      .filter(r => r.phase <= this.phase)
+      .sort((a, b) => {
+        // 优先高阶段
+        if (b.phase !== a.phase) return b.phase - a.phase;
+        // 同阶段优先特殊条件（minBuildings 高 > 低）
+        return (b.minBuildings || 3) - (a.minBuildings || 3);
+      });
+    for (const recipe of sorted) {
+      // 检查最少建筑数
+      if (scan.totalBuildings < (recipe.minBuildings || 3)) continue;
+      // 特殊：需要N种不同类型
+      if (recipe.minTypes && scan.typeCount < recipe.minTypes) continue;
+      // 检查 requires
+      let ok = true;
+      for (const [type, count] of Object.entries(recipe.requires)) {
+        if ((scan.typeCounts[type] || 0) < count) { ok = false; break; }
+      }
+      if (ok) return recipe;
+    }
+    return null;
+  },
+
+  // 处理实验选区点击
+  handlePetriClick(idx) {
+    if (!this._petriMode) return;
+    // 中心格必须有建筑
+    if (!this.grid[idx]) {
+      this.log('🚫 空格子！需选有建筑的格子作中心', 'w');
+      SFX.buildFail();
+      return;
+    }
+    const zone = this._petriZone(idx);
+    const scan = this._scanPetriZone(zone);
+    if (scan.totalBuildings < 3) {
+      this.log(`🧫 3×3区域内只有 ${scan.totalBuildings} 个建筑（需≥3）`, 'w');
+      SFX.buildFail();
+      return;
+    }
+    // 匹配配方
+    const recipe = this._matchPetriRecipe(scan);
+    this.cancelPetriMode();
+    if (recipe) {
+      this._applyPetriRecipe(recipe);
+      this.showCursorTooltip(`🧫 ${recipe.icon} ${recipe.name}！`);
+    } else {
+      // 保底：常规培养
+      this._applyPetriFallback(scan);
+      this.showCursorTooltip(`🧫 常规培养 — 尝试特定建筑组合可触发配方`);
+    }
+    this._petriCooldown = PETRI_COOLDOWN;
+    this._petriCount++;
+    this.updatePetriUI();
+    SFX.researchDone();
+  },
+
+  // 应用配方效果
+  _applyPetriRecipe(recipe) {
+    const b = recipe.buff;
+    if (b.type === 'instant_random') {
+      // 混沌培养：随机资源暴击
+      const resKeys = Object.keys(RES).filter(k => RES[k].phase <= this.phase);
+      const rk = resKeys[Math.floor(Math.random() * resKeys.length)];
+      const amount = Math.floor((this.res[rk] || 0) * b.value * 0.1 + 10);
+      this.res[rk] = (this.res[rk] || 0) + amount;
+      this.log(`🌀 混沌培养！${RES[rk].icon || rk} +${amount}`, 's');
+      this.showEvent('🧫 实验完成！', `🌀 混沌培养\n${RES[rk]?.n || rk} 暴击！+${amount}`, '#f59e0b');
+    } else {
+      // 正常 buff
+      this._petriBuff = {
+        id: recipe.id,
+        name: b.name,
+        icon: b.icon,
+        type: b.type,
+        value: b.value,
+        remaining: b.duration,
+        total: b.duration,
+        color: b.color,
+      };
+      this.log(`🧫 ${b.icon} ${b.name} 激活！持续 ${b.duration}s`, 's');
+      const buffDesc = this._petriBuffDesc(b);
+      this.showEvent('🧫 实验完成！', `${b.icon} ${b.name}\n${buffDesc}\n持续 ${b.duration} 秒`, b.color);
+    }
+    // 一次性资源奖励
+    if (recipe.reward) {
+      for (const [k, v] of Object.entries(recipe.reward)) {
+        if (v > 0) this.res[k] = (this.res[k] || 0) + v;
+      }
+    }
+  },
+
+  // 保底效果
+  _applyPetriFallback(scan) {
+    // 基础奖励：每个建筑给少量资源
+    const amt = scan.totalBuildings * 3;
+    this.res.glucose = (this.res.glucose || 0) + amt;
+    this.res.energy = (this.res.energy || 0) + amt;
+    this.log(`🧫 常规培养 — +${amt}🟢 +${amt}⚡`, 's');
+    this.showEvent('🧫 实验完成', `常规培养\n+${amt}🟢葡萄糖 +${amt}⚡能量\n\n💡 尝试更多建筑组合解锁特殊配方！`, '#6b7280');
+  },
+
+  // buff 描述文字
+  _petriBuffDesc(b) {
+    if (b.type === 'prodMult') return `全局产出 +${Math.round(b.value * 100)}%`;
+    if (b.type.startsWith('resMult_')) {
+      const resKey = b.type.split('_')[1];
+      return `${RES[resKey]?.n || resKey}产出 +${Math.round(b.value * 100)}%`;
+    }
+    if (b.type === 'consReduce') return `全局消耗 -${Math.round(b.value * 100)}%`;
+    if (b.type === 'qsDecay') return `QS衰减 -${Math.round(b.value * 100)}%`;
+    if (b.type === 'logisticsBoost') return `物流效率 +${Math.round(b.value * 100)}%`;
+    if (b.type === 'effBoost') return `全局效率 +${Math.round(b.value * 100)}%`;
+    return '';
+  },
+
+  // Tick: 冷却和buff倒计时
+  tickPetri() {
+    if (this._petriCooldown > 0) this._petriCooldown--;
+    if (this._petriBuff) {
+      this._petriBuff.remaining--;
+      if (this._petriBuff.remaining <= 0) {
+        this.log(`🧫 ${this._petriBuff.icon} ${this._petriBuff.name} 效果已结束`, '');
+        this._petriBuff = null;
+      }
+    }
+  },
+
+  // 更新培养皿实验UI面板
+  updatePetriUI() {
+    // 更新左侧按钮状态
+    const leftBtn = document.getElementById('petriExpBtnLeft');
+    const leftDesc = document.getElementById('petriExpDesc');
+    if (leftBtn) {
+      leftBtn.disabled = this._petriCooldown > 0;
+      leftBtn.style.opacity = this._petriCooldown > 0 ? '0.4' : '';
+    }
+    if (leftDesc) {
+      leftDesc.textContent = this._petriCooldown > 0
+        ? `冷却中 ${this._petriCooldown}s`
+        : this._petriBuff
+          ? `${this._petriBuff.icon} ${this._petriBuff.name} (${this._petriBuff.remaining}s)`
+          : '选择3×3区域，触发实验效果';
+    }
+
+    const sec = document.getElementById('secPetri');
+    if (!sec) return;
+    // 阶段2+才显示
+    if (this.phase < 2) { sec.style.display = 'none'; return; }
+    sec.style.display = '';
+    const panel = document.getElementById('petriResultPanel');
+    if (!panel) return;
+
+    let html = '';
+    // 按钮
+    const cdText = this._petriCooldown > 0
+      ? `<span style="color:var(--dim)">冷却 ${this._petriCooldown}s</span>`
+      : '<span style="color:#14b8a6">就绪</span>';
+    const btnDisabled = this._petriCooldown > 0 ? 'disabled style="opacity:0.4"' : '';
+    html += `<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+      <button id="petriStartBtn" onclick="G.startPetriMode()" class="petri-start-btn" ${btnDisabled}>🔬 开始实验</button>
+      <span style="font-size:0.72em">${cdText}</span>
+    </div>`;
+
+    // 当前buff
+    if (this._petriBuff) {
+      const b = this._petriBuff;
+      const pct = Math.max(0, (b.remaining / b.total) * 100);
+      const desc = this._petriBuffDesc(b);
+      html += `<div style="border:1px solid ${b.color}30;border-radius:4px;padding:6px;margin-top:4px;background:${b.color}08">
+        <div style="font-size:0.78em;display:flex;justify-content:space-between;align-items:center">
+          <span style="color:${b.color};font-weight:600">${b.icon} ${b.name}</span>
+          <span style="color:var(--dim);font-size:0.85em">${b.remaining}s</span>
+        </div>
+        <div style="font-size:0.68em;color:var(--dim);margin:2px 0">${desc}</div>
+        <div style="height:3px;background:rgba(255,255,255,0.04);border-radius:2px;overflow:hidden;margin-top:3px">
+          <div style="height:100%;width:${pct}%;background:${b.color};border-radius:2px;transition:width 1s linear"></div>
+        </div>
+      </div>`;
+    }
+
+    // 实验次数
+    if (this._petriCount > 0) {
+      html += `<div style="font-size:0.65em;color:var(--dim);margin-top:4px;text-align:right">累计实验: ${this._petriCount}次</div>`;
+    }
+
+    panel.innerHTML = html;
+  },
+
+  // 高亮3×3区域（鼠标悬停时调用）
+  _highlightPetriZone(centerIdx) {
+    // 清除旧高亮
+    document.querySelectorAll('.cell.petri-zone').forEach(c => c.classList.remove('petri-zone'));
+    document.querySelectorAll('.cell.petri-center').forEach(c => c.classList.remove('petri-center'));
+    if (centerIdx == null) return;
+    const zone = this._petriZone(centerIdx);
+    const gridEl = document.getElementById('grid');
+    if (!gridEl) return;
+    for (const idx of zone) {
+      const cell = gridEl.children[idx];
+      if (cell) cell.classList.add('petri-zone');
+    }
+    const centerCell = gridEl.children[centerIdx];
+    if (centerCell) centerCell.classList.add('petri-center');
   },
 
   // ===== PRESTIGE SYSTEM =====
