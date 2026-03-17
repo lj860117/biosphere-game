@@ -936,6 +936,209 @@ const SVG = {
   resonanceChamber:`<svg viewBox="0 0 64 64" fill="none"><rect x="10" y="12" width="44" height="40" rx="3" fill="#0f0520" stroke="#c084fc" stroke-width="1.5"/><circle cx="32" cy="30" r="12" fill="none" stroke="#c084fc" stroke-width="0.8" opacity="0.2"/><circle cx="32" cy="30" r="8" fill="none" stroke="#c084fc" stroke-width="1" opacity="0.3"><animateTransform attributeName="transform" type="rotate" from="0 32 30" to="360 32 30" dur="5s" repeatCount="indefinite"/></circle><circle cx="32" cy="30" r="3" fill="#c084fc" opacity="0.4"><animate attributeName="opacity" values="0.2;0.6;0.2" dur="2s" repeatCount="indefinite"/></circle><text x="32" y="46" text-anchor="middle" fill="#c084fc" font-size="6" opacity="0.4">QS</text></svg>`,
 };
 
+// ===== ★ MUTATION LAB — 变异实验室 =====
+// 解锁条件：P3 + 进化Lv.3 + 研究「生物膜技术」
+// 核心机制：消耗DNA+蛋白质培育随机突变 → 选择性激活 → 为整个菌落提供永久/临时增益
+// 设计理念：肉鸽式随机 + 策略选择 = 每局不同的build路线
+
+// 突变稀有度
+const MUT_RARITY = {
+  common:   { n:'普通', color:'#8aa0c0', weight:50, icon:'⚪', glow:'rgba(138,160,192,0.2)' },
+  uncommon: { n:'稀有', color:'#22c55e', weight:30, icon:'🟢', glow:'rgba(34,197,94,0.25)' },
+  rare:     { n:'精良', color:'#3b82f6', weight:15, icon:'🔵', glow:'rgba(59,130,246,0.3)' },
+  epic:     { n:'史诗', color:'#a855f7', weight:4,  icon:'🟣', glow:'rgba(168,85,247,0.35)' },
+  legend:   { n:'传说', color:'#f59e0b', weight:1,  icon:'🟡', glow:'rgba(245,158,11,0.4)' },
+};
+
+// 突变定义池
+const MUTATIONS = {
+  // === 普通突变（基础增益）===
+  thickWall: {
+    n:'增厚细胞壁', rarity:'common', icon:'🛡️',
+    d:'所有建筑维护费 -10%',
+    flavor:'更厚的壁意味着更少的修补。',
+    ef: { maintReduce: 0.10 },
+    category:'defense',
+  },
+  rapidDivision: {
+    n:'加速分裂', rarity:'common', icon:'🔄',
+    d:'人口增长速度 +15%',
+    flavor:'有丝分裂？不，是极速分裂。',
+    ef: { popGrowthMult: 0.15 },
+    category:'growth',
+  },
+  efficientTransport: {
+    n:'高效膜运输', rarity:'common', icon:'🚛',
+    d:'传送带效率 +12%',
+    flavor:'ABC转运蛋白的升级版。',
+    ef: { beltEffBonus: 0.12 },
+    category:'logistics',
+  },
+  glucoseAffinity: {
+    n:'葡萄糖亲和力', rarity:'common', icon:'🍯',
+    d:'葡萄糖产出 +10%',
+    flavor:'六碳糖，多多益善。',
+    ef: { resProdBonus: { glucose: 0.10 } },
+    category:'resource',
+  },
+  atpSynthaseBoost: {
+    n:'ATP合成酶强化', rarity:'common', icon:'⚡',
+    d:'ATP能量产出 +10%',
+    flavor:'质子梯度利用效率显著提升。',
+    ef: { resProdBonus: { energy: 0.10 } },
+    category:'resource',
+  },
+  nitrogenCapture: {
+    n:'固氮效率提升', rarity:'common', icon:'🔵',
+    d:'氮源产出 +10%',
+    flavor:'固氮酶的催化效率突破瓶颈。',
+    ef: { resProdBonus: { nitrogen: 0.10 } },
+    category:'resource',
+  },
+
+  // === 稀有突变（组合增益）===
+  metabolicOverdrive: {
+    n:'代谢过载', rarity:'uncommon', icon:'🔥',
+    d:'所有资源产出 +8%，但维护费 +5%',
+    flavor:'更快的代谢，更多的废物。值得吗？',
+    ef: { globalProdBonus: 0.08, maintIncrease: 0.05 },
+    category:'resource',
+  },
+  quorumAmplifier: {
+    n:'群感信号放大', rarity:'uncommon', icon:'📡',
+    d:'QS信号产出 +20%',
+    flavor:'细菌之间的"5G网络"。',
+    ef: { resProdBonus: { qs: 0.20 } },
+    category:'resource',
+  },
+  biofilmArmor: {
+    n:'生物膜铠甲', rarity:'uncommon', icon:'🧱',
+    d:'生物质产出 +15%，建筑升级费 -8%',
+    flavor:'坚不可摧的群体盾牌。',
+    ef: { resProdBonus: { biomass: 0.15 }, upgradeCostReduce: 0.08 },
+    category:'defense',
+  },
+  geneticDrift: {
+    n:'遗传漂变', rarity:'uncommon', icon:'🧬',
+    d:'DNA产出 +18%，进化成本 -5%',
+    flavor:'随机突变的偶然礼物。',
+    ef: { resProdBonus: { dna: 0.18 }, evoCostReduce: 0.05 },
+    category:'growth',
+  },
+  symbioticNetwork: {
+    n:'共生网络', rarity:'uncommon', icon:'🕸️',
+    d:'邻接加成效果 +15%',
+    flavor:'微生物间的互利共生达到了新高度。',
+    ef: { adjacencyBonus: 0.15 },
+    category:'logistics',
+  },
+  proteinFolding: {
+    n:'蛋白质折叠优化', rarity:'uncommon', icon:'🧪',
+    d:'蛋白质产出 +15%，科技研究速度 +10%',
+    flavor:'伴侣蛋白的终极杰作。',
+    ef: { resProdBonus: { protein: 0.15 }, techSpeedBonus: 0.10 },
+    category:'resource',
+  },
+
+  // === 精良突变（显著增益）===
+  horizontalTransfer: {
+    n:'水平基因转移', rarity:'rare', icon:'💉',
+    d:'每次进化额外 +3% 全局效率',
+    flavor:'借来的基因，自家的进步。',
+    ef: { evoExtraBonus: 0.03 },
+    category:'growth',
+  },
+  extremophile: {
+    n:'极端环境适应', rarity:'rare', icon:'🌋',
+    d:'资源竞争惩罚减少 40%',
+    flavor:'在极端条件下反而更强？嗜极生物的天赋。',
+    ef: { competitionResist: 0.40 },
+    category:'defense',
+  },
+  plasmidFactory: {
+    n:'质粒工厂', rarity:'rare', icon:'🔬',
+    d:'变异培育速度 +25%，培育成本 -15%',
+    flavor:'质粒批量生产线——突变的批发商。',
+    ef: { mutBrewSpeedBonus: 0.25, mutBrewCostReduce: 0.15 },
+    category:'mutation',
+  },
+  syntheticPathway: {
+    n:'合成代谢通路', rarity:'rare', icon:'⚗️',
+    d:'所有建筑产出 +12%',
+    flavor:'人工设计的代谢通路，效率惊人。',
+    ef: { globalProdBonus: 0.12 },
+    category:'resource',
+  },
+  sporeResilience: {
+    n:'芽孢韧性', rarity:'rare', icon:'💎',
+    d:'维护费 -20%，建筑不会因资源枯竭停机',
+    flavor:'芽孢状态下，再恶劣的环境也能扛过去。',
+    ef: { maintReduce: 0.20, noShutdown: true },
+    category:'defense',
+  },
+
+  // === 史诗突变（改变玩法）===
+  crispr: {
+    n:'CRISPR编辑器', rarity:'epic', icon:'✂️',
+    d:'可精确选择下次突变的类别',
+    flavor:'基因剪刀——精准编辑生命密码。',
+    ef: { mutCategoryLock: true },
+    category:'mutation',
+  },
+  endosymbiosis: {
+    n:'内共生事件', rarity:'epic', icon:'🔮',
+    d:'解锁第2组突变槽（最多激活6个突变）',
+    flavor:'线粒体的传说……在你身上重演。',
+    ef: { extraMutSlots: 3 },
+    category:'growth',
+  },
+  prionMemory: {
+    n:'朊病毒记忆', rarity:'epic', icon:'🧠',
+    d:'突变效果在传承重置后保留50%',
+    flavor:'蛋白质也能传递记忆？朊病毒说可以。',
+    ef: { mutPrestigeKeep: 0.50 },
+    category:'mutation',
+  },
+  quantumTunneling: {
+    n:'量子隧穿效应', rarity:'epic', icon:'⚛️',
+    d:'10%概率零消耗建造建筑',
+    flavor:'粒子穿过势垒……资源也可以？',
+    ef: { freeBuildChance: 0.10 },
+    category:'resource',
+  },
+
+  // === 传说突变（极其稀有）===
+  pangaea: {
+    n:'泛大陆合并', rarity:'legend', icon:'🌍',
+    d:'所有资源产出 +25%，维护费 -25%，邻接距离+1',
+    flavor:'当整个培养皿成为一个超级有机体。',
+    ef: { globalProdBonus: 0.25, maintReduce: 0.25, adjacencyRange: 1 },
+    category:'growth',
+  },
+  lastUniversalAncestor: {
+    n:'最后共同祖先', rarity:'legend', icon:'🌳',
+    d:'进化不消耗资源，效率加成 ×1.5',
+    flavor:'LUCA——生命之树的根。一切从这里开始。',
+    ef: { freeEvolve: true, evoEffMult: 1.5 },
+    category:'growth',
+  },
+};
+
+// 变异实验室配置
+const MUT_LAB_CONFIG = {
+  unlockPhase: 3,           // P3解锁
+  unlockEvoLv: 3,           // 需进化Lv.3
+  unlockTech: 'biofilmTech', // 需研究生物膜技术
+  baseSlots: 3,             // 基础突变槽数
+  maxSlots: 6,              // 最大突变槽（含内共生加成）
+  brewTime: 45,             // 基础培育时间（秒）
+  brewCost: { dna: 8, protein: 5 }, // 基础培育成本
+  rerollCost: { dna: 4 },    // 重新培育（换一个）成本
+  lockCost: { dna: 2 },      // 锁定突变不被替换的成本
+  maxBrewing: 1,            // 同时培育数量
+  offerCount: 3,            // 每次培育完成提供选择数量
+};
+
 // ===== ACHIEVEMENTS =====
 const ACHIEVE = [
   // 建筑里程碑
@@ -1009,6 +1212,14 @@ const ACHIEVE = [
   // 转生
   { id:'firstPrestige', n:'♻️ 轮回初始', d:'完成第一次转生', tier:'gold', check: s => s.prestigeCount >= 1, reward:{ energy:100, dna:30 } },
   { id:'prestige3', n:'♻️ 三度轮回', d:'转生3次', tier:'diamond', check: s => s.prestigeCount >= 3, reward:{ energy:200, dna:50, protein:30 } },
+  // ★ Q4：变异实验室成就
+  { id:'mutFirst', n:'🧬 初次突变', d:'激活第一个突变', tier:'bronze', check: s => s._mutSlots.length >= 1, reward:{ energy:50, dna:15 } },
+  { id:'mutSlotsFull', n:'🧬 突变满载', d:'填满所有基础突变槽(3个)', tier:'silver', check: s => s._mutSlots.length >= 3, reward:{ energy:100, dna:25, protein:15 } },
+  { id:'mutRare', n:'💎 精良品质', d:'获得一个精良或更高品质的突变', tier:'silver', check: s => s._mutSlots.some(m => { const r = MUTATIONS[m.id]?.rarity; return r === 'rare' || r === 'epic' || r === 'legend'; }), reward:{ energy:80, dna:20 } },
+  { id:'mutEpic', n:'🟣 史诗突变', d:'获得一个史诗品质的突变', tier:'gold', check: s => s._mutSlots.some(m => MUTATIONS[m.id]?.rarity === 'epic'), reward:{ energy:150, dna:40, protein:25 } },
+  { id:'mutLegend', n:'🌟 传说降临', d:'获得一个传说品质的突变', tier:'diamond', check: s => s._mutSlots.some(m => MUTATIONS[m.id]?.rarity === 'legend'), reward:{ energy:300, dna:80, protein:50 } },
+  { id:'mutCollect10', n:'📖 基因图鉴', d:'发现10种不同的突变', tier:'silver', check: s => s._mutHistory.length >= 10, reward:{ energy:80, dna:30 } },
+  { id:'mutBrew10', n:'🧪 培育专家', d:'累计培育10次突变', tier:'bronze', check: s => s._mutBrewCount >= 10, reward:{ energy:60, dna:15 } },
 ];
 
 // ===== ACHIEVEMENT CATEGORIES =====
@@ -1026,6 +1237,7 @@ const ACHV_CATEGORIES = {
   'economy':  { name:'经济', icon:'📊', ids:['maintSurvivor','maintBalancer','maintRecovery','efficientEmpire','noCompetition'] },
   'speed':    { name:'速度', icon:'⏱️', ids:['speedPhase2','speedBuild8'] },
   'prestige': { name:'转生', icon:'♻️', ids:['firstPrestige','prestige3'] },
+  'mutation': { name:'变异', icon:'🧬', ids:['mutFirst','mutSlotsFull','mutRare','mutEpic','mutLegend','mutCollect10','mutBrew10'] },
 };
 
 const ACHV_TIER_LABELS = { bronze:'铜', silver:'银', gold:'金', diamond:'钻石' };
@@ -1097,6 +1309,9 @@ const GUIDE = {
     { check: s => s.bldCount('transport') > 0, text:'多造运输网叠加效率，目标+30%以上！别忘了升级传送带（点线条→升级）', icon:'📈' },
     // ★ 资源竞争教学
     { check: s => Object.values(s._competitionPenalty||{}).some(p => p < 0.95), text:'⚖️ 资源供需紧张！当消耗接近产出时效率会下降 — 查看「供需」指标，增产关键资源或拆除低效消费建筑！', icon:'⚖️' },
+    // ★ Q4：变异实验室教学
+    { check: s => s._mutLabUnlocked && s._mutSlots.length === 0 && !s._mutBrewing, text:'🧬 变异实验室已解锁！在侧栏点击「培育突变」消耗DNA+蛋白质获取随机增益', icon:'🧬' },
+    { check: s => s._mutLabUnlocked && s._mutOffers.length > 0, text:'🧬 突变培育完成！在变异实验室面板选择一个激活 — 不同稀有度效果差异巨大', icon:'✨' },
   ],
   4: [
     { check: s => !s.techs.quorumSensing.done, text:'研究「群体感应」— 解锁QS信号系统，自动加速全产线', icon:'📖' },
@@ -1572,6 +1787,16 @@ const G = {
   // ★ Q2：传送带模式提醒
   _beltIdleTimer: null,    // 传送带模式闲置计时器
   _beltIdleSeconds: 0,     // 传送带模式闲置秒数
+
+  // ★ Q4：变异实验室状态
+  _mutLabUnlocked: false,  // 是否已解锁
+  _mutSlots: [],           // 已激活的突变 [{ id:'thickWall', locked:false }, ...]
+  _mutBrewing: null,       // 正在培育中 { progress:0, total:45, startTime:Date.now() } 或 null
+  _mutOffers: [],          // 培育完成后的候选列表 ['thickWall','rapidDivision','geneticDrift']
+  _mutHistory: [],         // 已发现的突变ID列表（图鉴用）
+  _mutCategoryLock: null,  // CRISPR锁定的类别（如果有）
+  _mutBrewCount: 0,        // 总培育次数（统计）
+  _mutActiveEffects: {},   // 当前生效的突变效果缓存
 
   // ===== INIT =====
   init() {
@@ -5794,6 +6019,14 @@ const G = {
       details.push({ name: rule.name, icon: rule.icon, bonus: ruleBonus, count: stacks });
     }
 
+    // ★ Q4：突变邻接加成增幅
+    const mutAdjBonus = this._mutActiveEffects.adjacencyBonus || 0;
+    if (mutAdjBonus > 0 && totalBonus > 0) {
+      const extra = totalBonus * mutAdjBonus;
+      totalBonus += extra;
+      details.push({ name: '突变增幅', icon: '🧬', bonus: extra, count: 1 });
+    }
+
     return { bonus: totalBonus, details };
   },
 
@@ -6143,9 +6376,13 @@ const G = {
       // ★ 方案F：供给同步加成 — 多输入建筑的供给均衡度奖励
       const syncBonus = 1 + (this._syncBonuses[idx]?.bonus || 0);
       const globalProdMult = this._prodMult || 1; // 转生产出加成
-      const mult = this.gEff * popMult * bldMult * beltMult * techBonus * adjBonus * syncBonus * (this._foodPowerLevel || 1) * globalProdMult;
+      // ★ Q4：突变全局产出加成
+      const mutGlobalBonus = 1 + (this._mutActiveEffects.globalProdBonus || 0);
+      const mult = this.gEff * popMult * bldMult * beltMult * techBonus * adjBonus * syncBonus * (this._foodPowerLevel || 1) * globalProdMult * mutGlobalBonus;
       for (let k in bd.prod) {
-        const prodVal = bd.prod[k] * mult;
+        // ★ Q4：突变单资源产出加成
+        const mutResBonus = 1 + (this._mutActiveEffects.resProdBonus?.[k] || 0);
+        const prodVal = bd.prod[k] * mult * mutResBonus;
         r[k] = (r[k]||0) + prodVal;
         breakdown[k].prod += prodVal;
       }
@@ -6167,6 +6404,8 @@ const G = {
       maint.overhead = Math.min(1 + excess * MAINTENANCE.overheadRate, MAINTENANCE.maxOverhead);
       // 代谢回路降低维护费
       const maintReduce = 1 - Math.min(totalConsReduce * 1.5, 0.4); // 代谢回路减维护(最高-40%)
+      // ★ Q4：突变维护费调整
+      const mutMaintMod = 1 - (this._mutActiveEffects.maintReduce || 0) + (this._mutActiveEffects.maintIncrease || 0);
       this.grid.forEach((g, idx) => {
         if (!g) return;
         const bd = BLDS[g.type];
@@ -6181,7 +6420,7 @@ const G = {
         // 高等级建筑维护费略高（等级带来的规模开销）
         const lvMult = 1 + (bldLv - 1) * 0.15;
         for (let k in baseMaint) {
-          const cost = baseMaint[k] * maint.overhead * lvMult * maintReduce;
+          const cost = baseMaint[k] * maint.overhead * lvMult * maintReduce * Math.max(0.1, mutMaintMod);
           r[k] = (r[k]||0) - cost;
           maint.total[k] = (maint.total[k]||0) + cost;
           breakdown[k].maint += cost;
@@ -6271,11 +6510,14 @@ const G = {
             // 超过阈值→开始惩罚产出
             const severity = Math.min((ratio - RESOURCE_COMPETITION.tensionThreshold) / (1 - RESOURCE_COMPETITION.tensionThreshold), 1);
             const eff = 1 - severity * (1 - RESOURCE_COMPETITION.minEfficiency);
-            penalty[k] = eff;
+            // ★ Q4：突变竞争抵抗
+            const mutResist = this._mutActiveEffects.competitionResist || 0;
+            const finalEff = Math.min(1, eff + (1 - eff) * mutResist);
+            penalty[k] = finalEff;
             // 对该资源的正产出施加竞争惩罚
             if (r[k] > 0) {
               const before = r[k];
-              r[k] *= eff;
+              r[k] *= finalEff;
               breakdown[k].competition += before - r[k];
             }
           } else {
@@ -6427,10 +6669,17 @@ const G = {
   evolve() {
     if (!this.canEvolve()) return;
     const cost = this.evoCost();
-    for (let k in cost) this.res[k] -= cost[k];
+    // ★ Q4：最后共同祖先突变 — 免费进化
+    if (!this._mutActiveEffects.freeEvolve) {
+      for (let k in cost) this.res[k] -= cost[k];
+    }
     let bonus = this.evoBonus();
+    // ★ Q4：突变额外进化加成
+    bonus += (this._mutActiveEffects.evoExtraBonus || 0);
     // 进化催化剂科技：加成翻倍
     bonus *= (this._evoBoostMult || 1);
+    // ★ Q4：突变进化效率倍率
+    bonus *= (this._mutActiveEffects.evoEffMult || 1);
     // 研究人口加成进化效率奖励
     const researchPop = Math.min(this.pop, this._popCap()) * (this.popAlloc.research / 100);
     const researchBoost = 1 + researchPop * 0.001; // 每个研究人口 +0.1% 进化奖励
@@ -6500,36 +6749,547 @@ const G = {
     }
   },
 
+  // ===== ★ Q4: MUTATION LAB — 变异实验室 =====
+
+  // 检查是否满足解锁条件
+  _checkMutLabUnlock() {
+    if (this._mutLabUnlocked) return;
+    const cfg = MUT_LAB_CONFIG;
+    if (this.phase >= cfg.unlockPhase && this.eL >= cfg.unlockEvoLv && this.techs[cfg.unlockTech]?.done) {
+      this._mutLabUnlocked = true;
+      this.log('🧬 变异实验室已解锁！在侧栏查看', 's');
+      this.showMilestone('🧬', '变异实验室解锁！');
+      this.showEvent('🧬 变异实验室', '你的菌落发展出了诱导突变的能力！\n\n消耗DNA和蛋白质培育随机突变，\n为菌落获得独特增益。', 'var(--purple)');
+      SFX.evolve();
+      this._renderMutLabPanel();
+    }
+  },
+
+  // 获取当前最大突变槽数
+  _mutMaxSlots() {
+    let slots = MUT_LAB_CONFIG.baseSlots;
+    // 内共生事件突变：额外3槽
+    if (this._mutSlots.some(m => m.id === 'endosymbiosis')) {
+      slots += (MUTATIONS.endosymbiosis.ef.extraMutSlots || 3);
+    }
+    return Math.min(slots, MUT_LAB_CONFIG.maxSlots);
+  },
+
+  // 计算培育成本（受突变效果影响）
+  _mutBrewCost() {
+    const base = { ...MUT_LAB_CONFIG.brewCost };
+    const reduce = this._mutActiveEffects.mutBrewCostReduce || 0;
+    for (let k in base) base[k] = Math.ceil(base[k] * (1 - reduce));
+    return base;
+  },
+
+  // 计算培育时间（受突变效果影响）
+  _mutBrewTime() {
+    const base = MUT_LAB_CONFIG.brewTime;
+    const bonus = this._mutActiveEffects.mutBrewSpeedBonus || 0;
+    return Math.max(10, Math.round(base * (1 - bonus)));
+  },
+
+  // 能否开始培育
+  _canBrew() {
+    if (!this._mutLabUnlocked) return false;
+    if (this._mutBrewing) return false;  // 正在培育中
+    if (this._mutOffers.length > 0) return false;  // 有未处理的候选
+    const cost = this._mutBrewCost();
+    for (let k in cost) if ((this.res[k] || 0) < cost[k]) return false;
+    return true;
+  },
+
+  // 开始培育突变
+  mutStartBrew() {
+    if (!this._canBrew()) return;
+    const cost = this._mutBrewCost();
+    for (let k in cost) this.res[k] -= cost[k];
+    this._mutBrewing = {
+      progress: 0,
+      total: this._mutBrewTime(),
+      startTime: Date.now(),
+    };
+    this._mutBrewCount++;
+    this.log('🧪 开始培育突变...', '');
+    SFX.build();
+    this._updateMutLabUI();
+  },
+
+  // 每帧tick培育进度
+  _tickMutBrewing() {
+    if (!this._mutBrewing) return;
+    this._mutBrewing.progress += 1 / this.spd;
+    if (this._mutBrewing.progress >= this._mutBrewing.total) {
+      // 培育完成 → 生成候选
+      this._mutBrewing = null;
+      this._generateMutOffers();
+      this.log('🧬 突变培育完成！选择一个突变激活', 's');
+      SFX.evolve();
+      this._updateMutLabUI();
+    } else {
+      // 更新进度条
+      this._updateMutBrewProgress();
+    }
+  },
+
+  // 加权随机选择突变
+  _rollMutation(excludeIds) {
+    const pool = [];
+    const categoryLock = this._mutCategoryLock;
+    for (let id in MUTATIONS) {
+      if (excludeIds.includes(id)) continue;
+      const mut = MUTATIONS[id];
+      // CRISPR类别锁定
+      if (categoryLock && mut.category !== categoryLock) continue;
+      const rarity = MUT_RARITY[mut.rarity];
+      pool.push({ id, weight: rarity.weight });
+    }
+    if (pool.length === 0) return null;
+    const totalW = pool.reduce((s, p) => s + p.weight, 0);
+    let roll = Math.random() * totalW;
+    for (const p of pool) {
+      roll -= p.weight;
+      if (roll <= 0) return p.id;
+    }
+    return pool[pool.length - 1].id;
+  },
+
+  // 生成培育候选列表
+  _generateMutOffers() {
+    const count = MUT_LAB_CONFIG.offerCount;
+    const offers = [];
+    const existingIds = this._mutSlots.map(m => m.id);
+    for (let i = 0; i < count; i++) {
+      const id = this._rollMutation([...offers, ...existingIds]);
+      if (id) {
+        offers.push(id);
+        // 加入图鉴
+        if (!this._mutHistory.includes(id)) this._mutHistory.push(id);
+      }
+    }
+    this._mutOffers = offers;
+    // 使用CRISPR后重置类别锁定
+    if (this._mutCategoryLock) {
+      this._mutCategoryLock = null;
+    }
+  },
+
+  // 选择一个候选突变激活
+  mutSelectOffer(mutId) {
+    if (!this._mutOffers.includes(mutId)) return;
+    const maxSlots = this._mutMaxSlots();
+    if (this._mutSlots.length < maxSlots) {
+      // 有空槽，直接激活
+      this._mutSlots.push({ id: mutId, locked: false });
+    } else {
+      // 满了 → 需要替换（显示替换UI）
+      this._mutPendingActivate = mutId;
+      this._showMutReplaceUI(mutId);
+      return;
+    }
+    this._mutOffers = [];
+    this._recalcMutEffects();
+    const mut = MUTATIONS[mutId];
+    const rarity = MUT_RARITY[mut.rarity];
+    this.log(`🧬 激活突变: ${mut.icon} ${mut.n}（${rarity.n}）`, 's');
+    this.showCursorTooltip(`${rarity.icon} ${mut.n} 已激活！`);
+    SFX.evolve();
+    this._updateMutLabUI();
+    this.updateRates();
+    this.updateUI();
+  },
+
+  // 跳过所有候选（不激活）
+  mutSkipOffers() {
+    this._mutOffers = [];
+    this.log('🧬 已跳过本次突变候选', '');
+    this._updateMutLabUI();
+  },
+
+  // 替换一个已有突变槽
+  mutReplaceSlot(slotIdx) {
+    const mutId = this._mutPendingActivate;
+    if (!mutId || slotIdx < 0 || slotIdx >= this._mutSlots.length) return;
+    const old = this._mutSlots[slotIdx];
+    if (old.locked) {
+      this.showCursorTooltip('⚠️ 该突变已锁定，无法替换', 'w');
+      return;
+    }
+    const oldMut = MUTATIONS[old.id];
+    this._mutSlots[slotIdx] = { id: mutId, locked: false };
+    this._mutPendingActivate = null;
+    this._mutOffers = [];
+    this._recalcMutEffects();
+    const mut = MUTATIONS[mutId];
+    const rarity = MUT_RARITY[mut.rarity];
+    this.log(`🧬 替换突变: ${oldMut.icon}${oldMut.n} → ${mut.icon}${mut.n}（${rarity.n}）`, 's');
+    SFX.evolve();
+    this._hidePopup('mutReplaceOverlay');
+    this._updateMutLabUI();
+    this.updateRates();
+    this.updateUI();
+  },
+
+  // 取消替换（保持现有）
+  mutCancelReplace() {
+    this._mutPendingActivate = null;
+    this._mutOffers = [];
+    this._hidePopup('mutReplaceOverlay');
+    this._updateMutLabUI();
+  },
+
+  // 锁定/解锁突变槽
+  mutToggleLock(slotIdx) {
+    if (slotIdx < 0 || slotIdx >= this._mutSlots.length) return;
+    const slot = this._mutSlots[slotIdx];
+    if (slot.locked) {
+      slot.locked = false;
+      this.showCursorTooltip('🔓 已解锁');
+    } else {
+      const cost = MUT_LAB_CONFIG.lockCost;
+      for (let k in cost) {
+        if ((this.res[k] || 0) < cost[k]) {
+          this.showCursorTooltip('⚠️ DNA不足，无法锁定', 'w');
+          return;
+        }
+      }
+      for (let k in cost) this.res[k] -= cost[k];
+      slot.locked = true;
+      this.showCursorTooltip('🔒 已锁定（替换时跳过）');
+    }
+    this._updateMutLabUI();
+  },
+
+  // 重新培育（消耗资源替换候选列表）
+  mutReroll() {
+    if (this._mutOffers.length === 0) return;
+    const cost = MUT_LAB_CONFIG.rerollCost;
+    for (let k in cost) {
+      if ((this.res[k] || 0) < cost[k]) {
+        this.showCursorTooltip('⚠️ DNA不足，无法重新培育', 'w');
+        return;
+      }
+    }
+    for (let k in cost) this.res[k] -= cost[k];
+    this._generateMutOffers();
+    this.log('🔄 重新培育了一批突变候选', '');
+    SFX.build();
+    this._updateMutLabUI();
+  },
+
+  // CRISPR：设置下次培育的类别锁定
+  mutSetCategoryLock(category) {
+    if (!this._mutSlots.some(m => m.id === 'crispr')) {
+      this.showCursorTooltip('⚠️ 需要CRISPR编辑器突变', 'w');
+      return;
+    }
+    const categories = { resource:'资源', growth:'成长', defense:'防御', logistics:'物流', mutation:'突变' };
+    this._mutCategoryLock = category;
+    this.showCursorTooltip(`✂️ 下次培育锁定：${categories[category] || category}`);
+    this._updateMutLabUI();
+  },
+
+  // 重新计算所有突变效果的缓存
+  _recalcMutEffects() {
+    const ef = {
+      maintReduce: 0, maintIncrease: 0,
+      popGrowthMult: 0, beltEffBonus: 0,
+      globalProdBonus: 0, adjacencyBonus: 0,
+      techSpeedBonus: 0, evoCostReduce: 0,
+      evoExtraBonus: 0, evoEffMult: 1,
+      competitionResist: 0,
+      mutBrewSpeedBonus: 0, mutBrewCostReduce: 0,
+      mutCategoryLock: false, extraMutSlots: 0,
+      mutPrestigeKeep: 0, freeBuildChance: 0,
+      freeEvolve: false, noShutdown: false,
+      adjacencyRange: 0,
+      upgradeCostReduce: 0,
+      resProdBonus: {},
+    };
+    for (const slot of this._mutSlots) {
+      const mut = MUTATIONS[slot.id];
+      if (!mut) continue;
+      const e = mut.ef;
+      if (e.maintReduce) ef.maintReduce += e.maintReduce;
+      if (e.maintIncrease) ef.maintIncrease += e.maintIncrease;
+      if (e.popGrowthMult) ef.popGrowthMult += e.popGrowthMult;
+      if (e.beltEffBonus) ef.beltEffBonus += e.beltEffBonus;
+      if (e.globalProdBonus) ef.globalProdBonus += e.globalProdBonus;
+      if (e.adjacencyBonus) ef.adjacencyBonus += e.adjacencyBonus;
+      if (e.techSpeedBonus) ef.techSpeedBonus += e.techSpeedBonus;
+      if (e.evoCostReduce) ef.evoCostReduce += e.evoCostReduce;
+      if (e.evoExtraBonus) ef.evoExtraBonus += e.evoExtraBonus;
+      if (e.evoEffMult) ef.evoEffMult *= e.evoEffMult;
+      if (e.competitionResist) ef.competitionResist += e.competitionResist;
+      if (e.mutBrewSpeedBonus) ef.mutBrewSpeedBonus += e.mutBrewSpeedBonus;
+      if (e.mutBrewCostReduce) ef.mutBrewCostReduce += e.mutBrewCostReduce;
+      if (e.mutCategoryLock) ef.mutCategoryLock = true;
+      if (e.extraMutSlots) ef.extraMutSlots += e.extraMutSlots;
+      if (e.mutPrestigeKeep) ef.mutPrestigeKeep = Math.max(ef.mutPrestigeKeep, e.mutPrestigeKeep);
+      if (e.freeBuildChance) ef.freeBuildChance += e.freeBuildChance;
+      if (e.freeEvolve) ef.freeEvolve = true;
+      if (e.noShutdown) ef.noShutdown = true;
+      if (e.adjacencyRange) ef.adjacencyRange += e.adjacencyRange;
+      if (e.upgradeCostReduce) ef.upgradeCostReduce += e.upgradeCostReduce;
+      if (e.resProdBonus) {
+        for (let k in e.resProdBonus) {
+          ef.resProdBonus[k] = (ef.resProdBonus[k] || 0) + e.resProdBonus[k];
+        }
+      }
+    }
+    this._mutActiveEffects = ef;
+  },
+
+  // ★ Q4：渲染变异实验室面板（完整重绘）
+  _renderMutLabPanel() {
+    const container = document.getElementById('mutLabContent');
+    if (!container) return;
+    const maxSlots = this._mutMaxSlots();
+
+    let html = '';
+
+    // —— 已激活的突变槽 ——
+    html += '<div class="mut-slots-header">激活中 <span class="mut-slots-count">' + this._mutSlots.length + '/' + maxSlots + '</span></div>';
+    html += '<div class="mut-slots">';
+    for (let i = 0; i < maxSlots; i++) {
+      const slot = this._mutSlots[i];
+      if (slot) {
+        const mut = MUTATIONS[slot.id];
+        const rarity = MUT_RARITY[mut.rarity];
+        html += `<div class="mut-slot mut-rarity-${mut.rarity}" data-slot="${i}" title="${mut.d}">
+          <div class="mut-slot-icon">${mut.icon}</div>
+          <div class="mut-slot-info">
+            <div class="mut-slot-name">${mut.n}</div>
+            <div class="mut-slot-rarity" style="color:${rarity.color}">${rarity.icon} ${rarity.n}</div>
+          </div>
+          <div class="mut-slot-actions">
+            <button class="mut-lock-btn ${slot.locked ? 'locked' : ''}" onclick="G.mutToggleLock(${i})" title="${slot.locked ? '点击解锁' : '锁定(防替换)'}">${slot.locked ? '🔒' : '🔓'}</button>
+          </div>
+        </div>`;
+      } else {
+        html += `<div class="mut-slot mut-slot-empty"><div class="mut-slot-icon">◇</div><div class="mut-slot-info"><div class="mut-slot-name" style="color:var(--dim)">空槽位</div></div></div>`;
+      }
+    }
+    html += '</div>';
+
+    // —— 培育区域 ——
+    html += '<div class="mut-brew-section">';
+    if (this._mutBrewing) {
+      // 正在培育
+      const pct = Math.min(100, (this._mutBrewing.progress / this._mutBrewing.total * 100)).toFixed(1);
+      html += `<div class="mut-brew-bar">
+        <div class="mut-brew-fill" id="mutBrewFill" style="width:${pct}%"></div>
+        <div class="mut-brew-text">🧪 培育中... ${pct}%</div>
+      </div>`;
+    } else if (this._mutOffers.length > 0) {
+      // 有候选突变待选择
+      html += '<div class="mut-offers-title">✨ 选择一个突变激活</div>';
+      html += '<div class="mut-offers">';
+      for (const mutId of this._mutOffers) {
+        const mut = MUTATIONS[mutId];
+        const rarity = MUT_RARITY[mut.rarity];
+        html += `<div class="mut-offer mut-rarity-${mut.rarity}" onclick="G.mutSelectOffer('${mutId}')">
+          <div class="mut-offer-header">
+            <span class="mut-offer-icon">${mut.icon}</span>
+            <span class="mut-offer-name">${mut.n}</span>
+            <span class="mut-offer-rarity" style="color:${rarity.color}">${rarity.icon}</span>
+          </div>
+          <div class="mut-offer-desc">${mut.d}</div>
+          <div class="mut-offer-flavor">"${mut.flavor}"</div>
+        </div>`;
+      }
+      html += '</div>';
+      // 操作按钮
+      html += '<div class="mut-offer-actions">';
+      const rerollCost = MUT_LAB_CONFIG.rerollCost;
+      const canReroll = Object.entries(rerollCost).every(([k, v]) => (this.res[k] || 0) >= v);
+      html += `<button class="mut-btn mut-btn-reroll ${canReroll ? '' : 'disabled'}" onclick="G.mutReroll()">🔄 重新培育 (${Object.entries(rerollCost).map(([k,v]) => RES[k].icon + v).join(' ')})</button>`;
+      html += `<button class="mut-btn mut-btn-skip" onclick="G.mutSkipOffers()">跳过</button>`;
+      html += '</div>';
+    } else {
+      // 可以开始培育
+      const cost = this._mutBrewCost();
+      const time = this._mutBrewTime();
+      const canBrew = this._canBrew();
+      html += `<button class="mut-brew-btn ${canBrew ? '' : 'disabled'}" onclick="G.mutStartBrew()">
+        <span class="mut-brew-btn-icon">🧪</span>
+        <span class="mut-brew-btn-text">
+          <span class="mut-brew-btn-name">培育突变</span>
+          <span class="mut-brew-btn-cost">${Object.entries(cost).map(([k,v]) => RES[k].icon + v).join(' ')} · ${time}秒</span>
+        </span>
+      </button>`;
+    }
+
+    // CRISPR类别锁定（如果拥有该突变）
+    if (this._mutSlots.some(m => m.id === 'crispr') && !this._mutBrewing && this._mutOffers.length === 0) {
+      const cats = { resource:'📦资源', growth:'🌱成长', defense:'🛡️防御', logistics:'🚛物流', mutation:'🧬突变' };
+      html += '<div class="mut-crispr-bar">';
+      html += '<span class="mut-crispr-label">✂️ CRISPR锁定:</span>';
+      for (const [cat, label] of Object.entries(cats)) {
+        const active = this._mutCategoryLock === cat;
+        html += `<button class="mut-crispr-btn ${active ? 'active' : ''}" onclick="G.mutSetCategoryLock('${cat}')">${label}</button>`;
+      }
+      if (this._mutCategoryLock) {
+        html += `<button class="mut-crispr-btn mut-crispr-clear" onclick="G._mutCategoryLock=null;G._updateMutLabUI()">✕</button>`;
+      }
+      html += '</div>';
+    }
+
+    html += '</div>';
+
+    // —— 统计 ——
+    html += `<div class="mut-stats">已发现 ${this._mutHistory.length}/${Object.keys(MUTATIONS).length} · 培育 ${this._mutBrewCount}次</div>`;
+
+    container.innerHTML = html;
+  },
+
+  // ★ Q4：轻量更新UI（只更新变化的部分）
+  _updateMutLabUI() {
+    // 简单起见：直接重新渲染整个面板
+    // 由于面板不大，性能可以接受
+    if (!this._mutLabUnlocked) return;
+    this._renderMutLabPanel();
+  },
+
+  // ★ Q4：更新培育进度条（高频调用，不重绘整个面板）
+  _updateMutBrewProgress() {
+    const fill = document.getElementById('mutBrewFill');
+    if (!fill || !this._mutBrewing) return;
+    const pct = Math.min(100, (this._mutBrewing.progress / this._mutBrewing.total * 100));
+    fill.style.width = pct.toFixed(1) + '%';
+    const textEl = fill.parentElement?.querySelector('.mut-brew-text');
+    if (textEl) textEl.textContent = `🧪 培育中... ${pct.toFixed(1)}%`;
+  },
+
+  // ★ Q4：突变替换弹窗
+  _showMutReplaceUI(newMutId) {
+    const mut = MUTATIONS[newMutId];
+    const rarity = MUT_RARITY[mut.rarity];
+    let html = `<div class="mut-replace-overlay" id="mutReplaceOverlay">
+      <div class="mut-replace-panel">
+        <div class="mut-replace-title">🧬 突变槽已满 — 选择替换</div>
+        <div class="mut-replace-new">
+          <div class="mut-replace-new-header">新突变</div>
+          <div class="mut-offer mut-rarity-${mut.rarity}" style="pointer-events:none">
+            <div class="mut-offer-header">
+              <span class="mut-offer-icon">${mut.icon}</span>
+              <span class="mut-offer-name">${mut.n}</span>
+              <span class="mut-offer-rarity" style="color:${rarity.color}">${rarity.icon} ${rarity.n}</span>
+            </div>
+            <div class="mut-offer-desc">${mut.d}</div>
+          </div>
+        </div>
+        <div class="mut-replace-current-title">选择要替换的突变（锁定项不可替换）：</div>
+        <div class="mut-replace-slots">`;
+    for (let i = 0; i < this._mutSlots.length; i++) {
+      const slot = this._mutSlots[i];
+      const old = MUTATIONS[slot.id];
+      const oldRarity = MUT_RARITY[old.rarity];
+      html += `<div class="mut-replace-slot ${slot.locked ? 'locked' : ''}" onclick="${slot.locked ? '' : 'G.mutReplaceSlot(' + i + ')'}">
+        <span class="mut-replace-slot-icon">${old.icon}</span>
+        <span class="mut-replace-slot-name">${old.n}</span>
+        <span class="mut-replace-slot-rarity" style="color:${oldRarity.color}">${oldRarity.icon}</span>
+        ${slot.locked ? '<span class="mut-replace-slot-lock">🔒</span>' : ''}
+      </div>`;
+    }
+    html += `</div>
+        <button class="mut-btn mut-btn-skip" onclick="G.mutCancelReplace()">取消（保持现有）</button>
+      </div>
+    </div>`;
+
+    // 移除旧的overlay
+    const old = document.getElementById('mutReplaceOverlay');
+    if (old) old.remove();
+    document.body.insertAdjacentHTML('beforeend', html);
+  },
+
   // ===== PHASE CHECK =====
   // 每个阶段需要的最低进化等级
   phaseEvoReq: { 2: 2, 3: 3, 4: 4, 5: 5 },
 
-  // 获取下一阶段的升级条件列表（返回 [{label, met}]）
+  // 获取下一阶段的升级条件列表（返回 [{label, met, tipTitle, tipTag, tipDesc, tipDetail, tipColor}]）
   getPhaseUpReqs() {
     const reqs = [];
-    const BLDNAMES = { glucoseCollector:'碳源采集器', energyStation:'ATP合成酶', simpleExtractor:'简易提取器',
-      proteinFactory:'蛋白质工厂', geneExtractor:'基因提取器', biofilmReactor:'生物膜反应器',
-      transport:'菌丝运输网', qsController:'群体感应塔' };
-    const TECHNAMES = { pureCulture:'纯培养技术', quorumSensing:'群体感应' };
+    const self = this;
+
+    // ---- 辅助：生成进化等级条件 + tooltip ----
+    function evoReq(reqLv) {
+      const met = self.eL >= reqLv;
+      const diff = reqLv - self.eL;
+      const cost = self.evoCost();
+      const costParts = Object.entries(cost).map(([k,v]) => `${v}${RES[k]?.icon||k}`).join(' + ');
+      let detail = met
+        ? `✓ 已达成 — 当前 Lv.${self.eL}`
+        : `还需提升 ${diff} 级\n下次进化费用: ${costParts}`;
+      const bonus = self.evoBonus() * (self._evoBoostMult || 1);
+      detail += `\n每次进化: 全局效率 +${Math.round(bonus*100)}%`;
+      return {
+        label: `进化等级 ≥ Lv.${reqLv}`, met,
+        tipTitle: '🧬 进化等级', tipTag: '进化',
+        tipDesc: met ? `当前 Lv.${self.eL} — 已满足 ≥ Lv.${reqLv}` : `当前 Lv.${self.eL} → 目标 Lv.${reqLv}`,
+        tipDetail: detail, tipColor: '#a855f7'
+      };
+    }
+
+    // ---- 辅助：生成建筑条件 + tooltip ----
+    function bldReq(bldKey) {
+      const b = BLDS[bldKey];
+      const count = self.bldCount(bldKey);
+      const met = count > 0;
+      const costParts = Object.entries(b.cost).map(([k,v]) => `${v}${RES[k]?.icon||k}`).join(' + ');
+      let detail = met
+        ? `✓ 已建造 ${count} 座`
+        : `✗ 尚未建造\n建造费用: ${costParts}`;
+      if (b.ratio) detail += `\n转化: ${b.ratio}`;
+      if (b.corePowered) detail += '\n🏠 由帝国核心供能';
+      return {
+        label: `建造 ${b.n}`, met,
+        tipTitle: `${b.emoji||''} ${b.n}`, tipTag: '建筑',
+        tipDesc: met ? `已建造 — ${b.d}` : `未建造 — ${b.d}`,
+        tipDetail: detail, tipColor: b.color || '#22c55e'
+      };
+    }
+
+    // ---- 辅助：生成科技条件 + tooltip ----
+    function techReq(techKey) {
+      const t = TECHS[techKey];
+      const met = self.techs[techKey]?.done;
+      const costParts = Object.entries(t.cost).map(([k,v]) => `${v}${RES[k]?.icon||k}`).join(' + ');
+      let detail = met
+        ? `✓ 已完成研究`
+        : `✗ 尚未研究\n研究费用: ${costParts}\n研究时间: ${t.time}秒`;
+      detail += `\n效果: ${t.ef}`;
+      if (t.req && t.req.length > 0) {
+        const preNames = t.req.map(r => TECHS[r]?.n || r).join('、');
+        detail += `\n前置科技: ${preNames}`;
+      }
+      return {
+        label: `研究 ${t.n}`, met,
+        tipTitle: `📖 ${t.n}`, tipTag: '科技',
+        tipDesc: met ? `已研究 — ${t.ef}` : `未研究 — ${t.d}`,
+        tipDetail: detail, tipColor: '#60a5fa'
+      };
+    }
 
     if (this.phase === 1) {
-      reqs.push({ label: `进化等级 ≥ Lv.2`, met: this.eL >= 2 });
-      reqs.push({ label: `建造 ${BLDNAMES.glucoseCollector}`, met: this.bldCount('glucoseCollector') > 0 });
-      reqs.push({ label: `建造 ${BLDNAMES.energyStation}`, met: this.bldCount('energyStation') > 0 });
-      reqs.push({ label: `建造 ${BLDNAMES.simpleExtractor}`, met: this.bldCount('simpleExtractor') > 0 });
-      reqs.push({ label: `研究 ${TECHNAMES.pureCulture}`, met: this.techs.pureCulture.done });
+      reqs.push(evoReq(2));
+      reqs.push(bldReq('glucoseCollector'));
+      reqs.push(bldReq('energyStation'));
+      reqs.push(bldReq('simpleExtractor'));
+      reqs.push(techReq('pureCulture'));
     } else if (this.phase === 2) {
-      reqs.push({ label: `进化等级 ≥ Lv.3`, met: this.eL >= 3 });
-      reqs.push({ label: `建造 ${BLDNAMES.proteinFactory}`, met: this.bldCount('proteinFactory') > 0 });
-      reqs.push({ label: `建造 ${BLDNAMES.geneExtractor}`, met: this.bldCount('geneExtractor') > 0 });
+      reqs.push(evoReq(3));
+      reqs.push(bldReq('proteinFactory'));
+      reqs.push(bldReq('geneExtractor'));
     } else if (this.phase === 3) {
-      reqs.push({ label: `进化等级 ≥ Lv.4`, met: this.eL >= 4 });
-      reqs.push({ label: `建造 ${BLDNAMES.biofilmReactor}`, met: this.bldCount('biofilmReactor') > 0 });
-      reqs.push({ label: `建造 ${BLDNAMES.transport}`, met: this.bldCount('transport') > 0 });
+      reqs.push(evoReq(4));
+      reqs.push(bldReq('biofilmReactor'));
+      reqs.push(bldReq('transport'));
     } else if (this.phase === 4) {
-      reqs.push({ label: `进化等级 ≥ Lv.5`, met: this.eL >= 5 });
-      reqs.push({ label: `建造 ${BLDNAMES.qsController}`, met: this.bldCount('qsController') > 0 });
-      reqs.push({ label: `研究 ${TECHNAMES.quorumSensing}`, met: this.techs.quorumSensing.done });
+      reqs.push(evoReq(5));
+      reqs.push(bldReq('qsController'));
+      reqs.push(techReq('quorumSensing'));
     }
     return reqs;
   },
@@ -6630,10 +7390,26 @@ const G = {
 
     // 渲染条件列表
     let html = '';
-    for (const r of reqs) {
-      html += `<div class="core-req-item ${r.met ? 'met' : 'unmet'}">${r.label}</div>`;
+    for (let i = 0; i < reqs.length; i++) {
+      const r = reqs[i];
+      html += `<div class="core-req-item ${r.met ? 'met' : 'unmet'}" data-req-idx="${i}">${r.label}</div>`;
     }
     reqsEl.innerHTML = html;
+
+    // 绑定条件项 hover tooltip
+    reqsEl.querySelectorAll('.core-req-item[data-req-idx]').forEach(el => {
+      const r = reqs[+el.dataset.reqIdx];
+      if (!r) return;
+      el.style.cursor = 'help';
+      el.addEventListener('mouseenter', () => {
+        GameTooltip.showRaw({
+          title: r.tipTitle, tag: r.tipTag,
+          desc: r.tipDesc, detail: r.tipDetail,
+          color: r.tipColor
+        }, el.getBoundingClientRect());
+      });
+      el.addEventListener('mouseleave', () => GameTooltip.hide());
+    });
 
     // 按钮状态
     if (allMet) {
@@ -6871,6 +7647,9 @@ const G = {
         this.tickWonder();
         this.tickChallenge(); // Challenge system
         this.tickPetri(); // Petri experiment cooldown & buff tick
+        // ★ Q4：变异实验室tick
+        this._tickMutBrewing();
+        this._checkMutLabUnlock();
         this.rt++;
       }
 
@@ -8973,6 +9752,19 @@ const G = {
     // 4. 培养皿实验按钮：阶段2+ 显示
     const petriRow = document.getElementById('petriExpRow');
     if (petriRow) petriRow.style.display = this.phase >= 2 ? '' : 'none';
+
+    // 5. ★ Q4：变异实验室面板
+    const mutLabSec = document.getElementById('mutLabSection');
+    if (mutLabSec) {
+      if (this._mutLabUnlocked) {
+        mutLabSec.style.display = '';
+        if (!mutLabSec.classList.contains('unlocked')) {
+          mutLabSec.classList.add('unlocked', 'sec-unlock-anim');
+        }
+      } else {
+        mutLabSec.style.display = 'none';
+      }
+    }
   },
 
   _unlockSection(id, condition, msg) {
@@ -9652,6 +10444,14 @@ const G = {
         _petriBuff: this._petriBuff || null,
         _petriCount: this._petriCount || 0,
         _petriActiveZone: this._petriActiveZone || null,
+        // ★ Q4：变异实验室
+        _mutLabUnlocked: this._mutLabUnlocked || false,
+        _mutSlots: this._mutSlots || [],
+        _mutBrewing: this._mutBrewing || null,
+        _mutOffers: this._mutOffers || [],
+        _mutHistory: this._mutHistory || [],
+        _mutCategoryLock: this._mutCategoryLock || null,
+        _mutBrewCount: this._mutBrewCount || 0,
       };
       localStorage.setItem('bioSphereV3', JSON.stringify(s));
       if (!silent) this.log('▸ 已保存', 's');
@@ -9764,12 +10564,23 @@ const G = {
       this._petriBuff = s._petriBuff || null;
       this._petriCount = s._petriCount || 0;
       this._petriActiveZone = s._petriActiveZone || null;
+      // ★ Q4：变异实验室状态恢复
+      this._mutLabUnlocked = s._mutLabUnlocked || false;
+      this._mutSlots = s._mutSlots || [];
+      this._mutBrewing = s._mutBrewing || null;
+      this._mutOffers = s._mutOffers || [];
+      this._mutHistory = s._mutHistory || [];
+      this._mutCategoryLock = s._mutCategoryLock || null;
+      this._mutBrewCount = s._mutBrewCount || 0;
       // Re-apply milestone buffs
       const achieveCount = Object.keys(this.achievements).length;
       for (const ms of ACHIEVE_MILESTONES) {
         if (this._claimedMilestones[ms.count]) ms.fn(this);
       }
       this._updateEmpireTitle(achieveCount);
+      // ★ Q4：恢复突变效果缓存
+      this._recalcMutEffects();
+      if (this._mutLabUnlocked) this._renderMutLabPanel();
       // 旧存档迁移：如果网格尺寸发生变化，传送带key中的索引也需要更新
       if (savedGrid.length !== savedLen && savedGrid.length > 0) {
         const migOldCols = s.gridCols || Math.round(Math.sqrt(savedGrid.length));
@@ -11441,6 +12252,37 @@ const GameTooltip = (() => {
     }, 80);
   }
 
+  // ===== 直接传入数据显示 Tooltip（不经过词典） =====
+  function showRaw(info, anchorRect) {
+    if (!info) return;
+    const tip = el();
+    if (!tip) return;
+
+    let html = `<div class="tt-title">${info.title} <span class="tt-tag">${info.tag}</span></div>`;
+    html += `<div class="tt-desc">${info.desc}</div>`;
+    if (info.detail) {
+      html += `<div class="tt-detail">${info.detail.split('\n').map(l => `<span>${l}</span>`).join('')}</div>`;
+    }
+    tip.innerHTML = html;
+    tip.style.borderColor = (info.color || 'rgba(168,85,247,0.35)') + '60';
+
+    // 位置计算（复用 show 逻辑）
+    tip.classList.add('show');
+    const tw = tip.offsetWidth, th = tip.offsetHeight;
+    const vw = window.innerWidth, vh = window.innerHeight;
+    let left = anchorRect.left + anchorRect.width / 2 - tw / 2;
+    let top = anchorRect.top - th - 8;
+    if (top < 4) top = anchorRect.bottom + 8;
+    if (top + th > vh - 4) top = vh - th - 4;
+    if (left < 4) left = 4;
+    if (left + tw > vw - 4) left = vw - tw - 4;
+    tip.style.left = left + 'px';
+    tip.style.top = top + 'px';
+    _showing = true;
+
+    clearTimeout(_hideTimer);
+  }
+
   // ===== DOM 扫描：为文本中的术语添加 .game-term 包装 =====
   // 需要扫描的容器 ID 列表
   const SCAN_CONTAINERS = [
@@ -11576,7 +12418,7 @@ const GameTooltip = (() => {
     obs.observe(document.body, { childList: true, subtree: true });
   }
 
-  return { init, glossary, scheduleScan, show, hide };
+  return { init, glossary, scheduleScan, show, showRaw, hide };
 })();
 
 // ===== BOOT =====
@@ -11584,6 +12426,52 @@ const GameTooltip = (() => {
 document.addEventListener('mousemove', (e) => { window._lastMouseEvt = e; });
 G.init();
 GameTooltip.init();
+
+// ===== 阶段标签 & 核心阶段标签 hover tooltip =====
+(() => {
+  function buildPhaseTooltip() {
+    const cur = G.phase;
+    const p = PHASES[cur - 1];
+    const cc = CORE_COLONY[cur];
+    let detail = PHASES.map(ph => {
+      const isCur = ph.id === cur;
+      return `${isCur ? '▸ ' : '  '}P${ph.id} ${ph.icon} ${ph.name}${isCur ? ' ← 当前' : ''}`;
+    }).join('\n');
+    detail += `\n\n核心: ${cc.emoji} ${cc.name}`;
+    detail += `\n供能上限: ${cc.maxCollectors} 台碳源采集器`;
+    if (cur < 5) {
+      const nextP = PHASES[cur];
+      detail += `\n\n下一阶段: P${nextP.id} ${nextP.icon} ${nextP.name}`;
+    }
+    return {
+      title: `${p.icon} 阶段 ${p.id}: ${p.name}`,
+      tag: `P${cur} / 共5阶段`,
+      desc: p.desc,
+      detail: detail,
+      color: typeof p.color === 'string' && p.color.startsWith('var(') ? '#22d3ee' : p.color
+    };
+  }
+
+  // #phaseBadge
+  const badge = document.getElementById('phaseBadge');
+  if (badge) {
+    badge.style.cursor = 'help';
+    badge.addEventListener('mouseenter', () => {
+      GameTooltip.showRaw(buildPhaseTooltip(), badge.getBoundingClientRect());
+    });
+    badge.addEventListener('mouseleave', () => GameTooltip.hide());
+  }
+
+  // #corePhaseTag
+  const coreTag = document.getElementById('corePhaseTag');
+  if (coreTag) {
+    coreTag.style.cursor = 'help';
+    coreTag.addEventListener('mouseenter', () => {
+      GameTooltip.showRaw(buildPhaseTooltip(), coreTag.getBoundingClientRect());
+    });
+    coreTag.addEventListener('mouseleave', () => GameTooltip.hide());
+  }
+})();
 
 // ===== 传送带按钮 hover tooltip =====
 (() => {

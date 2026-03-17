@@ -4,6 +4,61 @@
 
 ---
 
+## v0.8.0 — 2026-03-18 · 变异实验室 + 升级条件 Tooltip
+
+### ✨ 新功能 — Q4：变异实验室系统
+- [office] **全新子系统**：变异实验室（Mutation Lab），P2阶段自动解锁
+- [office] **突变培育**：消耗 ATP + DNA 启动培育，进度条实时显示，完成后随机生成候选突变
+- [office] **5级品质体系**：普通 / 精良 / 稀有 / 史诗 / 传说，品质越高效果越强
+  - 史诗/传说突变有专属发光动画（紫色/金色脉冲）
+- [office] **突变槽管理**：最多3个激活槽位（可通过突变扩展），支持替换和锁定
+- [office] **CRISPR类别锁定**：可锁定培育类别，提高目标突变的出现概率
+- [office] **20+种突变效果**，涵盖：
+  - 🛡️ 防御类：厚壁菌膜（维护费-10%）、生物膜装甲等
+  - ⚡ 产出类：快速分裂（全局产出+8%）、高效代谢等
+  - 🔗 物流类：菌丝增幅（传送带效率+12%）等
+  - 🧬 实验类：基因漂变（竞争抗性+40%）等
+  - 🏆 传说级：完美适应（产出+25%/维护-25%/邻接距离+1）
+- [office] **突变影响全局系统**：
+  - 维护费调节（`mutMaintMod`）
+  - 全局产出加成（`mutGlobalBonus`）
+  - 竞争抗性（`competitionResist`）
+  - 传送带效率加成（`beltEffBonus`）
+  - 培育成本/速度优化
+- [office] **变异实验室成就**：💎 精良品质（获得精良+品质突变）
+- [office] **存档兼容**：变异实验室状态完整存入 localStorage
+
+### ✨ 新功能 — Q5：帝国核心升级条件 Hover Tooltip
+- [office] 鼠标悬停升级条件项，弹出详细信息面板：
+  - 🧬 **进化等级条件**：当前等级 → 目标等级、还差几级、下次进化费用、效率加成
+  - 🏗️ **建筑条件**：已建/未建状态、建造费用清单、转化比例、是否核心供能
+  - 📖 **科技条件**：已研/未研状态、研究费用+时间、效果描述、前置科技
+- [office] 复用 `GameTooltip` 系统，新增 `showRaw(info, anchorRect)` 方法支持直接传入数据
+- [office] `getPhaseUpReqs()` 重构为三个辅助函数 `evoReq()` / `bldReq()` / `techReq()`，返回丰富的 tooltip 数据
+- [office] 条件项 hover 高亮效果（背景变亮 + 紫色微光）
+
+### ✨ 新功能 — 阶段标签 Hover Tooltip
+- [office] `#phaseBadge` 和 `#corePhaseTag` 悬停显示阶段概览：
+  - 全部5个阶段列表（当前阶段标记 `← 当前`）
+  - 核心名称和供能上限
+  - 下一阶段预告
+
+### 🎨 视觉 / UI
+- [office] 变异实验室完整 UI：突变槽卡片、培育按钮、进度条、候选选择面板
+- [office] 品质专属边框颜色：灰/绿/蓝/紫/金 + 史诗紫色脉冲 + 传说金色脉冲动画
+- [office] 升级条件项 `cursor: help` + hover 背景高亮过渡动画
+- [office] `GameTooltip.showRaw()` 支持自定义边框颜色
+
+### 🔧 技术实现
+- [office] `MUTATIONS` 常量表定义全部突变（id/名称/描述/品质/效果/类别）
+- [office] `MUT_RARITY` 品质权重表控制掉落概率
+- [office] `MUT_LAB_CONFIG` 配置培育费用、时间、候选数量
+- [office] `_mutActiveEffects` 缓存当前生效突变的合并效果，避免每帧重算
+- [office] `updateCoreUpgradeUI()` 每次渲染后重新绑定 hover 事件（innerHTML 清空旧 DOM）
+- [office] 阶段标签 hover 在 BOOT 区域一次性绑定，`buildPhaseTooltip()` 动态读取当前阶段数据
+
+---
+
 ## v0.7.0 — 2026-03-18 · 经济系统大改 + 传送带UX + 收支透明化
 
 ### ✨ 新功能 — Q1：资源收支明细 Tooltip
