@@ -1023,34 +1023,34 @@ const EVENTS = [
 // ===== GUIDE MESSAGES =====
 const GUIDE = {
   1: [
-    { check: s => s.bldCount('glucoseCollector') === 0, text:'建造「碳源采集器」—帝国核心供能，免费采集葡萄糖！(核心上限2台)', icon:'🌱' },
-    { check: s => s.bldCount('glucoseCollector') > 0 && s.bldCount('energyStation') === 0, text:'建造「ATP合成酶」把葡萄糖转化为能量 (1🟢→2.5⚡/s)', icon:'🔋' },
-    { check: s => s.bldCount('energyStation') > 0 && s.bldCount('simpleExtractor') === 0, text:'建造「简易提取器」用葡萄糖+能量合成DNA！(2🟢+1.5⚡→0.4🧬/s)', icon:'🧬' },
-    { check: s => s.bldCount('simpleExtractor') > 0 && s.res.dna < 3, text:'DNA正在合成中...攒到3就能研究科技', icon:'🔬' },
-    { check: s => s.res.dna >= 3 && !s.techs.pureCulture.done, text:'DNA够了！点左侧「研究」→「纯培养技术」', icon:'🧫' },
-    { check: s => s.techs.pureCulture.done && s.eL < 2 && !s.canEvolve(), text:'纯培养技术✓（效率已+10%）→ 攒够DNA后进化到Lv.2！', icon:'📈' },
-    { check: s => s.techs.pureCulture.done && s.eL < 2 && s.canEvolve(), text:'资源就绪！点击底部「进化」按钮升到Lv.2！', icon:'✨' },
+    { check: s => s.bldCount('glucoseCollector') === 0, text:'建造「碳源采集器」— 帝国核心免费供能，采集葡萄糖（一切资源的起点！）', icon:'🌱' },
+    { check: s => s.bldCount('glucoseCollector') > 0 && s.bldCount('energyStation') === 0, text:'建造「ATP合成酶」把葡萄糖→能量 (1🟢→2.5⚡/s) — 几乎所有设施都需要能量驱动', icon:'🔋' },
+    { check: s => s.bldCount('energyStation') > 0 && s.bldCount('simpleExtractor') === 0, text:'建造「简易提取器」用葡萄糖+能量合成DNA (2🟢+1.5⚡→0.4🧬/s) — DNA是进化和研究的关键', icon:'🧬' },
+    { check: s => s.bldCount('simpleExtractor') > 0 && s.res.dna < 3, text:'DNA正在合成中...攒到3就能研究科技（小手会指路！）', icon:'🔬' },
+    { check: s => s.res.dna >= 3 && !s.techs.pureCulture.done, text:'DNA够了！点左侧「研究」→「纯培养技术」— 全局效率+10%，第一个科技里程碑', icon:'🧫' },
+    { check: s => s.techs.pureCulture.done && s.eL < 2 && !s.canEvolve(), text:'纯培养技术✓（效率+10%）→ 攒够DNA后进化到Lv.2，解锁更多建筑！', icon:'📈' },
+    { check: s => s.techs.pureCulture.done && s.eL < 2 && s.canEvolve(), text:'资源就绪！点击底部「进化」按钮升到Lv.2 — 将解锁固氮装置和蛋白质工厂', icon:'✨' },
   ],
   2: [
-    { check: s => s.bldCount('nitrogenFixer') === 0, text:'建造「固氮装置」获取氮源 (0.3⚡→1🔵/s)', icon:'💨' },
-    { check: s => s.bldCount('nitrogenFixer') > 0 && s.bldCount('proteinFactory') === 0, text:'建造「蛋白质工厂」(0.8🔵+0.5⚡→0.6🧪/s)', icon:'⚗️' },
-    { check: s => s.bldCount('proteinFactory') > 0 && !s.techs.basicMetab.done, text:'研究「基础代谢学」解锁高效DNA提取器', icon:'📖' },
-    { check: s => s.techs.basicMetab.done && s.bldCount('geneExtractor') === 0, text:'建造「DNA提取器」高效版 (0.5🧪+1⚡→0.8🧬/s)', icon:'🏭' },
+    { check: s => s.bldCount('nitrogenFixer') === 0, text:'建造「固氮装置」获取氮源 (0.3⚡→1🔵/s) — 蛋白质工厂的原料来源！', icon:'💨' },
+    { check: s => s.bldCount('nitrogenFixer') > 0 && s.bldCount('proteinFactory') === 0, text:'建造「蛋白质工厂」(0.8🔵+0.5⚡→0.6🧪/s) — 用氮源合成蛋白质，高级建筑必需品', icon:'⚗️' },
+    { check: s => s.bldCount('proteinFactory') > 0 && !s.techs.basicMetab.done, text:'研究「基础代谢学」— 解锁高效DNA提取器，产能翻倍！', icon:'📖' },
+    { check: s => s.techs.basicMetab.done && s.bldCount('geneExtractor') === 0, text:'建造「DNA提取器」(0.5🧪+1⚡→0.8🧬/s) — 比简易提取器快2倍，用蛋白质换DNA', icon:'🏭' },
   ],
   3: [
-    { check: s => !s.techs.biofilmTech.done, text:'研究「生物膜技术」', icon:'📖' },
-    { check: s => s.techs.biofilmTech.done && s.bldCount('biofilmReactor') === 0, text:'建造「生物膜反应器」产出生物质', icon:'🧱' },
-    { check: s => s.bldCount('biofilmReactor') > 0 && s.bldCount('transport') === 0, text:'建造「菌丝运输网」全局产出+10%！', icon:'🔗' },
-    { check: s => s.bldCount('transport') > 0, text:'多造运输网叠加效率，目标+30%以上！', icon:'📈' },
+    { check: s => !s.techs.biofilmTech.done, text:'研究「生物膜技术」— 解锁生物膜反应器，进入高级材料时代', icon:'📖' },
+    { check: s => s.techs.biofilmTech.done && s.bldCount('biofilmReactor') === 0, text:'建造「生物膜反应器」— 需要葡萄糖+氮源+能量（三料输入），记得连传送带！', icon:'🧱' },
+    { check: s => s.bldCount('biofilmReactor') > 0 && s.bldCount('transport') === 0, text:'建造「菌丝运输网」— 全局产出+10%！多造叠加效率', icon:'🔗' },
+    { check: s => s.bldCount('transport') > 0, text:'多造运输网叠加效率，目标+30%以上！别忘了升级传送带（点线条→升级）', icon:'📈' },
   ],
   4: [
-    { check: s => !s.techs.quorumSensing.done, text:'研究「群体感应」', icon:'📖' },
-    { check: s => s.techs.quorumSensing.done && s.bldCount('qsController') === 0, text:'建造「群体感应塔」(2⚡→0.8📡/s)', icon:'🗼' },
-    { check: s => s.bldCount('qsController') > 0, text:'QS信号自动加速全产线，多多益善！', icon:'🚀' },
+    { check: s => !s.techs.quorumSensing.done, text:'研究「群体感应」— 解锁QS信号系统，自动加速全产线', icon:'📖' },
+    { check: s => s.techs.quorumSensing.done && s.bldCount('qsController') === 0, text:'建造「群体感应塔」(2⚡→0.8📡/s) — QS信号越多效率越高（上限+80%）', icon:'🗼' },
+    { check: s => s.bldCount('qsController') > 0, text:'QS信号自动加速全产线，多多益善！考虑升级传送带到Lv.3+提高吞吐量', icon:'🚀' },
   ],
   5: [
-    { check: s => !s.techs.dysonTheory.done, text:'研究「微型戴森理论」', icon:'📖' },
-    { check: s => s.techs.dysonTheory.done && s.bldCount('microDyson') === 0, text:'建造终极奇观「微型戴森球」！', icon:'🏛️' },
+    { check: s => !s.techs.dysonTheory.done, text:'研究「微型戴森理论」— 终极科技！为建造奇观做准备', icon:'📖' },
+    { check: s => s.techs.dysonTheory.done && s.bldCount('microDyson') === 0, text:'建造终极奇观「微型戴森球」！全图仅限一座，0消耗→超强产出', icon:'🏛️' },
     { check: s => s.bldCount('microDyson') > 0 && s.wBuild, text:'奇观建造中...静待奇迹诞生！', icon:'✨' },
     { check: s => s.wonderComplete, text:'🎉 你征服了微生物宇宙！游戏完成！', icon:'🌟' },
   ],
@@ -1469,6 +1469,7 @@ const G = {
     this._restoreSectionStates(); // 恢复折叠状态
     this.buildUI();        // 再渲染 UI（renderGrid 会基于正确的数据）
     this.updateSectionUnlocks(); // 初始解锁检查（不触发飘字）
+    this._updateSaveHint();      // 更新"不保存"提示
     this._gameReady = true;      // 标记游戏就绪（之后的解锁才触发飘字）
     this.calcOfflineEarnings();
     this.startLoop();
@@ -1485,9 +1486,15 @@ const G = {
     this.log('▸ 系统在线 — 微生物帝国启动', 's');
     this.log('▸ 起始资源: 50🟢葡萄糖 + 35⚡能量', 'ev');
     this.log('▸ 帝国核心供能上限2台 — 建造「碳源采集器」开始吧！', '');
+    if (this.phase < 3) this.log('⚠ 阶段3前进度不保存，达到物流阶段后自动开启存档', 'w');
 
     // 首次进入时显示开场引导（介绍游戏目标和阶段路线）
     this._checkShowIntro();
+
+    // 非首次进入 + 阶段<3: 帮助按钮持续脉冲提醒
+    if (localStorage.getItem('bioIntroSeen') && this.phase < 3) {
+      this._startHelpPulse();
+    }
 
     // 自动保存（每30秒）
     this.autoSaveInterval = setInterval(() => {
@@ -1899,6 +1906,25 @@ const G = {
     pop.classList.add('show');
     this._showBackdrop();
     SFX.milestone();
+    // 初始化 tab 切换（仅绑定一次）
+    if (!this._introTabsBound) {
+      const tabs = document.getElementById('introTabs');
+      if (tabs) {
+        tabs.addEventListener('click', (e) => {
+          const tab = e.target.closest('.intro-tab');
+          if (!tab) return;
+          const page = tab.dataset.introPage;
+          if (!page) return;
+          tabs.querySelectorAll('.intro-tab').forEach(t => t.classList.remove('active'));
+          tab.classList.add('active');
+          pop.querySelectorAll('.intro-page').forEach(p => p.classList.remove('active'));
+          const target = pop.querySelector(`.intro-page[data-page="${page}"]`);
+          if (target) target.classList.add('active');
+          SFX.click();
+        });
+      }
+      this._introTabsBound = true;
+    }
   },
 
   closeIntro() {
@@ -1908,6 +1934,19 @@ const G = {
     // 首次关闭开场弹窗后，触发音频初始化
     SFX.initOnInteraction();
     SFX.updateBGMPhase(this.phase);
+    // 启动帮助按钮脉冲（阶段 < 3 时持续闪动）
+    this._startHelpPulse();
+  },
+
+  // 帮助按钮脉冲控制：阶段 1-2 持续闪动，进入阶段 3 自动停止
+  _startHelpPulse() {
+    const btn = document.getElementById('helpBtn');
+    if (!btn || this.phase >= 3) return;
+    btn.classList.add('help-pulse');
+  },
+  _stopHelpPulse() {
+    const btn = document.getElementById('helpBtn');
+    if (btn) btn.classList.remove('help-pulse');
   },
 
   // 检查是否需要显示开场引导（仅首次进入）
@@ -2091,7 +2130,7 @@ const G = {
     });
   },
 
-  // 弹框：选择传送带类型进行升级
+  // 弹框：选择传送带类型进行升级（快速升级版）
   showBeltTypeSelector() {
     const groups = this._getBeltGroups();
     if (groups.length === 0) {
@@ -2099,18 +2138,44 @@ const G = {
       return;
     }
 
+    this._renderBeltTypeList(groups);
+    document.getElementById('beltTypeSelector').classList.add('show');
+  },
+
+  // 内部：渲染传送带类型列表（可被快速升级后重复调用刷新）
+  _renderBeltTypeList(groups) {
     const listEl = document.getElementById('beltTypeList');
     if (!listEl) return;
     listEl.innerHTML = '';
 
-    groups.forEach(grp => {
+    let totalUpgradable = 0;
+    const totalCostAll = {};
+
+    groups.forEach((grp, grpIdx) => {
       const item = document.createElement('div');
       item.className = 'belt-type-item' + (grp.allMax ? ' maxed' : '');
+      item.setAttribute('data-grp', grpIdx);
 
       const effColor = grp.effPct >= 100 ? 'var(--cyan)' : grp.effPct >= 70 ? 'var(--yellow)' : 'var(--orange)';
       const lvColor = grp.allMax ? 'var(--purple)' : grp.minLv >= 3 ? 'var(--cyan)' : grp.minLv >= 2 ? 'var(--yellow)' : 'var(--orange)';
       const resIcons = grp.icons.join('');
       const countTag = grp.count > 1 ? ` <span class="belt-type-count" style="color:var(--color-muted)">×${grp.count}</span>` : '';
+
+      // 计算该组升1级的费用
+      let grpCostStr = '';
+      if (!grp.allMax) {
+        const upgradeable = grp.keys.filter(k => this.getBeltLevel(k) < 5);
+        const minLv = Math.min(...upgradeable.map(k => this.getBeltLevel(k)));
+        const toUp = upgradeable.filter(k => this.getBeltLevel(k) === minLv);
+        const unitCost = this.getBeltUpgradeCost(toUp[0]);
+        if (unitCost) {
+          const grpCost = {};
+          for (let r in unitCost) grpCost[r] = unitCost[r] * toUp.length;
+          grpCostStr = Object.entries(grpCost).map(([k,v]) => `${v}${RES[k]?.icon||k}`).join('+');
+          totalUpgradable += toUp.length;
+          for (let r in grpCost) totalCostAll[r] = (totalCostAll[r] || 0) + grpCost[r];
+        }
+      }
 
       item.innerHTML = `
         <div style="flex:1;min-width:0">
@@ -2118,28 +2183,223 @@ const G = {
           <div class="belt-type-meta">
             <span class="belt-type-lv" style="color:${lvColor}">Lv.${grp.minLv}${grp.allMax ? ' ★' : ''}</span>
             <span class="belt-type-eff" style="color:${effColor}">效率 ${grp.effPct}%</span>
+            ${!grp.allMax && grpCostStr ? `<span style="color:var(--yellow);font-size:0.9em">${grpCostStr}</span>` : ''}
           </div>
         </div>
-        <span class="belt-type-arrow">${grp.allMax ? '✦' : '⬆'}</span>
+        ${grp.allMax ? '<span class="bld-type-arrow" style="color:var(--purple)">✦</span>' :
+          `<button class="bld-quick-up-btn belt-quick-up" style="border-color:#f97316;color:#f97316;background:rgba(249,115,22,0.15)" title="快速升级">⬆</button>`}
       `;
 
       if (!grp.allMax) {
+        const upBtn = item.querySelector('.belt-quick-up');
+        if (upBtn) {
+          upBtn.onclick = (e) => {
+            e.stopPropagation();
+            this._quickUpgradeBeltGroup(grp.keys, grp.fromName, grp.toName);
+          };
+        }
         item.onclick = () => {
-          this.closeBeltTypeSelector();
-          this.showBeltGroupUpgradePopup(grp.keys, grp.fromName, grp.toName);
+          this._quickUpgradeBeltGroup(grp.keys, grp.fromName, grp.toName);
         };
       }
       listEl.appendChild(item);
     });
 
-    document.getElementById('beltTypeSelector').classList.add('show');
+    // ====== 底部按钮 ======
+    const allBtn = document.getElementById('beltUpgradeAllBtn');
+    const maxBtn = document.getElementById('beltUpgradeMaxBtn');
+    if (allBtn) {
+      if (totalUpgradable >= 1) {
+        const costStr = Object.entries(totalCostAll).map(([k,v]) => `${v}${RES[k]?.icon||k}`).join('+');
+        const canAfford = this.checkRes(totalCostAll);
+        allBtn.style.display = '';
+        allBtn.disabled = !canAfford;
+        allBtn.style.opacity = canAfford ? '1' : '0.4';
+        document.getElementById('beltUpgradeAllCost').textContent = `(${costStr})`;
+      } else {
+        allBtn.style.display = 'none';
+      }
+    }
+    if (maxBtn) {
+      const maxCost = this._calcBeltUpgradeToMaxCost(groups);
+      if (maxCost && totalUpgradable >= 1) {
+        const costStr = Object.entries(maxCost).map(([k,v]) => `${v}${RES[k]?.icon||k}`).join('+');
+        const canAfford = this.checkRes(maxCost);
+        maxBtn.style.display = '';
+        maxBtn.disabled = !canAfford;
+        maxBtn.style.opacity = canAfford ? '1' : '0.4';
+        document.getElementById('beltUpgradeMaxCost').textContent = `(${costStr})`;
+      } else {
+        maxBtn.style.display = 'none';
+      }
+    }
+  },
+
+  // 计算将所有传送带升到 Lv5 的总费用
+  _calcBeltUpgradeToMaxCost(groups) {
+    const totalCost = {};
+    let hasAny = false;
+    const beltCosts = {
+      1: { energy: 8, glucose: 5 },
+      2: { energy: 20, glucose: 12 },
+      3: { energy: 40, glucose: 20, dna: 3 },
+      4: { energy: 70, glucose: 35, dna: 10 },
+    };
+    for (const grp of groups) {
+      for (const key of grp.keys) {
+        let lv = this.getBeltLevel(key);
+        if (lv >= 5) continue;
+        while (lv < 5) {
+          const cost = beltCosts[lv];
+          if (cost) {
+            for (let r in cost) totalCost[r] = (totalCost[r] || 0) + cost[r];
+          }
+          lv++;
+          hasAny = true;
+        }
+      }
+    }
+    return hasAny ? totalCost : null;
+  },
+
+  // 快速升级传送带组（无确认弹窗）
+  _quickUpgradeBeltGroup(keys, fromName, toName) {
+    const upgradeable = keys.filter(k => this.getBeltLevel(k) < 5);
+    if (upgradeable.length === 0) {
+      this.log('该类型传送带已全部满级', 'w');
+      return;
+    }
+    // 取最低等级统一升级
+    const minLv = Math.min(...upgradeable.map(k => this.getBeltLevel(k)));
+    const toUpgrade = upgradeable.filter(k => this.getBeltLevel(k) === minLv);
+    const unitCost = this.getBeltUpgradeCost(toUpgrade[0]);
+    if (!unitCost) return;
+    const totalCost = {};
+    for (let r in unitCost) totalCost[r] = unitCost[r] * toUpgrade.length;
+
+    if (!this.checkRes(totalCost)) {
+      this.log('资源不足，无法升级传送带', 'e');
+      SFX.buildFail();
+      return;
+    }
+
+    this.spend(totalCost);
+    for (const k of toUpgrade) {
+      this.beltLevels[k] = (this.beltLevels[k] || 1) + 1;
+    }
+    const newLv = minLv + 1;
+
+    // 连击
+    this._upgradeCombo = (this._upgradeCombo || 0) + toUpgrade.length;
+    clearTimeout(this._upgradeComboTimer);
+    this._upgradeComboTimer = setTimeout(() => { this._upgradeCombo = 0; }, 2000);
+
+    const effStr = Math.round(this.getBeltEfficiency(toUpgrade[0]) * 100);
+    const label = toUpgrade.length > 1 ? `⛓ ${fromName}→${toName} ×${toUpgrade.length}` : `⛓ ${fromName}→${toName}`;
+    this.log(`⬆ ${label} → Lv.${newLv} 效率${effStr}%`, 's');
+    SFX.coreUpgrade();
+    this.screenShake(4);
+
+    if (this._upgradeCombo >= 3) {
+      this.showGoldenFloat(`⬆×${this._upgradeCombo} COMBO!`);
+    }
+
+    // 刷新列表
+    this._chainsDirty = true;
+    const groups = this._getBeltGroups();
+    this._renderBeltTypeList(groups);
+    this.updateRates();
+    this.updateUI();
+    this.updateBeltUpgradeBtn();
+
+    // 全部满级提示
+    const allMax = groups.every(g => g.allMax);
+    if (allMax) {
+      this.showGoldenFloat('🌟 全部传送带满级！');
+    }
+  },
+
+  // 全部传送带升1级
+  upgradeAllBelts() {
+    const groups = this._getBeltGroups();
+    let totalUpgraded = 0;
+
+    for (const grp of groups) {
+      if (grp.allMax) continue;
+      const upgradeable = grp.keys.filter(k => this.getBeltLevel(k) < 5);
+      const minLv = Math.min(...upgradeable.map(k => this.getBeltLevel(k)));
+      const toUpgrade = upgradeable.filter(k => this.getBeltLevel(k) === minLv);
+      const unitCost = this.getBeltUpgradeCost(toUpgrade[0]);
+      if (!unitCost) continue;
+      const totalCost = {};
+      for (let r in unitCost) totalCost[r] = unitCost[r] * toUpgrade.length;
+      if (!this.checkRes(totalCost)) continue;
+      this.spend(totalCost);
+      for (const k of toUpgrade) {
+        this.beltLevels[k] = (this.beltLevels[k] || 1) + 1;
+      }
+      totalUpgraded += toUpgrade.length;
+    }
+
+    if (totalUpgraded > 0) {
+      this.log(`⬆ 批量升级传送带 ×${totalUpgraded}`, 's');
+      SFX.coreUpgrade();
+      this.screenShake(6);
+      this.showGoldenFloat(`⬆ 传送带 ×${totalUpgraded} 升级！`);
+      this._chainsDirty = true;
+      const newGroups = this._getBeltGroups();
+      this._renderBeltTypeList(newGroups);
+      this.updateRates();
+      this.updateUI();
+      this.updateBeltUpgradeBtn();
+    } else {
+      this.log('资源不足，无法升级', 'e');
+      SFX.buildFail();
+    }
+  },
+
+  // 全部传送带升满
+  upgradeAllBeltsToMax() {
+    const groups = this._getBeltGroups();
+    const maxCost = this._calcBeltUpgradeToMaxCost(groups);
+    if (!maxCost || !this.checkRes(maxCost)) {
+      this.log('资源不足，无法全部升满', 'e');
+      SFX.buildFail();
+      return;
+    }
+
+    let totalUpgrades = 0;
+    for (const grp of groups) {
+      for (const key of grp.keys) {
+        while (this.getBeltLevel(key) < 5) {
+          const cost = this.getBeltUpgradeCost(key);
+          if (!cost || !this.checkRes(cost)) break;
+          this.spend(cost);
+          this.beltLevels[key] = (this.beltLevels[key] || 1) + 1;
+          totalUpgrades++;
+        }
+      }
+    }
+
+    if (totalUpgrades > 0) {
+      this.log(`🌟 全部传送带批量升级 ×${totalUpgrades} — 满级！`, 's');
+      SFX.coreUpgrade();
+      this.screenShake(8);
+      this.showGoldenFloat(`🌟 传送带 ×${totalUpgrades} 全部升满！`);
+      this._chainsDirty = true;
+      const newGroups = this._getBeltGroups();
+      this._renderBeltTypeList(newGroups);
+      this.updateRates();
+      this.updateUI();
+      this.updateBeltUpgradeBtn();
+    }
   },
 
   closeBeltTypeSelector() {
     document.getElementById('beltTypeSelector')?.classList.remove('show');
   },
 
-  // 弹框：选择建筑实例进行升级
+  // 弹框：选择建筑实例进行升级（快速升级版 — 点击直接升级，无需确认弹窗）
   showBldTypeSelector(buildingKey) {
     const bd = BLDS[buildingKey];
     if (!bd) return;
@@ -2156,6 +2416,14 @@ const G = {
 
     this._upgradeAllKey = buildingKey; // 记住当前建筑类型，供一键升级使用
 
+    this._renderBldTypeList(buildingKey, bd, instances);
+
+    document.getElementById('bldTypeSelector').classList.add('show');
+    SFX.click();
+  },
+
+  // 内部：渲染建筑类型列表（可被快速升级后重复调用刷新）
+  _renderBldTypeList(buildingKey, bd, instances) {
     const listEl = document.getElementById('bldTypeList');
     if (!listEl) return;
     listEl.innerHTML = '';
@@ -2181,10 +2449,12 @@ const G = {
 
       const item = document.createElement('div');
       item.className = 'bld-type-item' + (isMax ? ' maxed' : '');
+      item.setAttribute('data-idx', idx);
 
       const lvColor = isMax ? 'var(--purple)' : lv >= 3 ? 'var(--cyan)' : lv >= 2 ? 'var(--yellow)' : 'var(--color-info)';
       const row = Math.floor(idx / this.gridSize) + 1;
       const col = idx % this.gridSize + 1;
+      const canAffordThis = cost && this.checkRes(cost);
 
       item.innerHTML = `
         <span class="bld-type-seq">#${seqIdx + 1}</span>
@@ -2192,27 +2462,38 @@ const G = {
         <div class="bld-type-info">
           <div class="bld-type-name">${bd.n} <span style="color:var(--color-muted-dark);font-size:0.85em">(${row},${col})</span></div>
           <div class="bld-type-meta">
-            <span class="bld-type-lv" style="color:${lvColor}">${isMax ? '★MAX' : 'Lv.' + lv + ' → Lv.' + (lv+1)}</span>
-            <span class="bld-type-mult" style="color:var(--color-info)">${mult}x${isMax ? '' : ' → ' + nextMult + 'x'}</span>
+            <span class="bld-type-lv" style="color:${lvColor}">${isMax ? '★MAX' : 'Lv.' + lv}</span>
+            <span class="bld-type-mult" style="color:var(--color-info)">${mult}x${isMax ? '' : '→' + nextMult + 'x'}</span>
             ${!isMax ? `<span class="bld-type-cost">${costStr}</span>` : ''}
           </div>
         </div>
-        <span class="bld-type-arrow">${isMax ? '✦' : '⬆'}</span>
+        ${isMax ? '<span class="bld-type-arrow" style="color:var(--purple)">✦</span>' :
+          `<button class="bld-quick-up-btn${canAffordThis ? '' : ' disabled'}" data-up-idx="${idx}" title="${canAffordThis ? '点击升级' : '资源不足'}">⬆</button>`}
       `;
 
+      // 快速升级：点击按钮直接升级该建筑（无确认弹窗）
       if (!isMax) {
+        const upBtn = item.querySelector('.bld-quick-up-btn');
+        if (upBtn) {
+          upBtn.onclick = (e) => {
+            e.stopPropagation();
+            this._quickUpgradeBuilding(idx, buildingKey);
+          };
+        }
+        // 点击整行也可以升级
         item.onclick = () => {
-          this.closeBldTypeSelector();
-          this.showUpgradePopup(idx);
+          this._quickUpgradeBuilding(idx, buildingKey);
         };
       }
       listEl.appendChild(item);
     });
 
-    // 更新一键全部升级按钮
+    // ====== 底部按钮区域 ======
     const upgradeAllBtn = document.getElementById('upgradeAllBtn');
+    const upgradeMaxBtn = document.getElementById('upgradeMaxBtn');
     if (upgradeAllBtn) {
-      if (upgradableCount >= 2) {
+      if (upgradableCount >= 1) {
+        // 「全部升1级」按钮 — 显示每个升1级的总费用
         const costStr = Object.entries(totalCost).map(([k,v]) => `${v}${RES[k]?.icon||k}`).join('+');
         const canAfford = this.checkRes(totalCost);
         upgradeAllBtn.style.display = '';
@@ -2223,9 +2504,153 @@ const G = {
         upgradeAllBtn.style.display = 'none';
       }
     }
+    if (upgradeMaxBtn) {
+      // 「全部升满」按钮 — 计算将所有建筑升到Lv5的总费用
+      const maxCost = this._calcUpgradeToMaxCost(buildingKey, instances);
+      if (maxCost && upgradableCount >= 1) {
+        const costStr = Object.entries(maxCost).map(([k,v]) => `${v}${RES[k]?.icon||k}`).join('+');
+        const canAfford = this.checkRes(maxCost);
+        upgradeMaxBtn.style.display = '';
+        upgradeMaxBtn.disabled = !canAfford;
+        upgradeMaxBtn.style.opacity = canAfford ? '1' : '0.4';
+        document.getElementById('upgradeMaxCost').textContent = `(${costStr})`;
+      } else {
+        upgradeMaxBtn.style.display = 'none';
+      }
+    }
+  },
 
-    document.getElementById('bldTypeSelector').classList.add('show');
-    SFX.click();
+  // 计算将所有建筑升到 Lv5 的总费用
+  _calcUpgradeToMaxCost(buildingKey, instances) {
+    const totalCost = {};
+    let hasAny = false;
+    for (const idx of instances) {
+      let lv = this.buildingLevels[idx] || 1;
+      if (lv >= 5) continue;
+      const g = this.grid[idx];
+      if (!g) continue;
+      const bd = BLDS[g.type];
+      if (!bd) continue;
+      while (lv < 5) {
+        for (let k in bd.cost) {
+          const c = Math.ceil(bd.cost[k] * Math.pow(1.8, lv));
+          totalCost[k] = (totalCost[k] || 0) + c;
+        }
+        lv++;
+        hasAny = true;
+      }
+    }
+    return hasAny ? totalCost : null;
+  },
+
+  // 快速升级单个建筑（无确认弹窗，直接在列表中升级并刷新）
+  _quickUpgradeBuilding(idx, buildingKey) {
+    const cost = this.getUpgradeCost(idx);
+    if (!cost || !this.checkRes(cost)) {
+      this.log('资源不足，无法升级', 'e');
+      SFX.buildFail();
+      return;
+    }
+
+    this.spend(cost);
+    this.buildingLevels[idx] = (this.buildingLevels[idx] || 1) + 1;
+    const lv = this.buildingLevels[idx];
+    const bd = BLDS[this.grid[idx].type];
+    this.stats.totalUpgrades = (this.stats.totalUpgrades || 0) + 1;
+
+    // 连击计数
+    this._upgradeCombo = (this._upgradeCombo || 0) + 1;
+    clearTimeout(this._upgradeComboTimer);
+    this._upgradeComboTimer = setTimeout(() => { this._upgradeCombo = 0; }, 2000);
+
+    // 反馈：日志 + 音效 + 粒子 + 震屏
+    const combo = this._upgradeCombo;
+    if (combo >= 3) {
+      this.log(`⬆×${combo} ${bd.n} → Lv.${lv}  产出×${this.getUpgradeMultiplier(idx).toFixed(1)}`, 's');
+    } else {
+      this.log(`⬆ ${bd.n} → Lv.${lv}  产出×${this.getUpgradeMultiplier(idx).toFixed(1)}`, 's');
+    }
+    SFX.coreUpgrade();
+    this.buildBurst(idx);
+    this.screenShake(Math.min(3 + combo, 8));
+
+    // 连击飘字
+    if (combo >= 2) {
+      this.showGoldenFloat(`⬆×${combo} COMBO!`);
+    }
+
+    // 刷新列表（保持弹窗打开状态）
+    const instances = [];
+    this.grid.forEach((g, i) => {
+      if (g && g.type === buildingKey) instances.push(i);
+    });
+    this._renderBldTypeList(buildingKey, bd, instances);
+
+    // 高亮刚升级的那一行
+    const updatedItem = document.querySelector(`.bld-type-item[data-idx="${idx}"]`);
+    if (updatedItem) {
+      updatedItem.classList.add('just-upgraded');
+      setTimeout(() => updatedItem.classList.remove('just-upgraded'), 600);
+    }
+
+    this.renderGrid();
+    this.renderBuildings();
+    this.updateRates();
+    this.updateUI();
+
+    // 如果全部满级了，显示完成提示
+    const allMax = instances.every(i => (this.buildingLevels[i] || 1) >= 5);
+    if (allMax) {
+      this.showGoldenFloat(`🌟 ${bd.n} 全部满级！`);
+    }
+  },
+
+  // 全部升到满级（逐级升，带动画序列）
+  upgradeAllToMax() {
+    const buildingKey = this._upgradeAllKey;
+    if (!buildingKey) return;
+    const bd = BLDS[buildingKey];
+
+    const instances = [];
+    this.grid.forEach((g, i) => {
+      if (g && g.type === buildingKey) instances.push(i);
+    });
+
+    // 计算总费用并检查
+    const maxCost = this._calcUpgradeToMaxCost(buildingKey, instances);
+    if (!maxCost || !this.checkRes(maxCost)) {
+      this.log('资源不足，无法全部升满', 'e');
+      SFX.buildFail();
+      return;
+    }
+
+    // 逐级执行升级，收集升级日志
+    let totalUpgrades = 0;
+    for (const idx of instances) {
+      while ((this.buildingLevels[idx] || 1) < 5) {
+        const cost = this.getUpgradeCost(idx);
+        if (!cost || !this.checkRes(cost)) break;
+        this.spend(cost);
+        this.buildingLevels[idx] = (this.buildingLevels[idx] || 1) + 1;
+        totalUpgrades++;
+        this.buildBurst(idx);
+      }
+    }
+
+    if (totalUpgrades > 0) {
+      this.stats.totalUpgrades = (this.stats.totalUpgrades || 0) + totalUpgrades;
+      this.log(`🌟 ${bd.n} 批量升级 ×${totalUpgrades} — 全部满级！`, 's');
+      SFX.coreUpgrade();
+      this.screenShake(8);
+      this.showGoldenFloat(`🌟 ${bd.n} ×${totalUpgrades} 全部升满！`);
+
+      // 刷新列表
+      this._renderBldTypeList(buildingKey, bd, instances);
+      this.renderGrid();
+      this.renderBuildings();
+      this.updateRates();
+      this.updateUI();
+    }
   },
 
   closeBldTypeSelector() {
@@ -4319,12 +4744,34 @@ const G = {
     }
     this._playerId = pid;
     this._playerName = localStorage.getItem('bioPlayerName') || null;
+    // 初始化昵称显示
+    this._updateNameDisplay();
 
     if (!this._playerName) {
       // 如果开场引导弹窗正在显示，延迟到关闭后再弹昵称
       const delay = localStorage.getItem('bioIntroSeen') ? 3000 : 8000;
       setTimeout(() => this.showNicknamePopup(), delay);
     }
+  },
+
+  // 更新荣誉区域的昵称显示
+  _updateNameDisplay() {
+    const el = document.getElementById('playerNameDisplay');
+    if (!el) return;
+    if (this._playerName) {
+      el.textContent = this._playerName;
+      el.style.color = 'var(--cyan)';
+    } else {
+      el.textContent = '点击设置昵称';
+      el.style.color = 'var(--dim)';
+    }
+  },
+
+  // 更新"不保存"提示（阶段3前显示，阶段3+隐藏）
+  _updateSaveHint() {
+    const hint = document.getElementById('noSaveHint');
+    if (!hint) return;
+    hint.style.display = this.phase < 3 ? '' : 'none';
   },
 
   // === 昵称弹窗 ===
@@ -4354,6 +4801,7 @@ const G = {
     this._playerName = name;
     localStorage.setItem('bioPlayerName', name);
     this.closeNickname();
+    this._updateNameDisplay();
     this.log(`🧬 昵称设置为: ${name}`, 's');
     this.showCursorTooltip(`昵称已设为「${name}」`);
     this.submitScore();
@@ -5268,6 +5716,8 @@ const G = {
 
     this.phase++;
     const p = PHASES[this.phase - 1];
+    // 进入阶段3时停止帮助按钮脉冲
+    if (this.phase >= 3) this._stopHelpPulse();
     this.showMilestone(p.icon, '进入阶段 ' + p.id + ': ' + p.name);
     this.log('◆ 进入阶段 ' + p.id + ': ' + p.name + ' — ' + p.desc, 's');
     SFX.phaseUp();
@@ -5290,6 +5740,13 @@ const G = {
     this.renderGrid();
     this.renderCoreColony(true);
     this.updateCoreUpgradeUI();
+
+    // 进入阶段3: 首次触发存档保存 + 提示玩家
+    if (this.phase === 3) {
+      this.save(true);
+      this.log('💾 进度已开始自动保存！', 's');
+      this._updateSaveHint();
+    }
   },
 
   // 旧的自动检查（现在仅用于内部条件判断，不再自动升级）
@@ -8088,6 +8545,11 @@ const G = {
   },
 
   save(silent) {
+    // 阶段1-2不保存存档（让新手快速体验，到阶段3才开始持久化）
+    if (this.phase < 3) {
+      if (!silent) this.log('▸ 阶段3前进度不保存 — 加油升阶！', 'w');
+      return;
+    }
     try {
       const s = {
         res: this.res, grid: this.grid, gridSize: this.gridSize, gridCols: this.gridCols, gridRows: this.gridRows, techs: this.techs,
@@ -8144,6 +8606,11 @@ const G = {
       const d = localStorage.getItem('bioSphereV3');
       if (!d) return;
       const s = JSON.parse(d);
+      // 阶段3前的存档不恢复（清理旧版遗留）
+      if ((s.phase || 1) < 3) {
+        localStorage.removeItem('bioSphereV3');
+        return;
+      }
       Object.assign(this.res, s.res || {});
 
       // 恢复存档时的网格尺寸（兼容旧版正方形存档）
@@ -8511,10 +8978,11 @@ const G = {
     this._hideBackdrop();
   },
 
-  // ===== ONE-CLICK UPGRADE ALL =====
+  // ===== ONE-CLICK UPGRADE ALL (升1级版) =====
   upgradeAllOfType() {
     const buildingKey = this._upgradeAllKey;
     if (!buildingKey) return;
+    const bd = BLDS[buildingKey];
 
     // 收集所有可升级的实例
     const targets = [];
@@ -8549,21 +9017,27 @@ const G = {
     }
 
     if (upgraded > 0) {
-      const bd = BLDS[buildingKey];
       this.stats.totalUpgrades = (this.stats.totalUpgrades || 0) + upgraded;
       this.log(`⬆ 批量升级 ${bd.n} ×${upgraded} 完成！`, 's');
       SFX.coreUpgrade();
       this.screenShake(6);
       this.showGoldenFloat(`⬆ ${bd.n} ×${upgraded} 升级！`);
+
+      // 刷新列表（保持弹窗打开）
+      const instances = [];
+      this.grid.forEach((g, i) => {
+        if (g && g.type === buildingKey) instances.push(i);
+      });
+      this._renderBldTypeList(buildingKey, bd, instances);
       this.renderGrid();
       this.renderBuildings();
       this.updateRates();
       this.updateUI();
-      // 刷新弹窗内容
-      this.closeBldTypeSelector();
-      if (upgraded < targets.length) {
-        // 还有未升级的，重新打开弹窗
-        setTimeout(() => this.showBldTypeSelector(buildingKey), 200);
+
+      // 如果全部满级了
+      const allMax = instances.every(i => (this.buildingLevels[i] || 1) >= 5);
+      if (allMax) {
+        this.showGoldenFloat(`🌟 ${bd.n} 全部满级！`);
       }
     } else {
       this.log('资源不足，无法升级', 'e');

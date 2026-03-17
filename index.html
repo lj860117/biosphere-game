@@ -498,6 +498,14 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 .belt-type-eff{font-family:'Share Tech Mono',monospace}
 .belt-type-count{color:#4a6a8a}
 .belt-type-arrow{font-size:0.8em;color:#f97316;flex-shrink:0;opacity:0.6}
+.belt-type-item.just-upgraded{
+  animation:belt-upgrade-flash 0.6s ease-out;
+  border-color:#f97316!important;
+}
+@keyframes belt-upgrade-flash{
+  0%{background:rgba(249,115,22,0.3);transform:scale(1.02)}
+  100%{background:rgba(10,18,30,0.85);transform:scale(1)}
+}
 
 /* Progress bar for research/wonder */
 .prog-wrap{margin-top:4px}
@@ -1457,6 +1465,10 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 .honor-achv-btn:hover .honor-achv-arrow{
   color:#fbbf24;transform:translateX(3px);
 }
+/* 昵称行 — 可点击改名 */
+.honor-name-row{background:rgba(6,214,160,0.02);border:1px solid rgba(6,214,160,0.06)}
+.honor-name-row:hover{background:rgba(6,214,160,0.08)!important;border-color:rgba(6,214,160,0.2)}
+.honor-name-row:hover .honor-name-edit{opacity:1!important;color:var(--cyan)!important}
 /* 总分行 */
 .honor-score-row{
   background:rgba(251,191,36,0.03);border:1px solid rgba(251,191,36,0.08);
@@ -1892,7 +1904,7 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
   position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:10006;
   background:linear-gradient(135deg,rgba(6,12,24,0.98),rgba(4,8,18,0.99));
   border:1.5px solid var(--cyan);border-radius:12px;
-  padding:28px 32px;text-align:center;min-width:360px;max-width:480px;
+  padding:24px 28px;text-align:center;min-width:380px;max-width:540px;
   box-shadow:0 0 60px rgba(6,214,160,0.15),0 0 120px rgba(6,214,160,0.05);
   display:none;overflow:hidden;
 }
@@ -1911,9 +1923,23 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
   color:var(--bright);letter-spacing:2px;margin-bottom:4px;position:relative;
 }
 .intro-subtitle{
-  font-size:0.75em;color:var(--cyan);letter-spacing:3px;margin-bottom:16px;
+  font-size:0.75em;color:var(--cyan);letter-spacing:3px;margin-bottom:12px;
   font-family:'Orbitron',monospace;position:relative;
 }
+/* Tab 栏 */
+.intro-tabs{display:flex;gap:4px;justify-content:center;margin-bottom:12px;position:relative;flex-wrap:wrap}
+.intro-tab{
+  padding:4px 10px;font-size:0.68em;font-weight:700;font-family:'Rajdhani',sans-serif;
+  background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:4px;
+  color:var(--dim);cursor:pointer;transition:all 0.2s;letter-spacing:0.3px;
+}
+.intro-tab:hover{border-color:var(--cyan);color:var(--cyan)}
+.intro-tab.active{border-color:var(--cyan);color:var(--cyan);background:rgba(6,214,160,0.1)}
+/* 多页容器 */
+.intro-page{display:none}
+.intro-page.active{display:block;animation:introPageIn 0.3s ease}
+@keyframes introPageIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+/* Page 1: 欢迎 */
 .intro-story{
   font-size:0.82em;color:#8aa0c0;line-height:1.6;margin-bottom:16px;
   text-align:left;padding:0 4px;position:relative;
@@ -1943,6 +1969,60 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 .intro-phase-icon{font-size:1.3em}
 .intro-phase-name{font-size:0.62em;font-weight:700;letter-spacing:0.5px}
 .intro-phase-arrow{color:var(--dim);font-size:0.7em;opacity:0.5}
+/* Page 2: 资源流向 */
+.intro-flow{text-align:left;position:relative}
+.intro-flow-title{font-size:0.78em;font-weight:700;color:var(--bright);margin-bottom:8px;text-align:center}
+.intro-flow-chain{display:flex;align-items:center;gap:4px;margin-bottom:6px;flex-wrap:wrap;justify-content:center}
+.intro-flow-node{
+  font-size:0.7em;padding:3px 8px;border-radius:4px;
+  background:rgba(255,255,255,0.04);border:1px solid;white-space:nowrap;
+}
+.intro-flow-arrow{color:var(--dim);font-size:0.72em}
+.intro-flow-note{
+  font-size:0.72em;color:#8aa0c0;line-height:1.55;margin-top:10px;
+  background:rgba(6,214,160,0.05);border:1px solid rgba(6,214,160,0.12);
+  border-radius:6px;padding:8px 10px;text-align:left;
+}
+.intro-flow-note b{font-weight:700}
+/* Page 3: 传送带指南 */
+.intro-belt{text-align:left;position:relative}
+.intro-belt-title{font-size:0.78em;font-weight:700;color:var(--bright);margin-bottom:6px;text-align:center}
+.intro-belt-desc{font-size:0.72em;color:#8aa0c0;line-height:1.55;margin-bottom:10px}
+.intro-belt-desc b{color:var(--bright);font-weight:700}
+.intro-belt-table{
+  width:100%;border-collapse:collapse;font-size:0.68em;margin-bottom:8px;
+}
+.intro-belt-table th{color:var(--cyan);font-weight:700;padding:3px 6px;border-bottom:1px solid rgba(6,214,160,0.2);text-align:center}
+.intro-belt-table td{padding:3px 6px;color:#8aa0c0;text-align:center;border-bottom:1px solid rgba(255,255,255,0.04)}
+.intro-belt-tip{
+  font-size:0.68em;color:#8aa0c0;line-height:1.5;
+  background:rgba(249,115,22,0.06);border:1px solid rgba(249,115,22,0.15);
+  border-radius:6px;padding:6px 8px;
+}
+.intro-belt-tip b{color:var(--bright);font-weight:700}
+/* Page 4: 攻略 */
+.intro-strat{text-align:left;position:relative}
+.intro-strat-phase{margin-bottom:8px}
+.intro-strat-label{font-size:0.75em;font-weight:700;margin-bottom:3px}
+.intro-strat-steps{margin:0;padding-left:18px;font-size:0.7em;color:#8aa0c0;line-height:1.6}
+.intro-strat-steps li{margin-bottom:1px}
+.intro-strat-steps b{color:var(--bright);font-weight:700}
+.intro-strat-why{font-style:italic;color:var(--dim);font-size:0.92em}
+/* 帮助按钮脉冲 */
+.ctrl-btn.help-pulse{
+  border-color:var(--cyan)!important;color:var(--cyan)!important;
+  background:rgba(6,214,160,0.12)!important;
+  animation:helpBtnPulse 1.6s ease-in-out infinite;
+  position:relative;z-index:2;
+}
+@keyframes helpBtnPulse{
+  0%,100%{box-shadow:0 0 4px rgba(6,214,160,0.15);transform:scale(1)}
+  50%{box-shadow:0 0 18px rgba(6,214,160,0.4),0 0 30px rgba(6,214,160,0.12);transform:scale(1.1)}
+}
+@keyframes noSavePulse{
+  0%,100%{opacity:0.6}
+  50%{opacity:1}
+}
 .intro-start-btn{
   position:relative;padding:10px 36px;
   background:linear-gradient(135deg,rgba(6,214,160,0.15),rgba(6,214,160,0.08));
@@ -2154,6 +2234,24 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 .bld-type-mult{font-family:'Share Tech Mono',monospace}
 .bld-type-cost{color:var(--yellow);font-weight:600}
 .bld-type-arrow{font-size:0.8em;color:var(--cyan);flex-shrink:0;opacity:0.6}
+/* 快速升级按钮 */
+.bld-quick-up-btn{
+  flex-shrink:0;width:32px;height:28px;border:1px solid var(--cyan);border-radius:4px;
+  background:rgba(6,214,160,0.15);color:var(--cyan);font-size:0.85em;font-weight:700;
+  cursor:pointer;transition:all 0.15s;display:flex;align-items:center;justify-content:center;
+}
+.bld-quick-up-btn:hover{background:rgba(6,214,160,0.35);transform:scale(1.1);box-shadow:0 0 12px rgba(6,214,160,0.3)}
+.bld-quick-up-btn:active{transform:scale(0.95);background:rgba(6,214,160,0.5)}
+.bld-quick-up-btn.disabled{opacity:0.3;cursor:not-allowed;pointer-events:none}
+/* 升级高亮动画 */
+.bld-type-item.just-upgraded{
+  animation:bld-upgrade-flash 0.6s ease-out;
+  border-color:var(--cyan)!important;
+}
+@keyframes bld-upgrade-flash{
+  0%{background:rgba(6,214,160,0.3);transform:scale(1.02)}
+  100%{background:rgba(10,18,30,0.85);transform:scale(1)}
+}
 .bld-type-seq{
   font-family:'Share Tech Mono',monospace;font-size:0.6em;font-weight:700;
   color:#4a7090;background:rgba(0,0,0,0.4);border:1px solid #1a3a5a;
@@ -2222,6 +2320,7 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
   .section-title{font-size:0.78em}
   #phaseEvoHint{font-size:0.55em}
   #saveIndicator{font-size:0.55em}
+  #noSaveHint{font-size:0.55em}
 }
 
 /* ===== RESPONSIVE: MOBILE (≤768px) ===== */
@@ -2237,6 +2336,7 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
   .phase-badge{font-size:0.52em;padding:2px 6px;order:5}
   #phaseEvoHint{display:none}
   #saveIndicator{display:none}
+  #noSaveHint{display:none}
   .ctrl-btn{padding:3px 7px;font-size:0.62em}
 
   /* 主区域改为垂直 + Tab 切换 */
@@ -2538,6 +2638,7 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
     <div class="phase-badge" id="phaseBadge" style="color:var(--green);border-color:var(--green)30">阶段 1 · 采集</div>
     <div id="phaseEvoHint" style="font-size:0.78em;text-align:center;margin:-2px 0 2px;opacity:0.8"></div>
     <div id="saveIndicator" style="font-size:0.78em;color:var(--dim);opacity:0;transition:opacity 0.3s;white-space:nowrap">💾 已保存</div>
+    <div id="noSaveHint" style="font-size:0.7em;color:#f59e0b;opacity:0.85;white-space:nowrap;animation:noSavePulse 2s ease-in-out infinite">⚠ 阶段3前不保存</div>
     <div class="ctrl-btns">
       <button class="ctrl-btn spd-btn" onclick="G.toggleSpeed()" id="spdBtn" title="加速">⚡ <span id="spdDisplay" style="font-family:'Orbitron',monospace;font-size:0.95em">1×</span></button>
       <button class="ctrl-btn pause-btn" onclick="G.togglePause()" id="pauseBtn" title="暂停/继续">⏸</button>
@@ -2546,7 +2647,7 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
       <button class="ctrl-btn audio-btn" id="sfxBtn" onclick="G.toggleSfx()" title="音效开关">🔊</button>
       <button class="ctrl-btn audio-btn" id="bgmBtn" onclick="G.toggleBgm()" title="背景音乐开关">🎵</button>
       <span style="width:1px;height:16px;background:var(--bdr);margin:0 2px"></span>
-      <button class="ctrl-btn" onclick="G.showIntro()" title="游戏帮助 / 目标说明" style="color:var(--cyan)">❓</button>
+      <button class="ctrl-btn" id="helpBtn" onclick="G.showIntro()" title="游戏帮助 / 目标说明" style="color:var(--cyan)">❓</button>
     </div>
   </div>
 
@@ -2721,6 +2822,12 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
                 </div>
                 <!-- 称号 -->
                 <div class="csb-score-item"><span class="s-label">👑 称号</span><span class="s-val" id="empireTitleDisplay" style="color:var(--cyan)">🦠 初生细胞</span></div>
+                <!-- 玩家昵称 — 可点击改名 -->
+                <div class="csb-score-item honor-name-row" onclick="G.showNicknamePopup()" title="点击修改昵称" style="cursor:pointer">
+                  <span class="s-label">🧬 昵称</span>
+                  <span class="s-val" id="playerNameDisplay" style="color:var(--cyan);font-weight:700">未设置</span>
+                  <span class="honor-name-edit" style="font-size:0.75em;color:var(--dim);opacity:0.5;justify-self:end;transition:all 0.2s">✏️</span>
+                </div>
                 <!-- 总分 + 评级徽章 -->
                 <div class="csb-score-item honor-score-row" id="scoreRow" style="cursor:default" oncontextmenu="event.preventDefault();G.showRatingTooltip(event)">
                   <span class="s-label" style="font-weight:600">🏆 总分</span>
@@ -2949,21 +3056,24 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 
 <!-- Building Type Selector Popup -->
 <div class="bld-type-selector" id="bldTypeSelector">
-  <div style="font-family:'Orbitron',monospace;font-size:0.75em;color:var(--cyan);letter-spacing:2px;margin-bottom:8px">⬆ 选择建筑升级</div>
-  <div style="font-size:0.55em;color:#5a7a90;margin-bottom:8px">点击选择要升级的建筑</div>
+  <div style="font-family:'Orbitron',monospace;font-size:0.75em;color:var(--cyan);letter-spacing:2px;margin-bottom:4px">⬆ 快速升级</div>
+  <div style="font-size:0.55em;color:#5a7a90;margin-bottom:8px">点击直接升级 · 无需确认</div>
   <div class="bld-type-list" id="bldTypeList"></div>
-  <div style="margin-top:10px;display:flex;gap:8px;justify-content:center;align-items:center">
-    <button class="recycle-yes" id="upgradeAllBtn" onclick="G.upgradeAllOfType()" style="border-color:var(--cyan);color:var(--cyan);background:rgba(6,214,160,0.12);font-size:0.72em;padding:6px 14px;display:none">⬆ 一键全部升级 <span id="upgradeAllCost" style="font-size:0.85em;opacity:0.8"></span></button>
+  <div style="margin-top:10px;display:flex;gap:6px;justify-content:center;align-items:center;flex-wrap:wrap">
+    <button class="recycle-yes" id="upgradeAllBtn" onclick="G.upgradeAllOfType()" style="border-color:var(--cyan);color:var(--cyan);background:rgba(6,214,160,0.12);font-size:0.72em;padding:6px 14px;display:none">⬆ 全部升1级 <span id="upgradeAllCost" style="font-size:0.85em;opacity:0.8"></span></button>
+    <button class="recycle-yes" id="upgradeMaxBtn" onclick="G.upgradeAllToMax()" style="border-color:var(--purple);color:var(--purple);background:rgba(168,85,247,0.12);font-size:0.72em;padding:6px 14px;display:none">🌟 全部升满 <span id="upgradeMaxCost" style="font-size:0.85em;opacity:0.8"></span></button>
     <button class="recycle-no" onclick="G.closeBldTypeSelector()">关闭</button>
   </div>
 </div>
 
 <!-- Belt Type Selector Popup -->
 <div class="belt-type-selector" id="beltTypeSelector">
-  <div style="font-family:'Orbitron',monospace;font-size:0.75em;color:#f97316;letter-spacing:2px;margin-bottom:8px">⛓ 选择传送带类型</div>
-  <div style="font-size:0.55em;color:#5a7a90;margin-bottom:8px">点击选择要升级的传送带</div>
+  <div style="font-family:'Orbitron',monospace;font-size:0.75em;color:#f97316;letter-spacing:2px;margin-bottom:4px">⛓ 快速升级传送带</div>
+  <div style="font-size:0.55em;color:#5a7a90;margin-bottom:8px">点击直接升级 · 无需确认</div>
   <div class="belt-type-list" id="beltTypeList"></div>
-  <div style="margin-top:10px">
+  <div style="margin-top:10px;display:flex;gap:6px;justify-content:center;align-items:center;flex-wrap:wrap">
+    <button class="recycle-yes" id="beltUpgradeAllBtn" onclick="G.upgradeAllBelts()" style="border-color:#f97316;color:#f97316;background:rgba(249,115,22,0.12);font-size:0.72em;padding:6px 14px;display:none">⬆ 全部升1级 <span id="beltUpgradeAllCost" style="font-size:0.85em;opacity:0.8"></span></button>
+    <button class="recycle-yes" id="beltUpgradeMaxBtn" onclick="G.upgradeAllBeltsToMax()" style="border-color:var(--purple);color:var(--purple);background:rgba(168,85,247,0.12);font-size:0.72em;padding:6px 14px;display:none">🌟 全部升满 <span id="beltUpgradeMaxCost" style="font-size:0.85em;opacity:0.8"></span></button>
     <button class="recycle-no" onclick="G.closeBeltTypeSelector()">关闭</button>
   </div>
 </div>
@@ -3034,46 +3144,164 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 <!-- Intro / Welcome Popup -->
 <div class="intro-popup" id="introPopup">
   <div class="intro-glow"></div>
-  <div style="font-size:2em;margin-bottom:6px;position:relative">🧬</div>
+  <div style="font-size:1.6em;margin-bottom:4px;position:relative">🧬</div>
   <div class="intro-title">BIOSPHERE</div>
   <div class="intro-subtitle">微 生 物 帝 国</div>
-  <div class="intro-story">
-    你是一团刚刚诞生的<b>原始液泡</b>——宇宙中最微小的生命形式。<br>
-    通过<b>采集资源、研究科技、建造设施</b>，从一无所有逐步进化，<br>
-    经历 <b>5 个文明阶段</b>，最终建造出终极生物奇观！
+
+  <!-- Tab 切换栏 -->
+  <div class="intro-tabs" id="introTabs">
+    <button class="intro-tab active" data-intro-page="welcome">🏠 欢迎</button>
+    <button class="intro-tab" data-intro-page="flowchart">📋 资源流向</button>
+    <button class="intro-tab" data-intro-page="beltguide">⛓ 传送带</button>
+    <button class="intro-tab" data-intro-page="strategy">📈 攻略</button>
   </div>
-  <div class="intro-goal">
-    <div class="intro-goal-label">🏛️ 终极目标</div>
-    <div class="intro-goal-text">建造「微型戴森球」— 征服微生物宇宙！</div>
+
+  <!-- Page 1: 欢迎 -->
+  <div class="intro-page active" id="introPageWelcome" data-page="welcome">
+    <div class="intro-story">
+      你是一团刚刚诞生的<b>原始液泡</b>——宇宙中最微小的生命形式。<br>
+      通过<b>采集资源、研究科技、建造设施</b>，从一无所有逐步进化，<br>
+      经历 <b>5 个文明阶段</b>，最终建造出终极生物奇观！
+    </div>
+    <div class="intro-goal">
+      <div class="intro-goal-label">🏛️ 终极目标</div>
+      <div class="intro-goal-text">建造「微型戴森球」— 征服微生物宇宙！</div>
+    </div>
+    <div class="intro-roadmap">
+      <div class="intro-phase" style="border-color:var(--green)20">
+        <div class="intro-phase-icon">🌱</div>
+        <div class="intro-phase-name" style="color:var(--green)">采集</div>
+      </div>
+      <div class="intro-phase-arrow">▸</div>
+      <div class="intro-phase" style="border-color:var(--orange)20">
+        <div class="intro-phase-icon">⚗️</div>
+        <div class="intro-phase-name" style="color:var(--orange)">代谢</div>
+      </div>
+      <div class="intro-phase-arrow">▸</div>
+      <div class="intro-phase" style="border-color:var(--blue)20">
+        <div class="intro-phase-icon">🔗</div>
+        <div class="intro-phase-name" style="color:var(--blue)">物流</div>
+      </div>
+      <div class="intro-phase-arrow">▸</div>
+      <div class="intro-phase" style="border-color:var(--yellow)20">
+        <div class="intro-phase-icon">🤖</div>
+        <div class="intro-phase-name" style="color:var(--yellow)">自动化</div>
+      </div>
+      <div class="intro-phase-arrow">▸</div>
+      <div class="intro-phase" style="border-color:var(--purple)20">
+        <div class="intro-phase-icon">🏛️</div>
+        <div class="intro-phase-name" style="color:var(--purple)">奇观</div>
+      </div>
+    </div>
   </div>
-  <div class="intro-roadmap">
-    <div class="intro-phase" style="border-color:var(--green)20">
-      <div class="intro-phase-icon">🌱</div>
-      <div class="intro-phase-name" style="color:var(--green)">采集</div>
-    </div>
-    <div class="intro-phase-arrow">▸</div>
-    <div class="intro-phase" style="border-color:var(--orange)20">
-      <div class="intro-phase-icon">⚗️</div>
-      <div class="intro-phase-name" style="color:var(--orange)">代谢</div>
-    </div>
-    <div class="intro-phase-arrow">▸</div>
-    <div class="intro-phase" style="border-color:var(--blue)20">
-      <div class="intro-phase-icon">🔗</div>
-      <div class="intro-phase-name" style="color:var(--blue)">物流</div>
-    </div>
-    <div class="intro-phase-arrow">▸</div>
-    <div class="intro-phase" style="border-color:var(--yellow)20">
-      <div class="intro-phase-icon">🤖</div>
-      <div class="intro-phase-name" style="color:var(--yellow)">自动化</div>
-    </div>
-    <div class="intro-phase-arrow">▸</div>
-    <div class="intro-phase" style="border-color:var(--purple)20">
-      <div class="intro-phase-icon">🏛️</div>
-      <div class="intro-phase-name" style="color:var(--purple)">奇观</div>
+
+  <!-- Page 2: 资源流向图 -->
+  <div class="intro-page" id="introPageFlow" data-page="flowchart">
+    <div class="intro-flow">
+      <div class="intro-flow-title">🔗 资源供给链 — 谁给谁供货？</div>
+
+      <div class="intro-flow-chain">
+        <span class="intro-flow-node" style="border-color:#22c55e40">🌱 碳源采集器</span>
+        <span class="intro-flow-arrow">→</span>
+        <span class="intro-flow-node" style="border-color:#f9731640">🔋 ATP合成酶</span>
+        <span class="intro-flow-arrow">→</span>
+        <span class="intro-flow-node" style="border-color:#ec489940">🧬 简易提取器</span>
+      </div>
+      <div style="font-size:0.65em;color:var(--dim);margin:-2px 0 6px 4px">▲ 阶段1 基础链：葡萄糖 → 能量 → DNA</div>
+
+      <div class="intro-flow-chain">
+        <span class="intro-flow-node" style="border-color:#f9731640">🔋 ATP合成酶</span>
+        <span class="intro-flow-arrow">→</span>
+        <span class="intro-flow-node" style="border-color:#3b82f640">💨 固氮装置</span>
+        <span class="intro-flow-arrow">→</span>
+        <span class="intro-flow-node" style="border-color:#ec489940">⚗️ 蛋白质工厂</span>
+        <span class="intro-flow-arrow">→</span>
+        <span class="intro-flow-node" style="border-color:#a855f740">🏭 DNA提取器</span>
+      </div>
+      <div style="font-size:0.65em;color:var(--dim);margin:-2px 0 6px 4px">▲ 阶段2：能量驱动固氮 → 氮源制蛋白 → 高效DNA</div>
+
+      <div class="intro-flow-chain">
+        <span class="intro-flow-node" style="border-color:#14b8a640">🧱 生物膜反应器</span>
+        <span class="intro-flow-arrow">←</span>
+        <span style="font-size:0.72em;color:var(--dim)">🟢+🔵+⚡</span>
+        <span style="font-size:0.65em;color:var(--dim);margin-left:6px">&nbsp;→&nbsp;</span>
+        <span class="intro-flow-node" style="border-color:#eab30840">🗼 群体感应塔</span>
+        <span class="intro-flow-arrow">←</span>
+        <span style="font-size:0.72em;color:var(--dim)">⚡</span>
+      </div>
+      <div style="font-size:0.65em;color:var(--dim);margin:-2px 0 6px 4px">▲ 阶段3-4：多资源合成生物质 / QS自动加速</div>
+
+      <div class="intro-flow-note">
+        💡 <b style="color:var(--bright)">关键法则</b>：每个建筑的原料必须由<b style="color:var(--cyan)">上游建筑通过传送带</b>输送。<br>
+        没有传送带连接 = 该建筑<b style="color:var(--red)">停产</b>（碳源采集器除外，它由核心供能）。
+      </div>
     </div>
   </div>
-  <button class="intro-start-btn" onclick="G.closeIntro()">▸ 开始冒险</button>
-  <div style="font-size:0.6em;color:var(--dim);margin-top:10px;position:relative">顶部栏 ❓ 按钮可重新查看</div>
+
+  <!-- Page 3: 传送带指南 -->
+  <div class="intro-page" id="introPageBelt" data-page="beltguide">
+    <div class="intro-belt">
+      <div class="intro-belt-title">⛓ 传送带是什么？</div>
+      <div class="intro-belt-desc">
+        传送带是连接两座<b>相邻建筑</b>的资源管道。<br>
+        上游建筑的产出通过传送带输送到下游建筑作为原料。<br>
+        <b>阶段1</b>建造时会<b style="color:var(--green)">自动连接</b>传送带；<br>
+        <b>阶段2+</b>需要你<b style="color:var(--orange)">手动点击建筑</b>来连接（更灵活但也更需要规划）。
+      </div>
+
+      <div class="intro-belt-title" style="margin-top:8px">📊 传送带等级表</div>
+      <table class="intro-belt-table">
+        <tr><th>等级</th><th>传输效率</th><th>吞吐容量</th><th>升级费用</th></tr>
+        <tr><td style="color:var(--dim)">Lv.1</td><td>75%</td><td>2.0/s</td><td>—</td></tr>
+        <tr><td style="color:#22c55e">Lv.2</td><td>90%</td><td>3.0/s</td><td>8⚡ 5🟢</td></tr>
+        <tr><td style="color:#3b82f6">Lv.3</td><td>100%</td><td>5.0/s</td><td>20⚡ 12🟢</td></tr>
+        <tr><td style="color:#a855f7">Lv.4</td><td>120%</td><td>8.0/s</td><td>40⚡ 20🟢 3🧬</td></tr>
+        <tr><td style="color:#eab308">Lv.5</td><td style="color:var(--green)">150%</td><td>12.0/s</td><td>70⚡ 35🟢 10🧬</td></tr>
+      </table>
+
+      <div class="intro-belt-tip">
+        💡 <b>升级传送带</b>：点击培养皿中的传送带线条，选择「升级」。<br>
+        💡 效率 &lt; 100% 意味着产出会<b>打折扣</b>！优先升到 Lv.3 保底。<br>
+        💡 吞吐容量不够？给同一对建筑<b>多拉几条传送带</b>并行！
+      </div>
+    </div>
+  </div>
+
+  <!-- Page 4: 阶段攻略 -->
+  <div class="intro-page" id="introPageStrat" data-page="strategy">
+    <div class="intro-strat">
+      <div class="intro-strat-phase">
+        <div class="intro-strat-label" style="color:var(--green)">🌱 阶段1 · 采集</div>
+        <ol class="intro-strat-steps">
+          <li><b>碳源采集器</b> — 免费葡萄糖，帝国起点</li>
+          <li><b>ATP合成酶</b> — <em class="intro-strat-why">有了葡萄糖才能产能量</em></li>
+          <li><b>简易提取器</b> — <em class="intro-strat-why">用葡萄糖+能量合成DNA，进化的钥匙</em></li>
+          <li>研究<b>「纯培养技术」</b>→ 进化到 Lv.2</li>
+        </ol>
+      </div>
+      <div class="intro-strat-phase">
+        <div class="intro-strat-label" style="color:var(--orange)">⚗️ 阶段2 · 代谢</div>
+        <ol class="intro-strat-steps">
+          <li><b>固氮装置</b> — <em class="intro-strat-why">蛋白质需要氮源，这是原料来源</em></li>
+          <li><b>蛋白质工厂</b> — <em class="intro-strat-why">氮源→蛋白质，高级建筑的必需品</em></li>
+          <li><b>手动连传送带</b> — <em class="intro-strat-why">阶段2起不再自动连！点击建筑手动连</em></li>
+          <li>研究<b>「基础代谢学」</b>→ 解锁高效DNA提取器</li>
+        </ol>
+      </div>
+      <div class="intro-strat-phase">
+        <div class="intro-strat-label" style="color:var(--blue)">🔗 阶段3-4 · 物流 & 自动化</div>
+        <ol class="intro-strat-steps">
+          <li><b>生物膜反应器</b> → 产出生物质（需要多种原料传送带）</li>
+          <li><b>菌丝运输网</b> — <em class="intro-strat-why">全局+10%效率，多造叠加！</em></li>
+          <li><b>群体感应塔</b> — <em class="intro-strat-why">QS信号自动加速全产线</em></li>
+          <li><b>升级传送带</b> — <em class="intro-strat-why">Lv.1只有75%效率，升级到Lv.3+ 才不亏</em></li>
+        </ol>
+      </div>
+    </div>
+  </div>
+
+  <button class="intro-start-btn" onclick="G.closeIntro()" style="margin-top:10px">▸ 开始冒险</button>
+  <div style="font-size:0.6em;color:var(--dim);margin-top:8px;position:relative">顶部栏 ❓ 按钮可重新查看</div>
 </div>
 
 <!-- Tooltip -->
