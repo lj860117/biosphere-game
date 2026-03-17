@@ -6330,6 +6330,209 @@ const G = {
       ctx.setLineDash([]);
     };
 
+    // ===== 邻接脉冲光波 =====
+    // 有邻接加成的相邻建筑之间，在共享边缘产生流动光脉冲
+    // 颜色 = 加成类别色，频率/亮度 = 加成强度
+    let _adjPulseCache = null;
+    let _adjPulseCacheTime = 0;
+    const ADJ_PULSE_CACHE_MS = 2000; // 每2秒重新计算邻接对
+
+    // 加成图标→颜色映射（与游戏主题一致）
+    const ADJ_ICON_COLORS = {
+      '🌱': '#22c55e', // 碳源系 — 绿
+      '⚡': '#f59e0b', // 能量系 — 橙黄
+      '🔗': '#06d6a0', // 供给链 — 青绿
+      '🔋': '#f97316', // 能量直供 — 橙
+      '💨': '#38bdf8', // 固氮 — 天蓝
+      '⚗️': '#a855f7', // 代谢 — 紫
+      '🧬': '#ec4899', // DNA — 粉
+      '🧫': '#14b8a6', // 生物膜 — 青
+      '📡': '#6366f1', // 信号 — 靛
+      '🕸️': '#84cc16', // 菌丝 — 黄绿
+      '♻️': '#10b981', // 代谢循环 — 绿
+      '🪫': '#fb923c', // 缓冲 — 浅橙
+      '🧪': '#c084fc', // 蛋白 — 浅紫
+      '🔵': '#3b82f6', // 氮源 — 蓝
+      '🍄': '#a3e635', // 孢子 — 亮绿
+      '🫧': '#67e8f9', // 核糖体 — 亮青
+      '🧱': '#d97706', // 生物质 — 深橙
+      '🌀': '#818cf8', // 共振 — 浅靛
+    };
+    const ADJ_DEFAULT_COLOR = '#06d6a0';
+
+    // 计算邻接脉冲对（缓存）
+    const computeAdjPulsePairs = () => {
+      const now = Date.now();
+      // 网格有变化时立即重算，否则每2秒刷新
+      if (_adjPulseCache && !this._chainsDirty && now - _adjPulseCacheTime < ADJ_PULSE_CACHE_MS) return _adjPulseCache;
+
+      const pairs = []; // { idxA, idxB, bonus, color, direction }
+      const cols = this.gridCols;
+      const rows = this.gridRows;
+      const seen = new Set();
+
+      for (let idx = 0; idx < this.grid.length; idx++) {
+        const g = this.grid[idx];
+        if (!g) continue;
+        const selfType = g.type;
+        const bd = BLDS[selfType];
+        if (!bd || bd.isBoost || bd.isWonder) continue;
+
+        const r = Math.floor(idx / cols);
+        const c = idx % cols;
+
+        // 检查四个方向的邻居
+        const dirs = [];
+        if (r > 0) dirs.push({ ni: idx - cols, dir: 'up' });
+        if (r < rows - 1) dirs.push({ ni: idx + cols, dir: 'down' });
+        if (c > 0) dirs.push({ ni: idx - 1, dir: 'left' });
+        if (c < cols - 1) dirs.push({ ni: idx + 1, dir: 'right' });
+
+        for (const { ni, dir } of dirs) {
+          const ng = this.grid[ni];
+          if (!ng) continue;
+          const nType = ng.type;
+
+          // 检查是否有匹配的邻接规则
+          let pairBonus = 0;
+          let bestIcon = '🔗';
+
+          for (const rule of ADJACENCY_RULES) {
+            if (rule.self !== '*' && rule.self !== selfType) continue;
+            if (rule.neighbor !== nType) continue;
+            pairBonus += rule.bonus;
+            bestIcon = rule.icon;
+          }
+
+          if (pairBonus <= 0) continue;
+
+          // 避免重复（A→B 和 B→A）
+          const pairKey = Math.min(idx, ni) + '-' + Math.max(idx, ni);
+          if (seen.has(pairKey)) continue;
+          seen.add(pairKey);
+
+          // 确定方向（用于光脉冲流动方向）
+          const color = ADJ_ICON_COLORS[bestIcon] || ADJ_DEFAULT_COLOR;
+          pairs.push({ idxA: idx, idxB: ni, bonus: pairBonus, color, dir });
+        }
+      }
+
+      _adjPulseCache = pairs;
+      _adjPulseCacheTime = now;
+      return pairs;
+    };
+
+    const drawAdjacencyPulse = () => {
+      const gridEl = document.getElementById('grid');
+      if (!gridEl || gridEl.children.length === 0) return;
+
+      const pairs = computeAdjPulsePairs();
+      if (pairs.length === 0) return;
+
+      const pRect = canvas.parentElement.getBoundingClientRect();
+      const t = Date.now();
+
+      ctx.save();
+
+      for (const pair of pairs) {
+        const cellA = gridEl.children[pair.idxA];
+        const cellB = gridEl.children[pair.idxB];
+        if (!cellA || !cellB) continue;
+
+        const rA = cellA.getBoundingClientRect();
+        const rB = cellB.getBoundingClientRect();
+
+        // 计算共享边缘在 canvas 坐标中的位置
+        let edgeX1, edgeY1, edgeX2, edgeY2;
+        const isHorizontal = (pair.dir === 'left' || pair.dir === 'right');
+
+        if (isHorizontal) {
+          // 水平相邻 — 共享边是垂直线段，在 gap 的中线
+          const leftCell = pair.dir === 'right' ? rA : rB;
+          const gapMidX = leftCell.right + 8 - pRect.left; // gap=16, 中点=8
+          const topY = Math.max(rA.top, rB.top) - pRect.top;
+          const botY = Math.min(rA.bottom, rB.bottom) - pRect.top;
+          // 缩进一点，不占满整个边
+          const inset = (botY - topY) * 0.12;
+          edgeX1 = gapMidX; edgeY1 = topY + inset;
+          edgeX2 = gapMidX; edgeY2 = botY - inset;
+        } else {
+          // 垂直相邻 — 共享边是水平线段
+          const topCell = pair.dir === 'down' ? rA : rB;
+          const gapMidY = topCell.bottom + 8 - pRect.top;
+          const leftX = Math.max(rA.left, rB.left) - pRect.left;
+          const rightX = Math.min(rA.right, rB.right) - pRect.left;
+          const inset = (rightX - leftX) * 0.12;
+          edgeX1 = leftX + inset;  edgeY1 = gapMidY;
+          edgeX2 = rightX - inset; edgeY2 = gapMidY;
+        }
+
+        const edgeLen = Math.sqrt((edgeX2 - edgeX1) ** 2 + (edgeY2 - edgeY1) ** 2);
+        if (edgeLen < 2) continue;
+
+        // 加成强度映射到视觉参数
+        const intensity = Math.min(pair.bonus / 0.4, 1); // 0~1
+        const baseAlpha = 0.15 + intensity * 0.45; // 0.15~0.6
+        // 脉冲频率：加成越高越快
+        const pulseSpeed = 1500 - intensity * 800; // 1500ms~700ms
+        const pulse = 0.5 + Math.sin(t * Math.PI * 2 / pulseSpeed) * 0.5; // 0~1 正弦波
+
+        const alpha = baseAlpha * (0.5 + pulse * 0.5);
+        const color = pair.color;
+
+        // === 1) 边缘底层柔光（宽、淡） ===
+        const glowWidth = 10 + intensity * 6; // 10~16
+        ctx.lineWidth = glowWidth;
+        ctx.strokeStyle = color;
+        ctx.globalAlpha = alpha * 0.2;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(edgeX1, edgeY1);
+        ctx.lineTo(edgeX2, edgeY2);
+        ctx.stroke();
+
+        // === 2) 边缘核心光线（窄、亮） ===
+        const coreWidth = 2 + intensity * 2; // 2~4
+        ctx.lineWidth = coreWidth;
+        ctx.globalAlpha = alpha * 0.7;
+        ctx.beginPath();
+        ctx.moveTo(edgeX1, edgeY1);
+        ctx.lineTo(edgeX2, edgeY2);
+        ctx.stroke();
+
+        // === 3) 流动光点（沿边缘移动的亮点） ===
+        const dotSpeed = 2000 - intensity * 1000; // 2000ms~1000ms 走一个来回
+        const dotPhase = (t % dotSpeed) / dotSpeed; // 0~1
+        // 双向流动：两个点从两端相向移动
+        for (let di = 0; di < 2; di++) {
+          const dp = di === 0 ? dotPhase : (1 - dotPhase);
+          const dx = edgeX1 + (edgeX2 - edgeX1) * dp;
+          const dy = edgeY1 + (edgeY2 - edgeY1) * dp;
+          const dotR = 1.5 + intensity * 1.5; // 1.5~3
+
+          // 光点外晕
+          const grad = ctx.createRadialGradient(dx, dy, 0, dx, dy, dotR * 3);
+          grad.addColorStop(0, color);
+          grad.addColorStop(1, color + '00');
+          ctx.globalAlpha = alpha * 0.6;
+          ctx.fillStyle = grad;
+          ctx.beginPath();
+          ctx.arc(dx, dy, dotR * 3, 0, Math.PI * 2);
+          ctx.fill();
+
+          // 光点核心
+          ctx.globalAlpha = alpha * 1.2;
+          ctx.fillStyle = '#ffffff';
+          ctx.beginPath();
+          ctx.arc(dx, dy, dotR * 0.6, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+
+      ctx.globalAlpha = 1;
+      ctx.restore();
+    };
+
     // ===== 传送带放置预览 =====
     // 当选中建筑悬停在空格子上时，预览将要生成的传送带
     const drawBeltPreview = () => {
@@ -6484,6 +6687,8 @@ const G = {
 
       // 先画临近弱连接
       drawProximityLinks();
+      // 邻接加成脉冲光波（在弱连接之上、传送带之下）
+      drawAdjacencyPulse();
       // 再画传送带轨道
       const activeFlows = drawConveyorBelts();
       // 生成传送带粒子
