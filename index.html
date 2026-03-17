@@ -4,14 +4,48 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>微生物帝国</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;500;600;700&family=Share+Tech+Mono&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;500;600;700&family=Share+Tech+Mono&display=swap">
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;500;600;700&family=Share+Tech+Mono&display=swap');
+/*
+ * ============================================================
+ *  CSS 模块索引 (Table of Contents)
+ * ============================================================
+ *  1. Reset & Design Tokens ............. :root, *, html/body
+ *  2. Leaderboard & Nickname ............ .nickname-popup, .lb-*
+ *  3. Layout ............................ .main, .sidebar, .center
+ *  4. Top Bar ........................... .top-bar, .ctrl-btn
+ *  5. Resources & Actions ............... .res-grid, .section
+ *  6. Section Collapse .................. .sec-toggle, .sec-body
+ *  7. Build Guidance .................... .guide-*, .hint
+ *  8. Red Dot Notifications ............. .red-dot
+ *  9. Tech Tree ......................... .tech-*, .prog-*
+ * 10. Petri Dish (Center) ............... .dish-*, .cell-*
+ * 11. Right Panel (Status & Guide) ...... .right-*, .goal-*
+ * 12. Core Colony Bar ................... .csb-*, .core-*
+ * 13. Empire Overview ................... .empire-overview*
+ * 14. Honor Section ..................... .honor-*
+ * 15. Button Hierarchy .................. .btn-*, .ctrl-btn
+ * 16. Belt System ....................... .belt-*, .port-*
+ * 17. Petri Experiment .................. .petri-*
+ * 18. Juicy Effects ..................... @keyframes, .float-*
+ * 19. Challenge Bar ..................... .challenge-*
+ * 20. Popups & Overlays ................. .popup, .overlay
+ * 21. Achievement System ................ .achieve-*, .achv-*
+ * 22. Mobile & Responsive ............... @media queries
+ * 23. Tooltip System .................... .term-tooltip*
+ * 24. Score Float ....................... .score-float*
+ * 25. Accessibility ..................... prefers-reduced-motion
+ * ============================================================
+ */
 *{margin:0;padding:0;box-sizing:border-box}
 :root{
   --bg:#060a12;--panel:rgba(8,14,28,0.97);--bdr:#142040;
   --cyan:#06d6a0;--green:#22c55e;--blue:#3b82f6;--purple:#a855f7;
   --orange:#f97316;--yellow:#eab308;--red:#ef4444;--pink:#ec4899;
-  --text:#b8c8dc;--dim:#6889a8;--bright:#e0f0ff;
+  --text:#b8c8dc;--dim:#8da8c2;--bright:#e0f0ff;
   /* 语义色 — 用于 JS 动态样式统一引用 */
   --color-max:#a855f7;--color-upgrade:#fbbf24;--color-success:#22c55e;
   --color-info:#7fb8d8;--color-muted:#5a7a9a;--color-muted-dark:#3a5a6a;
@@ -20,7 +54,7 @@
   /* 字号阶梯 — 统一规范 */
   --fs-2xs:0.55em;--fs-xs:0.65em;--fs-sm:0.75em;--fs-md:0.85em;--fs-lg:0.95em;--fs-xl:1.05em;
   /* 间距阶梯 */
-  --sp-2xs:2px;--sp-xs:4px;--sp-sm:6px;--sp-md:8px;--sp-lg:12px;--sp-xl:14px;--sp-2xl:16px;--sp-3xl:20px;
+  --sp-3xs:1px;--sp-2xs:2px;--sp-xs:4px;--sp-xs-sm:3px;--sp-sm-md:5px;--sp-sm:6px;--sp-md:8px;--sp-md-lg:10px;--sp-lg:12px;--sp-xl:14px;--sp-2xl:16px;--sp-xl-2xl:18px;--sp-3xl:20px;--sp-4xl:24px;--sp-5xl:28px;
   /* 圆角 */
   --r-xs:2px;--r-sm:3px;--r-md:4px;--r-lg:10px;--r-xl:12px;
   /* 布局尺寸 */
@@ -32,12 +66,12 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 .nickname-popup,.leaderboard-popup{
   position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:10004;
   background:rgba(8,12,22,0.98);border:1.5px solid var(--cyan);border-radius:10px;
-  padding:var(--sp-3xl) 28px;text-align:center;min-width:var(--popup-min-w);max-width:var(--popup-max-w);
+  padding:var(--sp-3xl) var(--sp-5xl);text-align:center;min-width:var(--popup-min-w);max-width:var(--popup-max-w);
   box-shadow:0 0 40px rgba(6,214,160,0.2);display:none;
 }
 .nickname-popup.show,.leaderboard-popup.show{display:block;animation:popIn .3s ease-out}
 .lb-row{
-  display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:4px;
+  display:flex;align-items:center;gap:var(--sp-md);padding:var(--sp-sm) var(--sp-md);border-radius:4px;
   transition:background 0.15s;
 }
 .lb-row:hover{background:rgba(255,255,255,0.03)}
@@ -47,10 +81,10 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 }
 .lb-name{flex:1;text-align:left;font-weight:600;color:var(--bright);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .lb-score{font-family:'Share Tech Mono',monospace;font-weight:700;color:#fbbf24;min-width:60px;text-align:right}
-.lb-grade{font-family:'Orbitron',monospace;font-size:0.8em;font-weight:700;padding:1px 6px;border-radius:3px;min-width:36px;text-align:center}
+.lb-grade{font-family:'Orbitron',monospace;font-size:0.8em;font-weight:700;padding:var(--sp-3xs) var(--sp-sm);border-radius:3px;min-width:36px;text-align:center}
 .lb-detail{font-size:0.85em;color:var(--dim);min-width:80px;text-align:right}
 .lb-btn{
-  padding:4px 10px;background:rgba(251,191,36,0.1);border:1px solid rgba(251,191,36,0.25);
+  padding:var(--sp-xs) var(--sp-md-lg);background:rgba(251,191,36,0.1);border:1px solid rgba(251,191,36,0.25);
   color:#fbbf24;border-radius:4px;cursor:pointer;font-size:0.8em;font-weight:600;
   font-family:'Rajdhani',sans-serif;transition:all 0.2s;
 }
@@ -58,7 +92,7 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 
 /* Mini leaderboard top 3 */
 .mini-lb-row{
-  display:flex;align-items:center;gap:5px;padding:3px 5px;border-radius:3px;
+  display:flex;align-items:center;gap:var(--sp-sm-md);padding:var(--sp-xs-sm) var(--sp-sm-md);border-radius:3px;
   transition:background 0.15s;font-size:0.68em;
 }
 .mini-lb-row:hover{background:rgba(255,255,255,0.03)}
@@ -66,7 +100,7 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 .mini-lb-medal{width:18px;text-align:center;font-size:1.05em;flex-shrink:0}
 .mini-lb-name{flex:1;font-weight:600;color:var(--bright);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:0.92em}
 .mini-lb-score{font-family:'Share Tech Mono',monospace;font-weight:700;color:#fbbf24;min-width:40px;text-align:right;font-size:0.9em}
-.mini-lb-grade{font-family:'Orbitron',monospace;font-size:0.7em;font-weight:700;padding:1px 4px;border-radius:2px;min-width:24px;text-align:center}
+.mini-lb-grade{font-family:'Orbitron',monospace;font-size:0.7em;font-weight:700;padding:var(--sp-3xs) var(--sp-xs);border-radius:2px;min-width:24px;text-align:center}
 
 /* === LAYOUT === */
 .app{display:flex;flex-direction:column;height:100vh}
@@ -93,14 +127,14 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 .title-box .sub{font-size:0.65em;color:var(--dim);letter-spacing:3px}
 .spacer{flex:1}
 .phase-badge{
-  padding:4px 12px;border-radius:12px;font-size:0.78em;font-weight:700;
+  padding:var(--sp-xs) var(--sp-lg);border-radius:12px;font-size:0.78em;font-weight:700;
   letter-spacing:1px;border:1px solid;
   animation:glow 2s ease-in-out infinite;
 }
 @keyframes glow{0%,100%{filter:brightness(1)}50%{filter:brightness(1.3)}}
-.ctrl-btns{display:flex;gap:4px}
+.ctrl-btns{display:flex;gap:var(--sp-xs)}
 .ctrl-btn{
-  padding:4px 10px;font-family:'Rajdhani',sans-serif;font-size:0.7em;font-weight:600;
+  padding:var(--sp-xs) var(--sp-md-lg);font-family:'Rajdhani',sans-serif;font-size:0.7em;font-weight:600;
   background:rgba(15,22,40,0.8);border:1px solid var(--bdr);color:var(--dim);
   border-radius:3px;cursor:pointer;transition:all 0.2s;
 }
@@ -108,7 +142,7 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 .ctrl-btn.warn:hover{border-color:var(--red);color:var(--red)}
 
 /* Speed button states */
-.spd-btn{transition:all 0.2s;gap:2px;display:inline-flex;align-items:center}
+.spd-btn{transition:all 0.2s;gap:var(--sp-2xs);display:inline-flex;align-items:center}
 .spd-btn.spd-2{border-color:var(--cyan);color:var(--cyan);background:rgba(6,214,160,0.08)}
 .spd-btn.spd-4{border-color:var(--yellow);color:var(--yellow);background:rgba(234,179,8,0.1);animation:spdPulse 1s ease-in-out infinite}
 @keyframes spdPulse{0%,100%{box-shadow:none}50%{box-shadow:0 0 8px rgba(234,179,8,0.3)}}
@@ -154,7 +188,7 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 .res-card:hover{border-color:#2a4a6a}
 .res-card.hidden{display:none}
 .res-icon{font-size:1.4em;line-height:1}
-.res-name{font-size:0.88em;color:var(--dim);margin-top:2px}
+.res-name{font-size:0.88em;color:var(--dim);margin-top:var(--sp-2xs)}
 .res-val{font-family:'Orbitron',monospace;font-size:1.1em;font-weight:700;color:var(--bright);
   text-shadow:0 1px 2px rgba(0,0,0,0.6)}
 .res-rate{font-family:'Share Tech Mono',monospace;font-size:0.85em;color:var(--dim)}
@@ -167,14 +201,14 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 .res-card.res-core{
   border-color:rgba(255,255,255,0.08);
   background:rgba(12,22,38,0.9);
-  padding:10px 8px;
+  padding:var(--sp-md-lg) var(--sp-md);
 }
 .res-card.res-core .res-val{
   font-size:1.2em;font-weight:900;letter-spacing:0.5px;
 }
 .res-card.res-core .res-icon{font-size:1.5em}
 .res-card.res-core .res-name{font-size:0.88em;font-weight:600}
-.res-card.res-core .res-rate{font-size:0.8em;margin-top:2px}
+.res-card.res-core .res-rate{font-size:0.8em;margin-top:var(--sp-2xs)}
 /* 各核心资源的独特发光色 */
 .res-card.res-core[data-res="glucose"]{
   border-color:rgba(34,197,94,0.2);
@@ -207,14 +241,21 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
   display:flex;align-items:center;gap:var(--sp-sm);
 }
 
-/* Section collapse/expand */
+/* Section collapse/expand — 统一 max-height 过渡动画 */
 .sec-toggle{
   margin-left:auto;background:none;border:none;color:var(--dim);cursor:pointer;
-  font-size:1.1em;line-height:1;padding:0 2px;transition:transform 0.2s;
+  font-size:1.1em;line-height:1;padding:0 var(--sp-2xs);transition:transform 0.2s;
   font-family:monospace;
 }
 .sec-toggle:hover{color:var(--bright)}
-.section.collapsed .sec-body{display:none}
+.sec-body{
+  overflow:hidden;
+  transition:max-height 0.35s ease,opacity 0.25s ease;
+  opacity:1;
+}
+.section.collapsed .sec-body{
+  max-height:0!important;opacity:0;pointer-events:none;overflow:hidden;
+}
 .section.collapsed .sec-toggle{transform:rotate(-90deg)}
 
 /* Locked sections — hidden until unlocked */
@@ -230,7 +271,7 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 
 /* === 强引导: 建造按钮灰色呼吸高亮 === */
 .action-btn.guide-highlight{
-  border-color:rgba(180,195,215,0.4)!important;
+  border-color:rgba(180,195,215,0.4);
   box-shadow:0 0 6px rgba(180,195,215,0.12),inset 0 0 3px rgba(180,195,215,0.03);
   animation:guideBtnPulse 2.2s ease-in-out infinite;
   position:relative;
@@ -254,19 +295,19 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 .guide-tooltip{
   position:absolute;left:0;right:0;bottom:calc(100% + 6px);
   background:rgba(160,175,195,0.08);border:1px solid rgba(160,175,195,0.18);
-  border-radius:4px;padding:4px 8px;font-size:0.68em;color:rgba(185,200,220,0.75);
+  border-radius:4px;padding:var(--sp-xs) var(--sp-md);font-size:0.68em;color:rgba(185,200,220,0.75);
   font-weight:600;text-align:center;pointer-events:none;
   animation:fadeIn 0.3s;z-index:5;
 }
 
 /* === 引导步骤拆分: 当前步骤 vs 后续步骤 === */
 .guide-step-item{
-  display:flex;align-items:flex-start;gap:6px;padding:3px 4px;border-radius:3px;
+  display:flex;align-items:flex-start;gap:var(--sp-sm);padding:var(--sp-xs-sm) var(--sp-xs);border-radius:3px;
   font-size:0.82em;font-weight:600;transition:all 0.2s;
 }
 .guide-step-item.step-current{
   color:rgba(200,215,235,0.85);background:rgba(160,175,195,0.06);
-  border-left:2px solid rgba(185,200,220,0.4);padding-left:6px;
+  border-left:2px solid rgba(185,200,220,0.4);padding-left:var(--sp-sm);
 }
 .guide-step-item.step-done{color:var(--green);opacity:0.6;text-decoration:line-through}
 .guide-step-item.step-future{color:#3a5070;opacity:0.5;font-size:0.72em}
@@ -317,14 +358,14 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 .action-btn.has-red-dot::before{top:5px;right:5px;width:7px;height:7px}
 
 /* Action Buttons */
-.build-row{display:flex;gap:3px;margin-bottom:3px;align-items:stretch}
+.build-row{display:flex;gap:var(--sp-xs-sm);margin-bottom:var(--sp-xs-sm);align-items:stretch}
 .build-row .action-btn{margin-bottom:0;flex:1;min-width:0}
 .action-btn{
-  width:100%;padding:10px 12px;
+  width:100%;padding:var(--sp-md-lg) var(--sp-lg);
   border:1px solid var(--bdr);border-radius:4px;
   background:linear-gradient(135deg,rgba(8,16,28,0.9),rgba(6,12,22,0.9));
   color:var(--text);cursor:pointer;transition:all 0.2s;text-align:left;
-  display:flex;align-items:center;gap:10px;position:relative;overflow:hidden;
+  display:flex;align-items:center;gap:var(--sp-md-lg);position:relative;overflow:hidden;
 }
 .action-btn:hover:not(.locked){background:rgba(6,214,160,0.04);border-color:#1a4a50;transform:translateX(2px)}
 .action-btn.active{border-color:var(--cyan);background:rgba(6,214,160,0.06);box-shadow:0 0 10px rgba(6,214,160,0.08)}
@@ -337,7 +378,7 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 .act-desc{font-size:0.95em;color:var(--dim)}
 .act-cost{font-size:0.95em;color:var(--yellow);font-weight:600}
 .act-tag{
-  position:absolute;top:3px;right:5px;font-size:0.7em;padding:2px 6px;
+  position:absolute;top:3px;right:5px;font-size:0.7em;padding:var(--sp-2xs) var(--sp-sm);
   border-radius:8px;font-weight:700;letter-spacing:0.5px;
 }
 
@@ -346,8 +387,8 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
   width:36px;flex-shrink:0;border:1px solid #1a3a4a;border-radius:4px;
   background:linear-gradient(180deg,rgba(6,214,160,0.06),rgba(6,214,160,0.02));
   color:var(--cyan);cursor:pointer;transition:all 0.2s;
-  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;
-  padding:2px 0;position:relative;overflow:visible;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:var(--sp-3xs);
+  padding:var(--sp-2xs) 0;position:relative;overflow:visible;
 }
 .build-upgrade-btn:hover{border-color:var(--cyan);background:rgba(6,214,160,0.10);
   box-shadow:0 0 8px rgba(6,214,160,0.12);transform:scale(1.05)}
@@ -361,7 +402,7 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
   position:fixed;z-index:20000;pointer-events:none;
   background:rgba(200,40,40,0.92);color:#fff;
   font-size:0.7em;font-weight:700;font-family:'Rajdhani',sans-serif;
-  padding:4px 10px;border-radius:4px;white-space:nowrap;
+  padding:var(--sp-xs) var(--sp-md-lg);border-radius:4px;white-space:nowrap;
   box-shadow:0 2px 12px rgba(0,0,0,0.4);
   animation:cursorTipIn 0.15s ease-out;
   transform:translate(12px,-100%);
@@ -378,11 +419,11 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 
 /* Belt connect button in build panel */
 .belt-connect-action-btn{
-  width:100%;padding:9px 12px;margin-top:6px;
+  width:100%;padding:var(--sp-md) var(--sp-lg);margin-top:var(--sp-sm);
   border:1px dashed #f9731650;border-radius:5px;
   background:linear-gradient(135deg,rgba(249,115,22,0.06),rgba(6,214,160,0.04));
   color:var(--text);cursor:pointer;transition:all 0.25s;text-align:left;
-  display:flex;align-items:center;gap:10px;position:relative;
+  display:flex;align-items:center;gap:var(--sp-md-lg);position:relative;
 }
 .belt-connect-action-btn:hover{
   border-color:#f97316;border-style:solid;
@@ -404,7 +445,7 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
   font-size:1.3em;width:28px;text-align:center;flex-shrink:0;
   filter:drop-shadow(0 0 4px rgba(249,115,22,0.3));
 }
-.belt-connect-text{display:flex;flex-direction:column;gap:1px}
+.belt-connect-text{display:flex;flex-direction:column;gap:var(--sp-3xs)}
 .belt-connect-name{font-weight:700;font-size:1.0em;color:#f97316}
 .belt-connect-desc{font-size:0.88em;color:var(--dim)}
 /* 有建筑阻塞时传送带按钮变红 */
@@ -431,8 +472,8 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
   box-shadow:0 0 12px rgba(6,214,160,0.15);
 }
 .cell.box-selected{
-  box-shadow:inset 0 0 12px rgba(6,214,160,0.25),0 0 8px rgba(6,214,160,0.15) !important;
-  border-color:rgba(6,214,160,0.6) !important;
+  box-shadow:inset 0 0 12px rgba(6,214,160,0.25),0 0 8px rgba(6,214,160,0.15);
+  border-color:rgba(6,214,160,0.6);
 }
 .cell.box-selected::after{
   content:'';position:absolute;inset:0;
@@ -441,26 +482,44 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 /* Multi-drag ghost */
 .multi-drag-ghost{
   position:fixed;z-index:10010;pointer-events:none;
-  display:flex;gap:2px;align-items:center;
+  display:flex;gap:var(--sp-2xs);align-items:center;
   background:rgba(6,214,160,0.15);border:2px solid rgba(6,214,160,0.5);
-  border-radius:6px;padding:4px 8px;backdrop-filter:blur(4px);
+  border-radius:6px;padding:var(--sp-xs) var(--sp-md);backdrop-filter:blur(4px);
   box-shadow:0 0 16px rgba(6,214,160,0.2);
   font-size:14px;transition:transform 0.1s;transform:scale(1.05);
 }
 .multi-drag-count{
   font-size:0.6em;color:var(--cyan);font-weight:700;
-  font-family:'Share Tech Mono',monospace;margin-left:2px;
+  font-family:'Share Tech Mono',monospace;margin-left:var(--sp-2xs);
+}
+
+/* Build drag ghost — 从侧栏拖拽建造时的浮动指示器 */
+.build-drag-ghost{animation:buildDragIn 0.15s ease-out}
+.build-drag-name{white-space:nowrap}
+@keyframes buildDragIn{0%{opacity:0;transform:scale(0.6)}100%{opacity:1;transform:scale(1.05)}}
+/* 格子在 build drag hover 时的脉冲动画 */
+.cell.build-drag-hover{
+  animation:buildDragHoverPulse 0.8s ease-in-out infinite;
+}
+@keyframes buildDragHoverPulse{
+  0%,100%{box-shadow:inset 0 0 12px rgba(6,214,160,0.3)}
+  50%{box-shadow:inset 0 0 20px rgba(6,214,160,0.5)}
+}
+/* 拖拽建造时 action-btn 的拖拽中样式 */
+.action-btn.build-dragging{
+  opacity:0.5;transform:scale(0.97);
+  border-style:dashed;
 }
 
 /* Belt action row (connect + upgrade inline) */
-.belt-action-row{display:flex;gap:3px;margin-top:6px;align-items:stretch}
+.belt-action-row{display:flex;gap:var(--sp-xs-sm);margin-top:var(--sp-sm);align-items:stretch}
 .belt-action-row .belt-connect-action-btn{margin-top:0;flex:1;min-width:0}
 .belt-upgrade-inline-btn{
   width:38px;flex-shrink:0;border:1px dashed #f9731650;border-radius:5px;
   background:linear-gradient(180deg,rgba(249,115,22,0.06),rgba(249,115,22,0.02));
   color:#f97316;cursor:pointer;transition:all 0.2s;
-  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
-  padding:4px 0;position:relative;overflow:visible;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:var(--sp-2xs);
+  padding:var(--sp-xs) 0;position:relative;overflow:visible;
 }
 .belt-upgrade-inline-btn:hover{border-color:#f97316;border-style:solid;
   background:rgba(249,115,22,0.10);box-shadow:0 0 10px rgba(249,115,22,0.10);
@@ -474,16 +533,16 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 .belt-type-selector{
   position:fixed;z-index:10005;top:50%;left:50%;transform:translate(-50%,-50%) scale(0.9);
   background:linear-gradient(135deg,rgba(6,12,24,0.97),rgba(4,8,18,0.98));
-  border:1px solid #f9731640;border-radius:8px;padding:16px 20px;
+  border:1px solid #f9731640;border-radius:8px;padding:var(--sp-2xl) var(--sp-3xl);
   box-shadow:0 0 40px rgba(249,115,22,0.15),0 4px 20px rgba(0,0,0,0.5);
   text-align:center;max-width:360px;width:90%;max-height:70vh;
   opacity:0;pointer-events:none;transition:all 0.2s ease-out;
 }
 .belt-type-selector.show{opacity:1;pointer-events:auto;transform:translate(-50%,-50%) scale(1)}
-.belt-type-list{display:flex;flex-direction:column;gap:4px;max-height:45vh;overflow-y:auto;
-  padding:2px;scrollbar-width:thin;scrollbar-color:#f97316 transparent}
+.belt-type-list{display:flex;flex-direction:column;gap:var(--sp-xs);max-height:45vh;overflow-y:auto;
+  padding:var(--sp-2xs);scrollbar-width:thin;scrollbar-color:#f97316 transparent}
 .belt-type-item{
-  display:flex;align-items:center;gap:8px;padding:8px 10px;
+  display:flex;align-items:center;gap:var(--sp-md);padding:var(--sp-md) var(--sp-md-lg);
   border:1px solid rgba(249,115,22,0.12);border-radius:5px;
   background:linear-gradient(135deg,rgba(10,18,30,0.85),rgba(8,14,24,0.9));
   cursor:pointer;transition:all 0.2s;text-align:left;
@@ -493,14 +552,14 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 .belt-type-item.maxed{opacity:0.35;cursor:default;pointer-events:none}
 .belt-type-route{font-size:0.75em;color:#8ab0d0;font-weight:600;flex:1;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.belt-type-meta{display:flex;gap:6px;align-items:center;font-size:0.6em;margin-top:2px}
+.belt-type-meta{display:flex;gap:var(--sp-sm);align-items:center;font-size:0.6em;margin-top:var(--sp-2xs)}
 .belt-type-lv{font-family:'Share Tech Mono',monospace;font-weight:700}
 .belt-type-eff{font-family:'Share Tech Mono',monospace}
 .belt-type-count{color:#4a6a8a}
 .belt-type-arrow{font-size:0.8em;color:#f97316;flex-shrink:0;opacity:0.6}
 .belt-type-item.just-upgraded{
   animation:belt-upgrade-flash 0.6s ease-out;
-  border-color:#f97316!important;
+  border-color:#f97316;
 }
 @keyframes belt-upgrade-flash{
   0%{background:rgba(249,115,22,0.3);transform:scale(1.02)}
@@ -508,18 +567,18 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 }
 
 /* Progress bar for research/wonder */
-.prog-wrap{margin-top:4px}
+.prog-wrap{margin-top:var(--sp-xs)}
 .prog-bar{height:3px;background:rgba(255,255,255,0.04);border-radius:2px;overflow:hidden}
 .prog-fill{height:100%;transition:width 0.3s;border-radius:2px}
 
 /* ===== TECH TREE ===== */
-.tech-tree{display:flex;flex-direction:column;align-items:center;gap:0;padding:4px 0}
+.tech-tree{display:flex;flex-direction:column;align-items:center;gap:0;padding:var(--sp-xs) 0}
 
 /* 阶段行 */
 .tt-phase{display:flex;flex-direction:column;align-items:center;width:100%;position:relative}
 .tt-phase-tag{
   font-family:'Orbitron',monospace;font-size:0.55em;color:var(--dim);letter-spacing:1px;
-  margin-bottom:2px;opacity:0.5;
+  margin-bottom:var(--sp-2xs);opacity:0.5;
 }
 
 /* 主干节点 */
@@ -541,8 +600,8 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 
 /* 分支容器 */
 .tt-branches{
-  display:flex;gap:4px;width:100%;max-width:320px;
-  padding-top:14px;position:relative;
+  display:flex;gap:var(--sp-xs);width:100%;max-width:320px;
+  padding-top:var(--sp-xl);position:relative;
 }
 .tt-branches .tt-branch{flex:1;min-width:0;position:relative}
 .tt-branches .tt-branch::before{
@@ -559,7 +618,7 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 
 /* 科技节点 */
 .tt-node{
-  width:100%;padding:7px 9px;
+  width:100%;padding:var(--sp-sm) var(--sp-md);
   border:1px solid var(--bdr);border-radius:4px;
   background:linear-gradient(135deg,rgba(8,16,28,0.9),rgba(6,12,22,0.9));
   color:var(--text);cursor:pointer;transition:all 0.25s;text-align:left;
@@ -592,22 +651,22 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 @keyframes techPulse{0%,100%{box-shadow:0 0 8px rgba(6,214,160,0.08)}50%{box-shadow:0 0 16px rgba(6,214,160,0.2)}}
 
 /* 节点内容 */
-.tt-name{font-weight:700;font-size:0.88em;line-height:1.2;display:flex;align-items:center;gap:4px}
+.tt-name{font-weight:700;font-size:0.88em;line-height:1.2;display:flex;align-items:center;gap:var(--sp-xs)}
 .tt-name .done-mark{color:var(--green);font-size:0.9em}
-.tt-desc{font-size:0.75em;color:var(--dim);margin-top:1px;line-height:1.2}
-.tt-cost{font-size:0.75em;color:var(--yellow);font-weight:600;margin-top:2px}
+.tt-desc{font-size:0.75em;color:var(--dim);margin-top:var(--sp-3xs);line-height:1.2}
+.tt-cost{font-size:0.75em;color:var(--yellow);font-weight:600;margin-top:var(--sp-2xs)}
 .tt-cost .status-done{color:var(--green)}
 .tt-cost .status-locked{color:#ef4444}
 .tt-exclusive-tag{
   display:inline-block;font-size:0.6em;color:#eab308;
   border:1px solid #eab30840;background:#eab30810;
-  padding:0 3px;border-radius:2px;vertical-align:middle;margin-left:3px;
+  padding:0 var(--sp-xs-sm);border-radius:2px;vertical-align:middle;margin-left:var(--sp-xs-sm);
 }
 /* 分支 vs 字样 */
 .tt-vs{
   position:absolute;top:10px;left:50%;transform:translateX(-50%);
   font-size:0.55em;color:#eab308;font-weight:700;
-  background:var(--panel);padding:0 4px;z-index:2;
+  background:var(--panel);padding:0 var(--sp-xs);z-index:2;
   letter-spacing:1px;opacity:0.7;
 }
 
@@ -629,7 +688,7 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
   flex:1;display:flex;flex-direction:column;position:relative;overflow:hidden;
   /* 荧光绿渐变外边框 — 核心操作区视觉聚焦 */
   border:2px solid rgba(6,214,160,0.35);
-  border-radius:6px;margin:2px;
+  border-radius:6px;margin:var(--sp-2xs);
   box-shadow:0 0 18px rgba(6,214,160,0.08),inset 0 0 30px rgba(6,214,160,0.03);
   animation:dishBorderGlow 4s ease-in-out infinite;
 }
@@ -639,11 +698,11 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 }
 .dish-header{
   display:flex;justify-content:space-between;align-items:center;
-  padding:6px 12px;border-bottom:1px solid var(--bdr);
+  padding:var(--sp-sm) var(--sp-lg);border-bottom:1px solid var(--bdr);
   background:rgba(5,10,18,0.95);flex-shrink:0;
 }
 .dish-name{font-family:'Orbitron',monospace;font-size:0.95em;color:var(--dim);letter-spacing:2px}
-.dish-env{display:flex;gap:8px;font-size:0.85em}
+.dish-env{display:flex;gap:var(--sp-md);font-size:0.85em}
 .dish-env span{color:var(--dim)}
 .dish-env .val{font-family:'Orbitron',monospace;color:var(--color-info)}
 .dish-view{flex:1;position:relative;overflow:auto;min-height:0;scrollbar-width:thin;scrollbar-color:rgba(6,214,160,0.35) transparent}
@@ -656,7 +715,7 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 #bgCanvas,#partCanvas{position:absolute;top:0;left:0;width:100%;pointer-events:none}
 #bgCanvas{z-index:0}#partCanvas{z-index:5}
 .grid{
-  position:relative;display:grid;gap:16px;padding:16px 24px;z-index:2;
+  position:relative;display:grid;gap:var(--sp-2xl);padding:var(--sp-2xl) var(--sp-4xl);z-index:2;
   justify-content:center;align-content:start;touch-action:manipulation;
   width:fit-content;min-width:100%;
 }
@@ -672,8 +731,8 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 .cell.occupied:hover{border-width:2px}
 /* 选中格子 — 橙色高亮边框 + 轻微缩放 */
 .cell.cell-selected{
-  border-color:var(--orange)!important;border-width:2px!important;
-  box-shadow:0 0 12px rgba(249,115,22,0.35),inset 0 0 8px rgba(249,115,22,0.1)!important;
+  border-color:var(--orange);border-width:2px;
+  box-shadow:0 0 12px rgba(249,115,22,0.35),inset 0 0 8px rgba(249,115,22,0.1);
   transform:scale(1.04);
   z-index:6;
   animation:cellSelectPulse 1.5s ease-in-out infinite;
@@ -685,11 +744,11 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 
 /* 资源阻塞状态 — 红色边框脉冲 + 半透明遮罩 */
 .cell.cell-blocked{
-  border-color:rgba(239,68,68,0.7)!important;
+  border-color:rgba(239,68,68,0.7);
   animation:cellBlockedPulse 2s ease-in-out infinite;
 }
 .cell.cell-blocked .cell-emoji{animation:none;opacity:0.45}
-.cell.cell-blocked .work-dot{background:#ef4444!important;box-shadow:0 0 4px #ef4444!important}
+.cell.cell-blocked .work-dot{background:#ef4444;box-shadow:0 0 4px #ef4444}
 .cell.cell-blocked .aura{display:none}
 .cell-blocked-overlay{
   position:absolute;inset:0;z-index:9;pointer-events:none;
@@ -704,7 +763,7 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
   position:absolute;top:0;left:0;right:0;z-index:10;pointer-events:none;
   text-align:center;font-size:0.48em;font-weight:800;
   color:#fca5a5;background:rgba(127,29,29,0.75);
-  padding:1px 0;letter-spacing:0.5px;
+  padding:var(--sp-3xs) 0;letter-spacing:0.5px;
   border-radius:3px 3px 0 0;
   text-shadow:0 1px 2px rgba(0,0,0,0.8);
 }
@@ -734,7 +793,7 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
   position:absolute;bottom:0;left:0;right:0;z-index:10;pointer-events:none;
   text-align:center;font-size:0.42em;font-weight:800;
   color:#06d6a0;background:rgba(6,78,59,0.75);
-  padding:1px 0;letter-spacing:0.3px;
+  padding:var(--sp-3xs) 0;letter-spacing:0.3px;
   border-radius:0 0 3px 3px;
   text-shadow:0 0 4px rgba(6,214,160,0.5);
   animation:adjGlow 2.5s ease-in-out infinite;
@@ -768,7 +827,7 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 .cell-tier{
   position:absolute;top:1px;left:1px;z-index:6;
   font-family:'Orbitron',monospace;font-size:0.5em;font-weight:900;
-  padding:1px 3px;border-radius:2px;letter-spacing:0.5px;
+  padding:var(--sp-3xs) var(--sp-xs-sm);border-radius:2px;letter-spacing:0.5px;
   background:rgba(0,0,0,0.6);border:1px solid;
 }
 .cell-tier.tier-1{color:#22c55e;border-color:#22c55e40}
@@ -785,7 +844,7 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
   font-size:0.6em;font-weight:700;color:rgba(200,215,230,0.85);
   pointer-events:none;z-index:6;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
   text-shadow:0 1px 3px rgba(0,0,0,0.8);
-  padding:0 1px;
+  padding:0 var(--sp-3xs);
 }
 
 /* 产出速率已移至hover tooltip，不再显示叠加标签 */
@@ -796,7 +855,7 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 /* 输入输出端口指示器 */
 .cell-ports{
   position:absolute;z-index:7;pointer-events:none;
-  display:flex;flex-direction:column;gap:1px;
+  display:flex;flex-direction:column;gap:var(--sp-3xs);
 }
 .cell-ports.in{left:-1px;top:50%;transform:translateY(-50%)}
 .cell-ports.out{right:-1px;top:50%;transform:translateY(-50%)}
@@ -841,7 +900,7 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 
 /* === RIGHT: STATUS + GUIDE === */
 .right-panel{
-  width:280px;flex-shrink:0;overflow-y:auto;padding:12px;
+  width:280px;flex-shrink:0;overflow-y:auto;padding:var(--sp-lg);
   background:var(--panel);border-left:1px solid var(--bdr);
   scrollbar-width:thin;scrollbar-color:#1a3050 transparent;
   font-size:1.05em;
@@ -852,22 +911,22 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 /* Status Card */
 .stat-card{
   background:rgba(10,18,30,0.8);border:1px solid var(--bdr);
-  border-radius:4px;padding:8px;margin-bottom:8px;
+  border-radius:4px;padding:var(--sp-md);margin-bottom:var(--sp-md);
 }
-.stat-row{display:flex;justify-content:space-between;font-size:0.82em;padding:2px 0;border-bottom:1px solid rgba(255,255,255,0.02)}
+.stat-row{display:flex;justify-content:space-between;font-size:0.82em;padding:var(--sp-2xs) 0;border-bottom:1px solid rgba(255,255,255,0.02)}
 .stat-label{color:var(--dim)}
 .stat-value{color:var(--color-info);font-weight:600;font-family:'Share Tech Mono',monospace}
 
 /* Guide / Next Goal */
 .guide-box{
   background:linear-gradient(135deg,rgba(160,175,195,0.03),rgba(160,175,195,0.01));
-  border:1px solid rgba(160,175,195,0.15);border-radius:6px;padding:10px;margin-bottom:8px;
+  border:1px solid rgba(160,175,195,0.15);border-radius:6px;padding:var(--sp-md-lg);margin-bottom:var(--sp-md);
   position:relative;
 }
-.guide-title{font-family:'Orbitron',monospace;font-size:0.82em;color:rgba(185,200,220,0.75);letter-spacing:1px;margin-bottom:4px}
+.guide-title{font-family:'Orbitron',monospace;font-size:0.82em;color:rgba(185,200,220,0.75);letter-spacing:1px;margin-bottom:var(--sp-xs)}
 .guide-text{font-size:0.88em;color:#8ab0d0;line-height:1.4}
 .guide-step{
-  display:flex;align-items:center;gap:6px;padding:4px 0;font-size:0.82em;
+  display:flex;align-items:center;gap:var(--sp-sm);padding:var(--sp-xs) 0;font-size:0.82em;
   border-bottom:1px solid rgba(160,175,195,0.06);
 }
 .guide-step.done{color:var(--green);text-decoration:line-through;opacity:0.5}
@@ -885,7 +944,7 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 /* Evolution */
 .evo-box{
   background:rgba(20,10,35,0.4);border:1px solid #2a1a4a;
-  border-radius:6px;padding:10px;margin-bottom:8px;
+  border-radius:6px;padding:var(--sp-md-lg);margin-bottom:var(--sp-md);
   position:relative;overflow:hidden;transition:border-color 0.4s,box-shadow 0.4s;
 }
 /* 可进化时闪光特效 */
@@ -915,12 +974,12 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
   0%,100%{text-shadow:0 0 4px rgba(168,85,247,0.3)}
   50%{text-shadow:0 0 12px rgba(168,85,247,0.7),0 0 20px rgba(168,85,247,0.3)}
 }
-.evo-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
+.evo-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--sp-xs)}
 .evo-lv{font-family:'Orbitron',monospace;font-size:0.8em;font-weight:700;color:var(--purple)}
-.evo-bar-wrap{width:100%;height:10px;background:rgba(255,255,255,0.03);border-radius:3px;overflow:hidden;border:1px solid #2a1a4a;margin:4px 0}
+.evo-bar-wrap{width:100%;height:10px;background:rgba(255,255,255,0.03);border-radius:3px;overflow:hidden;border:1px solid #2a1a4a;margin:var(--sp-xs) 0}
 .evo-bar{height:100%;background:linear-gradient(90deg,#5020a0,#c040a0);transition:width 0.5s;display:flex;align-items:center;justify-content:center;font-size:0.45em;font-weight:700;color:#fff;font-family:'Orbitron',monospace}
 .evo-btn{
-  width:100%;padding:6px;margin-top:4px;border:1px solid #4a1a6a;border-radius:3px;
+  width:100%;padding:var(--sp-sm);margin-top:var(--sp-xs);border:1px solid #4a1a6a;border-radius:3px;
   background:linear-gradient(135deg,rgba(80,20,120,0.15),rgba(40,10,60,0.15));
   color:#8060a0;cursor:pointer;font-family:'Rajdhani',sans-serif;font-weight:700;
   font-size:0.7em;letter-spacing:1px;transition:all 0.2s;
@@ -930,13 +989,13 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 .evo-btn:disabled{opacity:0.2;cursor:not-allowed}
 /* 可进化时按钮也有高亮 — 紫色主题 */
 .evo-box.can-evolve .evo-btn:not(:disabled){
-  border-color:#8040c0!important;color:#d0a0f0!important;
-  background:linear-gradient(135deg,rgba(120,40,180,0.25),rgba(60,15,90,0.25))!important;
+  border-color:#8040c0;color:#d0a0f0;
+  background:linear-gradient(135deg,rgba(120,40,180,0.25),rgba(60,15,90,0.25));
   animation:evoBtnPulse 1.5s ease-in-out infinite;
 }
 .evo-box.can-evolve .evo-btn:hover:not(:disabled){
-  background:linear-gradient(135deg,rgba(140,50,200,0.35),rgba(80,20,120,0.3))!important;
-  box-shadow:0 0 20px rgba(168,85,247,0.35),0 0 40px rgba(168,85,247,0.12)!important;
+  background:linear-gradient(135deg,rgba(140,50,200,0.35),rgba(80,20,120,0.3));
+  box-shadow:0 0 20px rgba(168,85,247,0.35),0 0 40px rgba(168,85,247,0.12);
   transform:scale(1.03);
 }
 @keyframes evoBtnPulse{
@@ -948,37 +1007,37 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 .wonder-overlay{
   position:fixed;bottom:16px;left:50%;transform:translateX(-50%);z-index:1000;
   background:rgba(10,15,25,0.95);border:1px solid var(--purple);border-radius:8px;
-  padding:10px 20px;display:none;text-align:center;min-width:260px;
+  padding:var(--sp-md-lg) var(--sp-3xl);display:none;text-align:center;min-width:260px;
   box-shadow:0 0 25px rgba(168,85,247,0.15);
 }
 .wonder-overlay.show{display:block}
-.wonder-name{font-family:'Orbitron',monospace;font-size:0.75em;color:var(--purple);margin-bottom:4px}
-.wonder-bar{width:100%;height:6px;background:rgba(255,255,255,0.04);border-radius:3px;overflow:hidden;margin:4px 0}
+.wonder-name{font-family:'Orbitron',monospace;font-size:0.75em;color:var(--purple);margin-bottom:var(--sp-xs)}
+.wonder-bar{width:100%;height:6px;background:rgba(255,255,255,0.04);border-radius:3px;overflow:hidden;margin:var(--sp-xs) 0}
 .wonder-fill{height:100%;background:linear-gradient(90deg,var(--purple),var(--pink));transition:width 0.5s}
 .wonder-pct{font-family:'Orbitron',monospace;font-size:0.65em;color:#8a6aaa}
 
 /* Log */
 .log-box{
   background:rgba(3,6,12,0.8);border:1px solid #0e1828;border-radius:3px;
-  padding:4px;height:80px;overflow-y:auto;font-size:0.82em;font-family:'Share Tech Mono',monospace;
+  padding:var(--sp-xs);height:80px;overflow-y:auto;font-size:0.82em;font-family:'Share Tech Mono',monospace;
 }
 .log-box::-webkit-scrollbar{width:2px}.log-box::-webkit-scrollbar-thumb{background:#1a2a40}
-.log-msg{padding:1px 0;border-bottom:1px solid rgba(255,255,255,0.015);color:#5a7a9a}
+.log-msg{padding:var(--sp-3xs) 0;border-bottom:1px solid rgba(255,255,255,0.015);color:#5a7a9a}
 .log-msg.s{color:#2aaa6a}.log-msg.w{color:#baa030}.log-msg.e{color:#d04040}.log-msg.ev{color:var(--cyan)}
 
 /* Event Popup */
 .event-popup{
   position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:10000;
   background:rgba(10,15,25,0.97);border:1px solid var(--cyan);border-radius:8px;
-  padding:20px 28px;max-width:360px;text-align:center;
+  padding:var(--sp-3xl) var(--sp-5xl);max-width:360px;text-align:center;
   box-shadow:0 0 40px rgba(6,214,160,0.15);display:none;
 }
 .event-popup.show{display:block;animation:popIn .3s ease-out}
 @keyframes popIn{0%{opacity:0;transform:translate(-50%,-50%) scale(0.9)}100%{opacity:1;transform:translate(-50%,-50%) scale(1)}}
-.event-popup h3{font-family:'Orbitron',monospace;font-size:0.9em;margin-bottom:6px}
-.event-popup p{font-size:0.8em;color:#8aa0c0;margin-bottom:12px;line-height:1.3}
+.event-popup h3{font-family:'Orbitron',monospace;font-size:0.9em;margin-bottom:var(--sp-sm)}
+.event-popup p{font-size:0.8em;color:#8aa0c0;margin-bottom:var(--sp-lg);line-height:1.3}
 .event-popup button{
-  padding:6px 20px;background:rgba(6,214,160,0.12);border:1px solid var(--cyan);
+  padding:var(--sp-sm) var(--sp-3xl);background:rgba(6,214,160,0.12);border:1px solid var(--cyan);
   color:var(--cyan);border-radius:4px;cursor:pointer;font-family:'Rajdhani',sans-serif;
   font-weight:700;font-size:0.8em;transition:all 0.2s;
 }
@@ -988,24 +1047,24 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 .milestone{
   position:fixed;top:20px;left:50%;transform:translateX(-50%);z-index:9999;
   background:rgba(10,15,25,0.95);border:1px solid var(--cyan);border-radius:6px;
-  padding:10px 24px;text-align:center;display:none;
+  padding:var(--sp-md-lg) var(--sp-4xl);text-align:center;display:none;
   box-shadow:0 0 30px rgba(6,214,160,0.2);
 }
 .milestone.show{display:block;animation:slideDown 0.4s ease-out}
 @keyframes slideDown{0%{opacity:0;transform:translate(-50%,-20px)}100%{opacity:1;transform:translate(-50%,0)}}
-.milestone .icon{font-size:1.5em;margin-bottom:2px}
+.milestone .icon{font-size:1.5em;margin-bottom:var(--sp-2xs)}
 .milestone .text{font-family:'Orbitron',monospace;font-size:0.7em;color:var(--cyan);letter-spacing:1px}
 
 /* Tooltip */
 .tooltip{
   position:fixed;z-index:9000;background:rgba(8,14,28,0.97);border:1px solid var(--bdr);
-  border-radius:6px;padding:10px 14px;max-width:290px;pointer-events:none;
+  border-radius:6px;padding:var(--sp-md-lg) var(--sp-xl);max-width:290px;pointer-events:none;
   font-size:0.7em;color:var(--text);box-shadow:0 4px 20px rgba(0,0,0,0.5);
   display:none;backdrop-filter:blur(4px);
 }
 .tooltip.show{display:block;animation:ttIn .15s ease-out}
 @keyframes ttIn{0%{opacity:0;transform:translateY(4px)}100%{opacity:1;transform:translateY(0)}}
-.tooltip .tt-name{font-weight:700;color:var(--bright);margin-bottom:3px;font-size:1.05em}
+.tooltip .tt-name{font-weight:700;color:var(--bright);margin-bottom:var(--sp-xs-sm);font-size:1.05em}
 .tooltip .tt-desc{color:#8aa0c0;font-size:0.9em;line-height:1.4}
 
 /* Cell backgrounds — 高对比主题色 */
@@ -1030,11 +1089,11 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 
 /* ===== CORE COLONY BAR — 帝国核心展示区 ===== */
 .core-colony-bar{
-  display:flex;align-items:center;gap:14px;flex-wrap:wrap;
-  padding:12px 18px;position:relative;overflow:hidden;flex-shrink:0;
+  display:flex;align-items:center;gap:var(--sp-xl);flex-wrap:wrap;
+  padding:var(--sp-lg) var(--sp-xl-2xl);position:relative;overflow:hidden;flex-shrink:0;
   border:2px solid var(--bdr);
   border-radius:6px;
-  margin:6px 8px 2px;
+  margin:var(--sp-sm) var(--sp-md) var(--sp-2xs);
   background:rgba(5,10,18,0.97);
   transition:background .4s,border-color .4s,box-shadow .4s;
 }
@@ -1121,7 +1180,7 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 /* 供能状态文字标签 */
 .core-supply-status-tag{
   font-family:'Orbitron',monospace;font-size:0.78em;font-weight:700;
-  padding:3px 10px;border-radius:3px;letter-spacing:1px;
+  padding:var(--sp-xs-sm) var(--sp-md-lg);border-radius:3px;letter-spacing:1px;
   white-space:nowrap;
   transition:all .3s;
 }
@@ -1187,10 +1246,10 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
   0%,100%{opacity:1}50%{opacity:0.4}
 }
 .core-colony-info{flex:1;min-width:0}
-.core-colony-label{display:flex;align-items:center;gap:8px}
+.core-colony-label{display:flex;align-items:center;gap:var(--sp-md)}
 .core-phase-tag{
   font-family:'Orbitron',monospace;font-size:0.78em;font-weight:900;
-  padding:3px 10px;border-radius:4px;letter-spacing:1.5px;
+  padding:var(--sp-xs-sm) var(--sp-md-lg);border-radius:4px;letter-spacing:1.5px;
   background:rgba(0,0,0,0.5);border:1px solid;
   transition:color .6s,border-color .6s;
 }
@@ -1199,13 +1258,13 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
   letter-spacing:1.5px;transition:color .6s;
 }
 .core-colony-desc{
-  font-size:0.82em;color:#7a9aba;margin-top:3px;
+  font-size:0.82em;color:#7a9aba;margin-top:var(--sp-xs-sm);
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
   transition:color .4s;
 }
 /* 核心供给状态 — 右侧醒目显示 */
 .core-colony-supply{
-  display:flex;flex-direction:column;align-items:flex-end;gap:3px;
+  display:flex;flex-direction:column;align-items:flex-end;gap:var(--sp-xs-sm);
   flex-shrink:0;
 }
 .core-supply-label{
@@ -1230,21 +1289,21 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 }
 /* ====== 帝国核心升级面板 ====== */
 .core-upgrade-panel{
-  width:100%;padding:10px 14px;margin-top:6px;
+  width:100%;padding:var(--sp-md-lg) var(--sp-xl);margin-top:var(--sp-sm);
   background:rgba(8,14,28,0.6);border:1px solid var(--bdr);border-radius:4px;
   grid-column:1/-1;
 }
 .core-upgrade-title{
   font-family:'Orbitron',monospace;font-size:0.78em;font-weight:700;
-  color:var(--dim);letter-spacing:1px;margin-bottom:6px;
+  color:var(--dim);letter-spacing:1px;margin-bottom:var(--sp-sm);
 }
 .core-upgrade-reqs{
-  display:flex;flex-wrap:wrap;gap:5px 10px;margin-bottom:8px;
+  display:flex;flex-wrap:wrap;gap:var(--sp-sm-md) var(--sp-md-lg);margin-bottom:var(--sp-md);
 }
 .core-req-item{
-  display:inline-flex;align-items:center;gap:4px;
+  display:inline-flex;align-items:center;gap:var(--sp-xs);
   font-size:0.75em;font-weight:600;
-  padding:3px 10px;border-radius:10px;
+  padding:var(--sp-xs-sm) var(--sp-md-lg);border-radius:10px;
   background:rgba(255,255,255,0.03);white-space:nowrap;
 }
 .core-req-item.met{color:var(--green)}
@@ -1252,7 +1311,7 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 .core-req-item.unmet{color:var(--orange)}
 .core-req-item.unmet::before{content:'✗';font-weight:900;font-size:0.9em;color:var(--red)}
 .core-upgrade-btn{
-  width:100%;padding:6px 12px;border-radius:3px;
+  width:100%;padding:var(--sp-sm) var(--sp-lg);border-radius:3px;
   font-family:'Rajdhani',sans-serif;font-weight:700;font-size:0.82em;
   letter-spacing:1px;cursor:pointer;transition:all 0.3s;
   border:1px solid;position:relative;overflow:visible;
@@ -1282,11 +1341,11 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 .empire-overview{
   background:linear-gradient(135deg,rgba(10,16,30,0.85),rgba(8,14,26,0.9));
   border:1px solid rgba(6,214,160,0.15);border-radius:6px;
-  margin:6px 8px 4px;padding:0;overflow:hidden;
+  margin:var(--sp-sm) var(--sp-md) var(--sp-xs);padding:0;overflow:hidden;
   transition:all 0.3s ease;flex-shrink:1;max-height:38vh;
 }
 .empire-overview-header{
-  display:flex;align-items:center;gap:6px;padding:5px 10px;
+  display:flex;align-items:center;gap:var(--sp-sm);padding:var(--sp-sm-md) var(--sp-md-lg);
   cursor:pointer;user-select:none;
   border-bottom:1px solid rgba(6,214,160,0.08);
 }
@@ -1298,7 +1357,7 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 }
 .colony-status-toggle{
   margin-left:auto;background:none;border:none;color:rgba(160,180,210,0.4);
-  cursor:pointer;font-size:0.9em;line-height:1;padding:0 2px;
+  cursor:pointer;font-size:0.9em;line-height:1;padding:0 var(--sp-2xs);
   transition:transform 0.2s;font-family:monospace;
 }
 .empire-overview .empire-overview-body{
@@ -1318,31 +1377,31 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 .empire-overview.collapsed .colony-status-toggle{transform:rotate(-90deg)}
 /* 两栏body */
 .empire-overview-body{
-  display:flex;flex-direction:row;gap:0;padding:6px 10px 8px;
+  display:flex;flex-direction:row;gap:0;padding:var(--sp-sm) var(--sp-md-lg) var(--sp-md);
 }
-.empire-col{flex:1;min-width:0;padding:0 6px}
+.empire-col{flex:1;min-width:0;padding:0 var(--sp-sm)}
 .empire-col-left{border-right:1px solid rgba(6,214,160,0.08)}
 .empire-col-right{}
 /* fieldset 虚线框分区 */
 .empire-fieldset{
   border:1px dashed rgba(6,214,160,0.12);border-radius:4px;
-  padding:6px 8px 8px;margin:0 0 6px;
+  padding:var(--sp-sm) var(--sp-md) var(--sp-md);margin:0 0 var(--sp-sm);
 }
 .empire-fieldset:last-child{margin-bottom:0}
 .empire-fieldset legend{
   font-family:'Orbitron',monospace;font-size:0.62em;color:rgba(6,214,160,0.45);
-  letter-spacing:1.5px;text-transform:uppercase;padding:0 6px;
-  margin-left:4px;
+  letter-spacing:1.5px;text-transform:uppercase;padding:0 var(--sp-sm);
+  margin-left:var(--sp-xs);
 }
 /* 核心栏在fieldset内部 — 减少外边距/内边距，保留底部装饰线 */
 .empire-fieldset .core-colony-bar{
   border:none;border-bottom:2px solid var(--bdr);
-  margin:0;padding:6px 4px 8px;border-radius:0;
+  margin:0;padding:var(--sp-sm) var(--sp-xs) var(--sp-md);border-radius:0;
   background:none;
 }
 /* 分工面板在fieldset内部 — 去掉原padding/border */
 .empire-fieldset .csb-alloc-group{
-  border-bottom:none;padding:2px 0;
+  border-bottom:none;padding:var(--sp-2xs) 0;
 }
 /* 零值状态灰色样式 */
 .alloc-disabled .ch-ctrl button{
@@ -1366,39 +1425,39 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 }
 /* 排行榜锁定提示 */
 .empire-lb-locked{
-  padding:4px 0;
+  padding:var(--sp-xs) 0;
 }
 .empire-lb-locked.hidden{display:none}
 /* 基础数据行 */
 .csb-group{
-  display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;padding:5px 0;
+  display:flex;flex-wrap:wrap;align-items:center;gap:var(--sp-md) var(--sp-xl);padding:var(--sp-sm-md) 0;
   border-bottom:1px solid rgba(6,214,160,0.06);
 }
 .csb-group:last-child{border-bottom:none}
 .csb-group .stat-item{
-  display:flex;align-items:center;gap:5px;font-size:0.82em;
+  display:flex;align-items:center;gap:var(--sp-sm-md);font-size:0.82em;
 }
 .csb-group .stat-item .s-label{color:var(--dim);font-size:1em}
 .csb-group .stat-item .s-val{color:var(--text);font-family:'Share Tech Mono',monospace;font-weight:600}
 /* 菌群分工区块 */
 .csb-alloc-group{
-  display:flex;flex-direction:column;gap:6px;padding:8px 0;
+  display:flex;flex-direction:column;gap:var(--sp-sm);padding:var(--sp-md) 0;
   border-bottom:1px solid rgba(6,214,160,0.06);
 }
-.csb-alloc-header{display:flex;align-items:center;gap:8px}
+.csb-alloc-header{display:flex;align-items:center;gap:var(--sp-md)}
 .csb-alloc-group .alloc-title{
   font-size:0.78em;color:var(--green);font-weight:700;letter-spacing:0.5px;
 }
-.csb-alloc-group .alloc-presets{display:flex;gap:4px;margin-left:4px}
+.csb-alloc-group .alloc-presets{display:flex;gap:var(--sp-xs);margin-left:var(--sp-xs)}
 .csb-alloc-group .alloc-presets button{
-  font-size:0.7em;padding:2px 8px;border-radius:4px;
+  font-size:0.7em;padding:var(--sp-2xs) var(--sp-md);border-radius:4px;
   border:1px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.05);
   color:var(--dim);cursor:pointer;line-height:1.4;transition:all .15s;
 }
 .csb-alloc-group .alloc-presets button:hover{background:rgba(255,255,255,0.1);color:var(--text)}
-.csb-alloc-channels{display:flex;flex-direction:column;gap:5px}
+.csb-alloc-channels{display:flex;flex-direction:column;gap:var(--sp-sm-md)}
 .csb-alloc-channel{
-  display:flex;align-items:center;gap:8px;
+  display:flex;align-items:center;gap:var(--sp-md);
 }
 .csb-alloc-channel .ch-label{font-size:0.85em}
 .csb-alloc-channel .ch-bar{
@@ -1410,7 +1469,7 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 .csb-alloc-channel .ch-bar-fill{
   height:100%;border-radius:3px;transition:width .3s;position:relative;z-index:1;
 }
-.csb-alloc-channel .ch-ctrl{display:flex;align-items:center;gap:3px}
+.csb-alloc-channel .ch-ctrl{display:flex;align-items:center;gap:var(--sp-xs-sm)}
 .csb-alloc-channel .ch-ctrl button{
   width:20px;height:20px;font-size:0.72em;border-radius:3px;
   border:1px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.05);
@@ -1424,38 +1483,38 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 .csb-alloc-channel .ch-info{font-size:0.72em;color:var(--dim)}
 /* 成就/分数行 */
 .csb-score-group{
-  display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;padding:5px 0;
+  display:flex;flex-wrap:wrap;align-items:center;gap:var(--sp-md) var(--sp-xl);padding:var(--sp-sm-md) 0;
   border-bottom:1px solid rgba(6,214,160,0.06);
 }
-.csb-score-item{display:flex;align-items:center;gap:4px;font-size:0.78em}
+.csb-score-item{display:flex;align-items:center;gap:var(--sp-xs);font-size:0.78em}
 .csb-score-item .s-label{color:var(--dim)}
 .csb-score-item .s-val{font-family:'Share Tech Mono',monospace;font-weight:600}
 
 /* === 荣誉区域增强样式 === */
 .honor-fieldset{
-  border-color:rgba(251,191,36,0.15)!important;
+  border-color:rgba(251,191,36,0.15);
   background:rgba(251,191,36,0.02);
 }
 .honor-fieldset legend{
-  color:rgba(251,191,36,0.55)!important;font-size:0.68em!important;letter-spacing:2px!important;
+  color:rgba(251,191,36,0.55);font-size:0.68em;letter-spacing:2px;
 }
 .honor-group{
-  gap:4px 0!important;flex-direction:column!important;padding:4px 0!important;
+  gap:var(--sp-xs) 0;flex-direction:column;padding:var(--sp-xs) 0;
 }
 .honor-group .csb-score-item{
-  display:grid!important;grid-template-columns:auto 1fr auto;align-items:center;
-  font-size:0.88em!important;padding:4px 8px;border-radius:4px;
-  width:100%;transition:background 0.2s;gap:8px;
+  display:grid;grid-template-columns:auto 1fr auto;align-items:center;
+  font-size:0.88em;padding:var(--sp-xs) var(--sp-md);border-radius:4px;
+  width:100%;transition:background 0.2s;gap:var(--sp-md);
 }
 .honor-group .csb-score-item .s-label{font-size:0.88em;font-weight:600;white-space:nowrap}
 .honor-group .csb-score-item .s-val{font-size:0.92em;font-weight:700}
 /* 成就行 — 可点击 */
 .honor-achv-btn{
-  cursor:pointer!important;
+  cursor:pointer;
   background:rgba(251,191,36,0.04);border:1px solid rgba(251,191,36,0.1);
 }
 .honor-achv-btn:hover{
-  background:rgba(251,191,36,0.1)!important;
+  background:rgba(251,191,36,0.1);
   border-color:rgba(251,191,36,0.25);
 }
 .honor-achv-arrow{
@@ -1467,8 +1526,8 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 }
 /* 昵称行 — 可点击改名 */
 .honor-name-row{background:rgba(6,214,160,0.02);border:1px solid rgba(6,214,160,0.06)}
-.honor-name-row:hover{background:rgba(6,214,160,0.08)!important;border-color:rgba(6,214,160,0.2)}
-.honor-name-row:hover .honor-name-edit{opacity:1!important;color:var(--cyan)!important}
+.honor-name-row:hover{background:rgba(6,214,160,0.08);border-color:rgba(6,214,160,0.2)}
+.honor-name-row:hover .honor-name-edit{opacity:1;color:var(--cyan)}
 /* 总分行 */
 .honor-score-row{
   background:rgba(251,191,36,0.03);border:1px solid rgba(251,191,36,0.08);
@@ -1477,7 +1536,7 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 /* 评级徽章 */
 .honor-rank-badge{
   font-family:'Orbitron',monospace;font-size:0.72em;font-weight:900;
-  padding:2px 7px;border-radius:4px;letter-spacing:1.5px;
+  padding:var(--sp-2xs) var(--sp-sm);border-radius:4px;letter-spacing:1.5px;
   background:rgba(251,191,36,0.12);border:1px solid rgba(251,191,36,0.25);
   color:#fbbf24;justify-self:end;
   transition:all 0.3s;
@@ -1491,11 +1550,11 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 }
 /* 排行榜区块 */
 .csb-lb-group{
-  display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:5px 0;
+  display:flex;flex-wrap:wrap;align-items:center;gap:var(--sp-md);padding:var(--sp-sm-md) 0;
   border-bottom:1px solid rgba(6,214,160,0.06);
 }
 .csb-lb-group .mini-lb-entry{font-size:0.78em}
-.csb-lb-group .lb-btn{font-size:0.72em;padding:3px 10px}
+.csb-lb-group .lb-btn{font-size:0.72em;padding:var(--sp-xs-sm) var(--sp-md-lg)}
 
 /* 阶段主题色 — 通过 data-phase 属性切换 */
 .core-colony-bar[data-phase="1"]{
@@ -1563,33 +1622,33 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
   text-shadow:0 1px 3px rgba(0,0,0,0.5);
 }
 .evo-btn:not(:disabled){
-  background:linear-gradient(135deg,rgba(249,115,22,0.2),rgba(200,80,10,0.15))!important;
-  border-color:var(--orange)!important;color:#fff!important;
+  background:linear-gradient(135deg,rgba(249,115,22,0.2),rgba(200,80,10,0.15));
+  border-color:var(--orange);color:#fff;
   font-weight:800;letter-spacing:1.5px;
   transition:all 0.25s cubic-bezier(.4,0,.2,1);
 }
 .evo-btn:hover:not(:disabled){
   transform:scale(1.03);
-  box-shadow:0 0 20px rgba(249,115,22,0.35),0 0 40px rgba(249,115,22,0.12)!important;
-  background:linear-gradient(135deg,rgba(249,115,22,0.35),rgba(200,80,10,0.25))!important;
+  box-shadow:0 0 20px rgba(249,115,22,0.35),0 0 40px rgba(249,115,22,0.12);
+  background:linear-gradient(135deg,rgba(249,115,22,0.35),rgba(200,80,10,0.25));
 }
 .core-upgrade-btn.ready{
-  background:linear-gradient(135deg,rgba(249,115,22,0.18),rgba(6,214,160,0.12))!important;
-  border-color:var(--orange)!important;color:#fff!important;
+  background:linear-gradient(135deg,rgba(249,115,22,0.18),rgba(6,214,160,0.12));
+  border-color:var(--orange);color:#fff;
   transition:all 0.25s cubic-bezier(.4,0,.2,1);
 }
 .core-upgrade-btn.ready:hover{
   transform:scale(1.03);
-  box-shadow:0 0 20px rgba(249,115,22,0.3),0 0 40px rgba(249,115,22,0.1)!important;
+  box-shadow:0 0 20px rgba(249,115,22,0.3),0 0 40px rgba(249,115,22,0.1);
 }
 /* 次要按钮 — 描边样式 + 半透明背景 */
 .lb-btn,
 .challenge-skip,
 .recycle-no,
 .reset-no{
-  background:rgba(20,32,60,0.3)!important;
-  border:1px solid rgba(100,130,160,0.25)!important;
-  color:var(--dim)!important;
+  background:rgba(20,32,60,0.3);
+  border:1px solid rgba(100,130,160,0.25);
+  color:var(--dim);
   font-weight:600;
   transition:all 0.2s;
 }
@@ -1597,9 +1656,9 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 .challenge-skip:hover,
 .recycle-no:hover,
 .reset-no:hover{
-  background:rgba(20,32,60,0.5)!important;
-  border-color:rgba(100,130,160,0.4)!important;
-  color:var(--text)!important;
+  background:rgba(20,32,60,0.5);
+  border-color:rgba(100,130,160,0.4);
+  color:var(--text);
 }
 
 /* ===== KEY TEXT READABILITY — 1px 黑色外描边 ===== */
@@ -1645,19 +1704,19 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 .belt-action-menu{
   position:fixed;z-index:10004;
   background:rgba(8,12,22,0.97);border:1px solid #f97316;border-radius:8px;
-  padding:10px 14px;min-width:190px;display:none;
+  padding:var(--sp-md-lg) var(--sp-xl);min-width:190px;display:none;
   box-shadow:0 0 25px rgba(249,115,22,0.15);
   backdrop-filter:blur(6px);
 }
 .belt-action-menu.show{display:block;animation:popIn .2s ease-out}
 .belt-action-title{
-  font-size:0.72em;font-weight:700;color:var(--bright);margin-bottom:3px;
+  font-size:0.72em;font-weight:700;color:var(--bright);margin-bottom:var(--sp-xs-sm);
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:200px;
 }
-.belt-action-info{font-size:0.62em;color:var(--dim);margin-bottom:8px}
-.belt-action-btns{display:flex;flex-direction:column;gap:4px}
+.belt-action-info{font-size:0.62em;color:var(--dim);margin-bottom:var(--sp-md)}
+.belt-action-btns{display:flex;flex-direction:column;gap:var(--sp-xs)}
 .belt-action-btn{
-  padding:5px 10px;border-radius:4px;cursor:pointer;
+  padding:var(--sp-sm-md) var(--sp-md-lg);border-radius:4px;cursor:pointer;
   font-family:'Rajdhani',sans-serif;font-weight:600;font-size:0.7em;
   text-align:left;transition:all 0.15s;border:1px solid;
   background:rgba(0,0,0,0.3);
@@ -1671,62 +1730,62 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 .belt-action-btn.connect:hover{background:rgba(6,214,160,0.1)}
 .belt-action-close{
   position:absolute;top:4px;right:6px;background:none;border:none;
-  color:var(--dim);cursor:pointer;font-size:0.65em;padding:2px 4px;
+  color:var(--dim);cursor:pointer;font-size:0.65em;padding:var(--sp-2xs) var(--sp-xs);
 }
 .belt-action-close:hover{color:var(--bright)}
 
 /* Belt connect mode highlights */
 .cell.belt-connect-from{
-  border-color:var(--cyan) !important;
-  box-shadow:0 0 12px rgba(6,214,160,0.4) !important;
+  border-color:var(--cyan);
+  box-shadow:0 0 12px rgba(6,214,160,0.4);
   animation:beltFromPulse 1s ease-in-out infinite;
 }
 @keyframes beltFromPulse{0%,100%{box-shadow:0 0 8px rgba(6,214,160,0.3)}50%{box-shadow:0 0 16px rgba(6,214,160,0.5)}}
 /* 有效目标：亮绿色（FLOW_MAP 中有对应关系） */
 .cell.belt-target-valid{
-  border-color:rgba(34,197,94,0.6) !important;
-  box-shadow:0 0 10px rgba(34,197,94,0.25) !important;
+  border-color:rgba(34,197,94,0.6);
+  box-shadow:0 0 10px rgba(34,197,94,0.25);
 }
 .cell.belt-target-valid:hover{
-  border-color:#22c55e !important;
-  box-shadow:0 0 16px rgba(34,197,94,0.45) !important;
+  border-color:#22c55e;
+  box-shadow:0 0 16px rgba(34,197,94,0.45);
 }
 /* 无效目标：暗灰色（无 FLOW_MAP 对应关系） */
 .cell.belt-target-invalid{
-  border-color:rgba(100,116,139,0.3) !important;
-  box-shadow:0 0 4px rgba(100,116,139,0.1) !important;
+  border-color:rgba(100,116,139,0.3);
+  box-shadow:0 0 4px rgba(100,116,139,0.1);
   opacity:0.6;
 }
 .cell.belt-target-invalid:hover{
-  border-color:rgba(249,115,22,0.5) !important;
-  box-shadow:0 0 10px rgba(249,115,22,0.15) !important;
+  border-color:rgba(249,115,22,0.5);
+  box-shadow:0 0 10px rgba(249,115,22,0.15);
   opacity:0.85;
 }
 
 /* ===== Petri Dish Experiment ===== */
 .petri-exp-btn{
-  border-color:rgba(20,184,166,0.3) !important;
-  background:linear-gradient(180deg,rgba(20,184,166,0.06),rgba(20,184,166,0.02)) !important;
+  border-color:rgba(20,184,166,0.3);
+  background:linear-gradient(180deg,rgba(20,184,166,0.06),rgba(20,184,166,0.02));
 }
 .petri-exp-btn:hover{
-  border-color:rgba(20,184,166,0.6) !important;
-  box-shadow:0 0 12px rgba(20,184,166,0.15) !important;
+  border-color:rgba(20,184,166,0.6);
+  box-shadow:0 0 12px rgba(20,184,166,0.15);
 }
 .petri-exp-btn.active{
-  border-color:#14b8a6 !important;
-  background:rgba(20,184,166,0.12) !important;
-  box-shadow:0 0 16px rgba(20,184,166,0.25) !important;
+  border-color:#14b8a6;
+  background:rgba(20,184,166,0.12);
+  box-shadow:0 0 16px rgba(20,184,166,0.25);
 }
 .cell.petri-zone{
-  box-shadow:inset 0 0 8px rgba(20,184,166,0.3) !important;
-  border-color:rgba(20,184,166,0.5) !important;
+  box-shadow:inset 0 0 8px rgba(20,184,166,0.3);
+  border-color:rgba(20,184,166,0.5);
 }
 .cell.petri-center{
-  box-shadow:inset 0 0 12px rgba(20,184,166,0.5), 0 0 8px rgba(20,184,166,0.3) !important;
-  border-color:#14b8a6 !important;
+  box-shadow:inset 0 0 12px rgba(20,184,166,0.5), 0 0 8px rgba(20,184,166,0.3);
+  border-color:#14b8a6;
 }
 .petri-start-btn{
-  font-size:0.72em;padding:5px 12px;
+  font-size:0.72em;padding:var(--sp-sm-md) var(--sp-lg);
   background:linear-gradient(180deg,rgba(20,184,166,0.10),rgba(20,184,166,0.04));
   border:1px solid rgba(20,184,166,0.3);border-radius:5px;
   color:#14b8a6;cursor:pointer;transition:all 0.2s;
@@ -1738,30 +1797,30 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 }
 .petri-start-btn[disabled]{cursor:default}
 .petri-start-btn.active{
-  background:rgba(20,184,166,0.18) !important;
-  border-color:#14b8a6 !important;
-  box-shadow:0 0 12px rgba(20,184,166,0.3) !important;
+  background:rgba(20,184,166,0.18);
+  border-color:#14b8a6;
+  box-shadow:0 0 12px rgba(20,184,166,0.3);
 }
 
 /* Reset popup */
 .reset-popup{
   position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:10003;
   background:rgba(10,15,25,0.97);border:1px solid var(--red);border-radius:8px;
-  padding:20px 28px;text-align:center;min-width:280px;
+  padding:var(--sp-3xl) var(--sp-5xl);text-align:center;min-width:280px;
   box-shadow:0 0 40px rgba(239,68,68,0.2);display:none;
 }
 .reset-popup.show{display:block;animation:popIn .25s ease-out}
-.reset-title{font-family:'Orbitron',monospace;font-size:0.85em;color:var(--red);margin-bottom:10px;letter-spacing:1px}
-.reset-msg{font-size:0.72em;color:var(--dim);margin-bottom:14px;line-height:1.6}
-.reset-btns{display:flex;gap:8px;justify-content:center}
+.reset-title{font-family:'Orbitron',monospace;font-size:0.85em;color:var(--red);margin-bottom:var(--sp-md-lg);letter-spacing:1px}
+.reset-msg{font-size:0.72em;color:var(--dim);margin-bottom:var(--sp-xl);line-height:1.6}
+.reset-btns{display:flex;gap:var(--sp-md);justify-content:center}
 .reset-yes{
-  padding:6px 18px;background:rgba(239,68,68,0.15);border:1px solid var(--red);
+  padding:var(--sp-sm) var(--sp-xl-2xl);background:rgba(239,68,68,0.15);border:1px solid var(--red);
   color:var(--red);border-radius:4px;cursor:pointer;font-family:'Rajdhani',sans-serif;
   font-weight:700;font-size:0.78em;transition:all 0.2s;
 }
 .reset-yes:hover{background:rgba(239,68,68,0.3)}
 .reset-no{
-  padding:6px 18px;background:rgba(60,80,100,0.15);border:1px solid var(--bdr);
+  padding:var(--sp-sm) var(--sp-xl-2xl);background:rgba(60,80,100,0.15);border:1px solid var(--bdr);
   color:var(--dim);border-radius:4px;cursor:pointer;font-family:'Rajdhani',sans-serif;
   font-weight:600;font-size:0.78em;transition:all 0.2s;
 }
@@ -1771,22 +1830,22 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 .recycle-popup{
   position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:10001;
   background:rgba(10,15,25,0.97);border:1px solid var(--orange);border-radius:8px;
-  padding:16px 24px;text-align:center;min-width:300px;
+  padding:var(--sp-2xl) var(--sp-4xl);text-align:center;min-width:300px;
   box-shadow:0 0 30px rgba(249,115,22,0.15);display:none;
 }
 .recycle-popup.show{display:block;animation:popIn .25s ease-out}
-.recycle-title{font-family:'Orbitron',monospace;font-size:0.8em;color:var(--orange);margin-bottom:8px;letter-spacing:1px}
-.recycle-name{font-size:0.85em;color:var(--bright);font-weight:700;margin-bottom:6px}
-.recycle-refund{font-size:0.72em;color:var(--green);margin-bottom:12px}
-.recycle-btns{display:flex;gap:8px;justify-content:center}
+.recycle-title{font-family:'Orbitron',monospace;font-size:0.8em;color:var(--orange);margin-bottom:var(--sp-md);letter-spacing:1px}
+.recycle-name{font-size:0.85em;color:var(--bright);font-weight:700;margin-bottom:var(--sp-sm)}
+.recycle-refund{font-size:0.72em;color:var(--green);margin-bottom:var(--sp-lg)}
+.recycle-btns{display:flex;gap:var(--sp-md);justify-content:center}
 .recycle-yes{
-  padding:5px 16px;background:rgba(249,115,22,0.15);border:1px solid var(--orange);
+  padding:var(--sp-sm-md) var(--sp-2xl);background:rgba(249,115,22,0.15);border:1px solid var(--orange);
   color:var(--orange);border-radius:4px;cursor:pointer;font-family:'Rajdhani',sans-serif;
   font-weight:700;font-size:0.78em;transition:all 0.2s;
 }
 .recycle-yes:hover{background:rgba(249,115,22,0.25)}
 .recycle-no{
-  padding:5px 16px;background:rgba(60,80,100,0.15);border:1px solid var(--bdr);
+  padding:var(--sp-sm-md) var(--sp-2xl);background:rgba(60,80,100,0.15);border:1px solid var(--bdr);
   color:var(--dim);border-radius:4px;cursor:pointer;font-family:'Rajdhani',sans-serif;
   font-weight:700;font-size:0.78em;transition:all 0.2s;
 }
@@ -1794,7 +1853,7 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 
 /* Cell recycle hover */
 .cell.occupied:hover{border-color:#4a3a1a}
-.cell.recycle-highlight{border-color:var(--orange)!important;box-shadow:inset 0 0 8px rgba(249,115,22,0.15)}
+.cell.recycle-highlight{border-color:var(--orange);box-shadow:inset 0 0 8px rgba(249,115,22,0.15)}
 
 /* ===== JUICY EFFECTS ===== */
 
@@ -1802,12 +1861,12 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 .achieve-popup{
   position:absolute;top:6px;left:50%;transform:translateX(-50%);z-index:10002;
   background:rgba(10,12,20,0.96);border:1.5px solid #fbbf24;border-radius:8px;
-  padding:8px 16px;text-align:left;max-width:90%;
+  padding:var(--sp-md) var(--sp-2xl);text-align:left;max-width:90%;
   box-shadow:0 4px 24px rgba(251,191,36,0.2),inset 0 0 15px rgba(251,191,36,0.03);
   display:none;overflow:hidden;
   backdrop-filter:blur(6px);
 }
-.achieve-popup.show{display:flex;flex-direction:row;align-items:center;gap:10px;animation:achieveDropIn .4s cubic-bezier(.17,.67,.35,1.1)}
+.achieve-popup.show{display:flex;flex-direction:row;align-items:center;gap:var(--sp-md-lg);animation:achieveDropIn .4s cubic-bezier(.17,.67,.35,1.1)}
 @keyframes achieveDropIn{
   0%{opacity:0;transform:translateX(-50%) translateY(-30px) scale(0.9)}
   60%{transform:translateX(-50%) translateY(4px) scale(1.02)}
@@ -1821,13 +1880,13 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 .achieve-icon{font-size:1.8em;flex-shrink:0;animation:achieveBounce .6s ease-out}
 @keyframes achieveBounce{0%{transform:scale(0)}40%{transform:scale(1.4)}70%{transform:scale(0.9)}100%{transform:scale(1)}}
 .achieve-body{flex:1;min-width:0}
-.achieve-label{font-family:'Orbitron',monospace;font-size:0.6em;color:#fbbf24;letter-spacing:2px;text-transform:uppercase;margin-bottom:2px}
-.achieve-name{font-size:0.9em;font-weight:900;color:var(--bright);margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.achieve-desc{font-size:0.72em;color:#8aa0c0;margin-bottom:4px;line-height:1.3}
+.achieve-label{font-family:'Orbitron',monospace;font-size:0.6em;color:#fbbf24;letter-spacing:2px;text-transform:uppercase;margin-bottom:var(--sp-2xs)}
+.achieve-name{font-size:0.9em;font-weight:900;color:var(--bright);margin-bottom:var(--sp-2xs);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.achieve-desc{font-size:0.72em;color:#8aa0c0;margin-bottom:var(--sp-xs);line-height:1.3}
 .achieve-reward{
   font-size:0.72em;font-weight:700;color:var(--green);
   background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.2);
-  border-radius:3px;padding:2px 8px;display:inline-block;
+  border-radius:3px;padding:var(--sp-2xs) var(--sp-md);display:inline-block;
 }
 
 /* Combo popup */
@@ -1843,7 +1902,7 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
   animation:comboPulse .3s ease-in-out;
 }
 @keyframes comboPulse{0%{transform:scale(1)}50%{transform:scale(1.3)}100%{transform:scale(1)}}
-.combo-bonus{font-size:0.7em;color:var(--cyan);font-weight:700;margin-top:2px}
+.combo-bonus{font-size:0.7em;color:var(--cyan);font-weight:700;margin-top:var(--sp-2xs)}
 
 /* Build burst particles */
 .burst-particle{
@@ -1868,7 +1927,7 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 /* Resource value jump animation */
 .res-val.res-jump{
   animation:resJump .4s cubic-bezier(.17,.67,.35,1.2);
-  color:#fbbf24!important;
+  color:#fbbf24;
 }
 @keyframes resJump{
   0%{transform:scale(1)}
@@ -1881,7 +1940,7 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 .challenge-bar{
   position:fixed;bottom:60px;left:50%;transform:translateX(-50%);z-index:9999;
   background:rgba(10,15,25,0.97);border:1.5px solid var(--yellow);border-radius:8px;
-  padding:8px 14px;display:none;align-items:center;gap:10px;min-width:400px;max-width:600px;
+  padding:var(--sp-md) var(--sp-xl);display:none;align-items:center;gap:var(--sp-md-lg);min-width:400px;max-width:600px;
   box-shadow:0 0 25px rgba(234,179,8,0.15);
   backdrop-filter:blur(6px);
 }
@@ -1889,12 +1948,12 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 @keyframes slideUp{0%{opacity:0;transform:translateX(-50%) translateY(20px)}100%{opacity:1;transform:translateX(-50%) translateY(0)}}
 .challenge-name{font-family:'Orbitron',monospace;font-size:0.7em;font-weight:700;color:var(--yellow);white-space:nowrap}
 .challenge-desc{font-size:0.62em;color:#8aa0c0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.challenge-timer{display:flex;align-items:center;gap:6px;flex-shrink:0}
+.challenge-timer{display:flex;align-items:center;gap:var(--sp-sm);flex-shrink:0}
 .challenge-bar-wrap{width:80px;height:6px;background:rgba(255,255,255,0.04);border-radius:3px;overflow:hidden}
 .challenge-fill{height:100%;background:linear-gradient(90deg,var(--yellow),var(--orange));transition:width 0.5s;border-radius:3px}
 .challenge-time{font-family:'Orbitron',monospace;font-size:0.6em;color:var(--yellow);min-width:28px;text-align:right}
 .challenge-skip{
-  padding:3px 8px;font-size:0.6em;background:none;border:1px solid var(--bdr);color:var(--dim);
+  padding:var(--sp-xs-sm) var(--sp-md);font-size:0.6em;background:none;border:1px solid var(--bdr);color:var(--dim);
   border-radius:3px;cursor:pointer;font-family:'Rajdhani',sans-serif;font-weight:600;transition:all 0.2s;
 }
 .challenge-skip:hover{border-color:var(--red);color:var(--red)}
@@ -1904,7 +1963,7 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
   position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:10006;
   background:linear-gradient(135deg,rgba(6,12,24,0.98),rgba(4,8,18,0.99));
   border:1.5px solid var(--cyan);border-radius:12px;
-  padding:24px 28px;text-align:center;min-width:380px;max-width:540px;
+  padding:var(--sp-4xl) var(--sp-5xl);text-align:center;min-width:380px;max-width:540px;
   box-shadow:0 0 60px rgba(6,214,160,0.15),0 0 120px rgba(6,214,160,0.05);
   display:none;overflow:hidden;
 }
@@ -1920,16 +1979,16 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 }
 .intro-title{
   font-family:'Orbitron',monospace;font-size:1.1em;font-weight:900;
-  color:var(--bright);letter-spacing:2px;margin-bottom:4px;position:relative;
+  color:var(--bright);letter-spacing:2px;margin-bottom:var(--sp-xs);position:relative;
 }
 .intro-subtitle{
-  font-size:0.75em;color:var(--cyan);letter-spacing:3px;margin-bottom:12px;
+  font-size:0.75em;color:var(--cyan);letter-spacing:3px;margin-bottom:var(--sp-lg);
   font-family:'Orbitron',monospace;position:relative;
 }
 /* Tab 栏 */
-.intro-tabs{display:flex;gap:4px;justify-content:center;margin-bottom:12px;position:relative;flex-wrap:wrap}
+.intro-tabs{display:flex;gap:var(--sp-xs);justify-content:center;margin-bottom:var(--sp-lg);position:relative;flex-wrap:wrap}
 .intro-tab{
-  padding:4px 10px;font-size:0.68em;font-weight:700;font-family:'Rajdhani',sans-serif;
+  padding:var(--sp-xs) var(--sp-md-lg);font-size:0.68em;font-weight:700;font-family:'Rajdhani',sans-serif;
   background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:4px;
   color:var(--dim);cursor:pointer;transition:all 0.2s;letter-spacing:0.3px;
 }
@@ -1941,28 +2000,28 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 @keyframes introPageIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
 /* Page 1: 欢迎 */
 .intro-story{
-  font-size:0.82em;color:#8aa0c0;line-height:1.6;margin-bottom:16px;
-  text-align:left;padding:0 4px;position:relative;
+  font-size:0.82em;color:#8aa0c0;line-height:1.6;margin-bottom:var(--sp-2xl);
+  text-align:left;padding:0 var(--sp-xs);position:relative;
 }
 .intro-story b{color:var(--bright);font-weight:700}
 .intro-goal{
   background:rgba(168,85,247,0.08);border:1px solid rgba(168,85,247,0.25);
-  border-radius:8px;padding:10px 14px;margin-bottom:16px;position:relative;
+  border-radius:8px;padding:var(--sp-md-lg) var(--sp-xl);margin-bottom:var(--sp-2xl);position:relative;
 }
 .intro-goal-label{
   font-family:'Orbitron',monospace;font-size:0.65em;color:var(--purple);
-  letter-spacing:2px;margin-bottom:4px;
+  letter-spacing:2px;margin-bottom:var(--sp-xs);
 }
 .intro-goal-text{
   font-size:0.9em;color:#d4b8ff;font-weight:700;
 }
 .intro-roadmap{
-  display:flex;align-items:center;justify-content:center;gap:4px;
-  margin-bottom:18px;flex-wrap:wrap;position:relative;
+  display:flex;align-items:center;justify-content:center;gap:var(--sp-xs);
+  margin-bottom:var(--sp-xl-2xl);flex-wrap:wrap;position:relative;
 }
 .intro-phase{
-  display:flex;flex-direction:column;align-items:center;gap:2px;
-  padding:6px 8px;border-radius:6px;min-width:52px;
+  display:flex;flex-direction:column;align-items:center;gap:var(--sp-2xs);
+  padding:var(--sp-sm) var(--sp-md);border-radius:6px;min-width:52px;
   background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);
   transition:all 0.3s;
 }
@@ -1971,47 +2030,47 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 .intro-phase-arrow{color:var(--dim);font-size:0.7em;opacity:0.5}
 /* Page 2: 资源流向 */
 .intro-flow{text-align:left;position:relative}
-.intro-flow-title{font-size:0.78em;font-weight:700;color:var(--bright);margin-bottom:8px;text-align:center}
-.intro-flow-chain{display:flex;align-items:center;gap:4px;margin-bottom:6px;flex-wrap:wrap;justify-content:center}
+.intro-flow-title{font-size:0.78em;font-weight:700;color:var(--bright);margin-bottom:var(--sp-md);text-align:center}
+.intro-flow-chain{display:flex;align-items:center;gap:var(--sp-xs);margin-bottom:var(--sp-sm);flex-wrap:wrap;justify-content:center}
 .intro-flow-node{
-  font-size:0.7em;padding:3px 8px;border-radius:4px;
+  font-size:0.7em;padding:var(--sp-xs-sm) var(--sp-md);border-radius:4px;
   background:rgba(255,255,255,0.04);border:1px solid;white-space:nowrap;
 }
 .intro-flow-arrow{color:var(--dim);font-size:0.72em}
 .intro-flow-note{
-  font-size:0.72em;color:#8aa0c0;line-height:1.55;margin-top:10px;
+  font-size:0.72em;color:#8aa0c0;line-height:1.55;margin-top:var(--sp-md-lg);
   background:rgba(6,214,160,0.05);border:1px solid rgba(6,214,160,0.12);
-  border-radius:6px;padding:8px 10px;text-align:left;
+  border-radius:6px;padding:var(--sp-md) var(--sp-md-lg);text-align:left;
 }
 .intro-flow-note b{font-weight:700}
 /* Page 3: 传送带指南 */
 .intro-belt{text-align:left;position:relative}
-.intro-belt-title{font-size:0.78em;font-weight:700;color:var(--bright);margin-bottom:6px;text-align:center}
-.intro-belt-desc{font-size:0.72em;color:#8aa0c0;line-height:1.55;margin-bottom:10px}
+.intro-belt-title{font-size:0.78em;font-weight:700;color:var(--bright);margin-bottom:var(--sp-sm);text-align:center}
+.intro-belt-desc{font-size:0.72em;color:#8aa0c0;line-height:1.55;margin-bottom:var(--sp-md-lg)}
 .intro-belt-desc b{color:var(--bright);font-weight:700}
 .intro-belt-table{
-  width:100%;border-collapse:collapse;font-size:0.68em;margin-bottom:8px;
+  width:100%;border-collapse:collapse;font-size:0.68em;margin-bottom:var(--sp-md);
 }
-.intro-belt-table th{color:var(--cyan);font-weight:700;padding:3px 6px;border-bottom:1px solid rgba(6,214,160,0.2);text-align:center}
-.intro-belt-table td{padding:3px 6px;color:#8aa0c0;text-align:center;border-bottom:1px solid rgba(255,255,255,0.04)}
+.intro-belt-table th{color:var(--cyan);font-weight:700;padding:var(--sp-xs-sm) var(--sp-sm);border-bottom:1px solid rgba(6,214,160,0.2);text-align:center}
+.intro-belt-table td{padding:var(--sp-xs-sm) var(--sp-sm);color:#8aa0c0;text-align:center;border-bottom:1px solid rgba(255,255,255,0.04)}
 .intro-belt-tip{
   font-size:0.68em;color:#8aa0c0;line-height:1.5;
   background:rgba(249,115,22,0.06);border:1px solid rgba(249,115,22,0.15);
-  border-radius:6px;padding:6px 8px;
+  border-radius:6px;padding:var(--sp-sm) var(--sp-md);
 }
 .intro-belt-tip b{color:var(--bright);font-weight:700}
 /* Page 4: 攻略 */
 .intro-strat{text-align:left;position:relative}
-.intro-strat-phase{margin-bottom:8px}
-.intro-strat-label{font-size:0.75em;font-weight:700;margin-bottom:3px}
-.intro-strat-steps{margin:0;padding-left:18px;font-size:0.7em;color:#8aa0c0;line-height:1.6}
-.intro-strat-steps li{margin-bottom:1px}
+.intro-strat-phase{margin-bottom:var(--sp-md)}
+.intro-strat-label{font-size:0.75em;font-weight:700;margin-bottom:var(--sp-xs-sm)}
+.intro-strat-steps{margin:0;padding-left:var(--sp-xl-2xl);font-size:0.7em;color:#8aa0c0;line-height:1.6}
+.intro-strat-steps li{margin-bottom:var(--sp-3xs)}
 .intro-strat-steps b{color:var(--bright);font-weight:700}
 .intro-strat-why{font-style:italic;color:var(--dim);font-size:0.92em}
 /* 帮助按钮脉冲 */
 .ctrl-btn.help-pulse{
-  border-color:var(--cyan)!important;color:var(--cyan)!important;
-  background:rgba(6,214,160,0.12)!important;
+  border-color:var(--cyan);color:var(--cyan);
+  background:rgba(6,214,160,0.12);
   animation:helpBtnPulse 1.6s ease-in-out infinite;
   position:relative;z-index:2;
 }
@@ -2024,7 +2083,7 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
   50%{opacity:1}
 }
 .intro-start-btn{
-  position:relative;padding:10px 36px;
+  position:relative;padding:var(--sp-md-lg) 36px;
   background:linear-gradient(135deg,rgba(6,214,160,0.15),rgba(6,214,160,0.08));
   border:1.5px solid var(--cyan);color:var(--cyan);border-radius:6px;
   cursor:pointer;font-family:'Orbitron',monospace;font-weight:700;font-size:0.85em;
@@ -2040,7 +2099,7 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 .offline-popup{
   position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:10002;
   background:rgba(8,12,22,0.98);border:1.5px solid var(--cyan);border-radius:10px;
-  padding:20px 28px;text-align:center;min-width:280px;max-width:360px;
+  padding:var(--sp-3xl) var(--sp-5xl);text-align:center;min-width:280px;max-width:360px;
   box-shadow:0 0 40px rgba(6,214,160,0.2);display:none;overflow:hidden;
 }
 .offline-popup.show{display:block;animation:popIn .3s ease-out}
@@ -2054,7 +2113,7 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 .upgrade-popup{
   position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:10001;
   background:rgba(10,15,25,0.97);border:1px solid var(--cyan);border-radius:8px;
-  padding:16px 24px;text-align:center;min-width:300px;
+  padding:var(--sp-2xl) var(--sp-4xl);text-align:center;min-width:300px;
   box-shadow:0 0 30px rgba(6,214,160,0.15);display:none;
 }
 .upgrade-popup.show{display:block;animation:popIn .25s ease-out}
@@ -2063,12 +2122,12 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 .choice-popup{
   position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:10003;
   background:rgba(8,12,22,0.98);border:1.5px solid var(--purple);border-radius:10px;
-  padding:20px 24px;text-align:center;min-width:340px;max-width:420px;
+  padding:var(--sp-3xl) var(--sp-4xl);text-align:center;min-width:340px;max-width:420px;
   box-shadow:0 0 40px rgba(168,85,247,0.2);display:none;
 }
 .choice-popup.show{display:block;animation:popIn .3s ease-out}
 .choice-btn{
-  flex:1;padding:12px 10px;border-radius:6px;cursor:pointer;transition:all 0.2s;
+  flex:1;padding:var(--sp-lg) var(--sp-md-lg);border-radius:6px;cursor:pointer;transition:all 0.2s;
   text-align:center;font-family:'Rajdhani',sans-serif;
 }
 .choice-a{
@@ -2079,7 +2138,7 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
   background:rgba(168,85,247,0.06);border:1.5px solid rgba(168,85,247,0.3);
 }
 .choice-b:hover{background:rgba(168,85,247,0.12);border-color:var(--purple);transform:translateY(-2px)}
-.choice-label{font-size:0.85em;font-weight:700;color:var(--bright);margin-bottom:4px}
+.choice-label{font-size:0.85em;font-weight:700;color:var(--bright);margin-bottom:var(--sp-xs)}
 .choice-desc{font-size:0.6em;color:var(--dim);line-height:1.3}
 .choice-a:hover .choice-label{color:var(--cyan)}
 .choice-b:hover .choice-label{color:var(--purple)}
@@ -2137,7 +2196,7 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 .belt-guide-tooltip{
   position:absolute;z-index:100;
   background:rgba(251,191,36,0.12);border:1px solid rgba(251,191,36,0.5);border-radius:6px;
-  padding:4px 10px;font-size:0.6em;color:#fbbf24;font-weight:600;
+  padding:var(--sp-xs) var(--sp-md-lg);font-size:0.6em;color:#fbbf24;font-weight:600;
   white-space:nowrap;pointer-events:auto;cursor:pointer;
   animation:guideFloat 2s ease-in-out infinite;
   box-shadow:0 0 12px rgba(251,191,36,0.18);
@@ -2167,7 +2226,7 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 .guide-hand-bubble{
   position:absolute;left:52px;top:4px;
   background:rgba(251,191,36,0.10);border:1px solid rgba(251,191,36,0.35);
-  border-radius:8px;padding:6px 12px;
+  border-radius:8px;padding:var(--sp-sm) var(--sp-lg);
   font-size:0.82em;color:#f0d060;font-weight:600;font-family:'Rajdhani',sans-serif;
   white-space:nowrap;pointer-events:none;
   box-shadow:0 0 16px rgba(251,191,36,0.12);
@@ -2192,8 +2251,8 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 }
 
 /* ===== ACHIEVEMENT TIERS ===== */
-.achieve-popup.tier-gold{border-color:#fbbf24 !important;box-shadow:0 0 40px rgba(251,191,36,0.4) !important}
-.achieve-popup.tier-diamond{border-color:#a855f7 !important;box-shadow:0 0 60px rgba(168,85,247,0.5),0 0 120px rgba(168,85,247,0.2) !important}
+.achieve-popup.tier-gold{border-color:#fbbf24;box-shadow:0 0 40px rgba(251,191,36,0.4)}
+.achieve-popup.tier-diamond{border-color:#a855f7;box-shadow:0 0 60px rgba(168,85,247,0.5),0 0 120px rgba(168,85,247,0.2)}
 @keyframes firework{
   0%{transform:scale(0);opacity:1}
   50%{transform:scale(1.5);opacity:0.8}
@@ -2209,16 +2268,16 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 .bld-type-selector{
   position:fixed;z-index:10005;top:50%;left:50%;transform:translate(-50%,-50%) scale(0.9);
   background:linear-gradient(135deg,rgba(6,12,24,0.97),rgba(4,8,18,0.98));
-  border:1px solid rgba(6,214,160,0.3);border-radius:8px;padding:16px 20px;
+  border:1px solid rgba(6,214,160,0.3);border-radius:8px;padding:var(--sp-2xl) var(--sp-3xl);
   box-shadow:0 0 40px rgba(6,214,160,0.15),0 4px 20px rgba(0,0,0,0.5);
   text-align:center;max-width:380px;width:90%;max-height:70vh;
   opacity:0;pointer-events:none;transition:all 0.2s ease-out;
 }
 .bld-type-selector.show{opacity:1;pointer-events:auto;transform:translate(-50%,-50%) scale(1)}
-.bld-type-list{display:flex;flex-direction:column;gap:4px;max-height:45vh;overflow-y:auto;
-  padding:2px;scrollbar-width:thin;scrollbar-color:var(--cyan) transparent}
+.bld-type-list{display:flex;flex-direction:column;gap:var(--sp-xs);max-height:45vh;overflow-y:auto;
+  padding:var(--sp-2xs);scrollbar-width:thin;scrollbar-color:var(--cyan) transparent}
 .bld-type-item{
-  display:flex;align-items:center;gap:8px;padding:8px 10px;
+  display:flex;align-items:center;gap:var(--sp-md);padding:var(--sp-md) var(--sp-md-lg);
   border:1px solid rgba(6,214,160,0.12);border-radius:5px;
   background:linear-gradient(135deg,rgba(10,18,30,0.85),rgba(8,14,24,0.9));
   cursor:pointer;transition:all 0.2s;text-align:left;
@@ -2229,7 +2288,7 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 .bld-type-emoji{font-size:1.3em;flex-shrink:0;width:26px;text-align:center}
 .bld-type-info{flex:1;min-width:0}
 .bld-type-name{font-size:0.78em;color:#b8d0e8;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.bld-type-meta{display:flex;gap:6px;align-items:center;font-size:0.58em;margin-top:2px}
+.bld-type-meta{display:flex;gap:var(--sp-sm);align-items:center;font-size:0.58em;margin-top:var(--sp-2xs)}
 .bld-type-lv{font-family:'Share Tech Mono',monospace;font-weight:700}
 .bld-type-mult{font-family:'Share Tech Mono',monospace}
 .bld-type-cost{color:var(--yellow);font-weight:600}
@@ -2246,7 +2305,7 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 /* 升级高亮动画 */
 .bld-type-item.just-upgraded{
   animation:bld-upgrade-flash 0.6s ease-out;
-  border-color:var(--cyan)!important;
+  border-color:var(--cyan);
 }
 @keyframes bld-upgrade-flash{
   0%{background:rgba(6,214,160,0.3);transform:scale(1.02)}
@@ -2255,14 +2314,14 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 .bld-type-seq{
   font-family:'Share Tech Mono',monospace;font-size:0.6em;font-weight:700;
   color:#4a7090;background:rgba(0,0,0,0.4);border:1px solid #1a3a5a;
-  border-radius:3px;padding:1px 4px;flex-shrink:0;
+  border-radius:3px;padding:var(--sp-3xs) var(--sp-xs);flex-shrink:0;
 }
 
 /* ===== CELL SEQUENCE NUMBER BADGE ===== */
 .cell-seq{
   position:absolute;bottom:0px;right:1px;z-index:6;
   font-family:'Share Tech Mono',monospace;font-size:0.48em;font-weight:700;
-  background:rgba(0,0,0,0.6);padding:1px 3px;border-radius:2px;
+  background:rgba(0,0,0,0.6);padding:var(--sp-3xs) var(--sp-xs-sm);border-radius:2px;
   pointer-events:none;color:#5a7a9a;letter-spacing:0.5px;
 }
 
@@ -2270,10 +2329,10 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 .mobile-tab-bar{
   display:none;
   background:var(--panel);border-top:1px solid var(--bdr);
-  padding:2px 0;gap:0;
+  padding:var(--sp-2xs) 0;gap:0;
 }
 .mobile-tab{
-  flex:1;padding:6px 4px;background:none;border:none;
+  flex:1;padding:var(--sp-sm) var(--sp-xs);background:none;border:none;
   color:var(--dim);font-family:'Rajdhani',sans-serif;font-size:0.7em;font-weight:600;
   cursor:pointer;transition:all 0.2s;text-align:center;
   border-top:2px solid transparent;
@@ -2283,37 +2342,37 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 
 /* ===== RESPONSIVE: TABLET (≤1100px) ===== */
 @media (max-width:1100px){
-  .sidebar{width:340px;padding:12px;font-size:1.1em}
-  .right-panel{width:240px;padding:10px;font-size:1em}
-  .topbar{padding:6px 10px;gap:8px}
+  .sidebar{width:340px;padding:var(--sp-lg);font-size:1.1em}
+  .right-panel{width:240px;padding:var(--sp-md-lg);font-size:1em}
+  .topbar{padding:var(--sp-sm) var(--sp-md-lg);gap:var(--sp-md)}
   .logo{width:28px;height:28px}
   .logo svg{width:18px;height:18px}
   .title-box h1{font-size:0.85em;letter-spacing:1px}
   .title-box .sub{font-size:0.55em}
-  .phase-badge{font-size:0.58em;padding:2px 8px}
-  .ctrl-btn{padding:3px 8px;font-size:0.65em}
-  .core-colony-bar{padding:8px 12px;gap:10px;margin:4px 6px 2px}
+  .phase-badge{font-size:0.58em;padding:var(--sp-2xs) var(--sp-md)}
+  .ctrl-btn{padding:var(--sp-xs-sm) var(--sp-md);font-size:0.65em}
+  .core-colony-bar{padding:var(--sp-md) var(--sp-lg);gap:var(--sp-md-lg);margin:var(--sp-xs) var(--sp-sm) var(--sp-2xs)}
   .core-colony-icon{font-size:1.8em}
   .core-phase-tag{font-size:0.55em}
   .core-colony-title{font-size:0.78em}
   .core-colony-desc{font-size:0.6em}
-  .grid{gap:14px;padding:14px 20px}
+  .grid{gap:var(--sp-xl);padding:var(--sp-xl) var(--sp-3xl)}
   .cell .label{font-size:0.45em}
   .cell-emoji{font-size:0.9em}
   .cell-tier{font-size:0.4em}
   .cell-rate{font-size:0.38em}
   /* 帝国总览适配 */
   .csb-group .stat-item{font-size:0.75em}
-  .csb-alloc-group{gap:5px;padding:6px 0}
-  .csb-score-group{gap:6px;padding:4px 0}
-  .empire-fieldset{padding:4px 6px 6px}
+  .csb-alloc-group{gap:var(--sp-sm-md);padding:var(--sp-sm) 0}
+  .csb-score-group{gap:var(--sp-sm);padding:var(--sp-xs) 0}
+  .empire-fieldset{padding:var(--sp-xs) var(--sp-sm) var(--sp-sm)}
   .empire-fieldset legend{font-size:0.58em}
 }
 
 /* ===== RESPONSIVE: SMALL TABLET (≤900px) ===== */
 @media (max-width:900px){
-  .right-panel{width:210px;padding:8px;font-size:0.95em}
-  .sidebar{width:300px;padding:10px;font-size:1.05em}
+  .right-panel{width:210px;padding:var(--sp-md);font-size:0.95em}
+  .sidebar{width:300px;padding:var(--sp-md-lg);font-size:1.05em}
   .stat-row{font-size:0.68em}
   .guide-step{font-size:0.7em}
   .evo-header{font-size:0.9em}
@@ -2328,21 +2387,21 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
   .app{height:100vh;height:100dvh}
 
   /* 顶栏紧凑化 */
-  .topbar{padding:4px 8px;gap:6px;flex-wrap:wrap}
+  .topbar{padding:var(--sp-xs) var(--sp-md);gap:var(--sp-sm);flex-wrap:wrap}
   .logo{width:24px;height:24px}
   .logo svg{width:16px;height:16px}
   .title-box h1{font-size:0.75em;letter-spacing:1px}
   .title-box .sub{display:none}
-  .phase-badge{font-size:0.52em;padding:2px 6px;order:5}
+  .phase-badge{font-size:0.52em;padding:var(--sp-2xs) var(--sp-sm);order:5}
   #phaseEvoHint{display:none}
   #saveIndicator{display:none}
   #noSaveHint{display:none}
-  .ctrl-btn{padding:3px 7px;font-size:0.62em}
+  .ctrl-btn{padding:var(--sp-xs-sm) var(--sp-sm);font-size:0.62em}
 
   /* 主区域改为垂直 + Tab 切换 */
   .main{flex-direction:column;position:relative}
   .sidebar,.right-panel{
-    width:100%!important;flex-shrink:0;
+    width:100%;flex-shrink:0;
     position:absolute;inset:0;z-index:80;
     overflow-y:auto;display:none;
     background:var(--panel);border:none;
@@ -2352,13 +2411,13 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
   .center.mobile-hidden{display:none}
 
   /* 培养皿 header 简化 */
-  .dish-header{padding:3px 8px}
+  .dish-header{padding:var(--sp-xs-sm) var(--sp-md)}
   .dish-name{font-size:0.6em}
   .dish-name span{display:none}
-  .dish-env{font-size:0.55em;gap:6px}
+  .dish-env{font-size:0.55em;gap:var(--sp-sm)}
 
   /* 核心栏紧凑 */
-  .core-colony-bar{margin:2px 4px;padding:6px 10px;gap:8px}
+  .core-colony-bar{margin:var(--sp-2xs) var(--sp-xs);padding:var(--sp-sm) var(--sp-md-lg);gap:var(--sp-md)}
   .core-colony-icon{font-size:1.4em}
   .core-colony-title{font-size:0.7em}
   .core-colony-desc{display:none}
@@ -2366,20 +2425,20 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
   .core-supply-label{font-size:0.5em}
   .core-supply-value{font-size:0.7em}
   .core-colony-status{font-size:0.5em}
-  .core-phase-tag{font-size:0.5em;padding:1px 5px}
+  .core-phase-tag{font-size:0.5em;padding:var(--sp-3xs) var(--sp-sm-md)}
 
   /* 帝国总览移动端：两栏改单栏 */
-  .empire-overview{margin:2px 4px}
+  .empire-overview{margin:var(--sp-2xs) var(--sp-xs)}
   .empire-overview-body{flex-direction:column}
-  .empire-col-left{border-right:none;border-bottom:1px solid rgba(6,214,160,0.08);padding-bottom:6px}
-  .empire-fieldset{padding:4px 6px;margin-bottom:4px}
+  .empire-col-left{border-right:none;border-bottom:1px solid rgba(6,214,160,0.08);padding-bottom:var(--sp-sm)}
+  .empire-fieldset{padding:var(--sp-xs) var(--sp-sm);margin-bottom:var(--sp-xs)}
   .empire-fieldset legend{font-size:0.55em}
 
   /* Grid 调整 */
-  .grid{gap:12px;padding:12px 16px}
+  .grid{gap:var(--sp-lg);padding:var(--sp-lg) var(--sp-2xl)}
   .cell .label{font-size:0.42em}
   .cell-emoji{font-size:0.85em}
-  .cell-tier{font-size:0.38em;padding:0px 2px}
+  .cell-tier{font-size:0.38em;padding:0px var(--sp-2xs)}
   .cell-rate{font-size:0.35em}
   .cell-seq{font-size:0.35em}
   .cell-port{width:7px;height:7px;font-size:4px}
@@ -2390,11 +2449,11 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
   /* 弹窗适配 */
   .event-popup,.reset-popup,.recycle-popup,.upgrade-popup,.choice-popup,.offline-popup{
     max-width:90vw;min-width:auto;width:90vw;
-    padding:14px 16px;
+    padding:var(--sp-xl) var(--sp-2xl);
   }
-  .bld-type-selector{width:95%;max-width:95vw;padding:12px 14px}
+  .bld-type-selector{width:95%;max-width:95vw;padding:var(--sp-lg) var(--sp-xl)}
   .belt-action-menu{max-width:85vw}
-  .challenge-bar{min-width:auto;max-width:95vw;width:95vw;bottom:50px;padding:6px 10px;gap:6px}
+  .challenge-bar{min-width:auto;max-width:95vw;width:95vw;bottom:50px;padding:var(--sp-sm) var(--sp-md-lg);gap:var(--sp-sm)}
   .challenge-name{font-size:0.62em}
   .challenge-desc{font-size:0.55em}
 
@@ -2402,15 +2461,15 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
   .log-box{height:60px;font-size:0.55em}
 
   /* 资源网格 */
-  .res-grid{grid-template-columns:1fr 1fr;gap:3px}
-  .res-card{padding:6px}
+  .res-grid{grid-template-columns:1fr 1fr;gap:var(--sp-xs-sm)}
+  .res-card{padding:var(--sp-sm)}
   .res-icon{font-size:1em}
   .res-name{font-size:0.55em}
   .res-val{font-size:0.75em}
   .res-rate{font-size:0.55em}
 
   /* 里程碑 toast */
-  .milestone{top:10px;padding:8px 16px;max-width:90vw}
+  .milestone{top:10px;padding:var(--sp-md) var(--sp-2xl);max-width:90vw}
   .milestone .text{font-size:0.6em}
 }
 
@@ -2427,7 +2486,7 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 #gameTooltip{
   position:fixed;z-index:30000;pointer-events:none;
   max-width:280px;min-width:160px;
-  padding:10px 14px;border-radius:8px;
+  padding:var(--sp-md-lg) var(--sp-xl);border-radius:8px;
   background:rgba(8,12,24,0.96);
   border:1px solid rgba(168,85,247,0.35);
   box-shadow:0 4px 20px rgba(0,0,0,0.5),0 0 12px rgba(168,85,247,0.1);
@@ -2441,24 +2500,24 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 }
 #gameTooltip .tt-title{
   font-weight:700;font-size:0.8em;color:#d0a0f0;
-  margin-bottom:4px;letter-spacing:0.5px;
-  display:flex;align-items:center;gap:5px;
+  margin-bottom:var(--sp-xs);letter-spacing:0.5px;
+  display:flex;align-items:center;gap:var(--sp-sm-md);
 }
 #gameTooltip .tt-tag{
-  font-size:0.6em;padding:1px 5px;border-radius:3px;
+  font-size:0.6em;padding:var(--sp-3xs) var(--sp-sm-md);border-radius:3px;
   font-weight:600;letter-spacing:0.5px;
   background:rgba(168,85,247,0.12);border:1px solid rgba(168,85,247,0.25);
   color:#a78bfa;
 }
 #gameTooltip .tt-desc{
   font-size:0.7em;color:#8a9aba;line-height:1.4;
-  margin-bottom:3px;
+  margin-bottom:var(--sp-xs-sm);
 }
 #gameTooltip .tt-detail{
   font-size:0.65em;color:var(--cyan);line-height:1.3;
-  padding-top:3px;border-top:1px solid rgba(255,255,255,0.04);
+  padding-top:var(--sp-xs-sm);border-top:1px solid rgba(255,255,255,0.04);
 }
-#gameTooltip .tt-detail span{display:block;margin:1px 0}
+#gameTooltip .tt-detail span{display:block;margin:var(--sp-3xs) 0}
 
 /* ===== ACHIEVEMENT HALL PANEL ===== */
 .achv-hall-overlay{
@@ -2469,12 +2528,12 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 .achv-hall-overlay.show{display:flex;animation:fadeIn 0.25s ease-out}
 .achv-hall{
   width:min(700px,92vw);max-height:85vh;background:linear-gradient(135deg,rgba(6,12,24,0.98),rgba(4,8,18,0.99));
-  border:1px solid rgba(251,191,36,0.25);border-radius:12px;padding:20px 24px;
+  border:1px solid rgba(251,191,36,0.25);border-radius:12px;padding:var(--sp-3xl) var(--sp-4xl);
   box-shadow:0 0 60px rgba(251,191,36,0.1),0 8px 30px rgba(0,0,0,0.5);
   display:flex;flex-direction:column;overflow:hidden;
 }
 .achv-hall-header{
-  display:flex;align-items:center;gap:12px;margin-bottom:14px;padding-bottom:10px;
+  display:flex;align-items:center;gap:var(--sp-lg);margin-bottom:var(--sp-xl);padding-bottom:var(--sp-md-lg);
   border-bottom:1px solid rgba(251,191,36,0.12);
 }
 .achv-hall-title{
@@ -2483,12 +2542,12 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 }
 .achv-hall-close{
   margin-left:auto;background:none;border:1px solid rgba(255,255,255,0.1);color:var(--dim);
-  cursor:pointer;font-size:1.1em;padding:2px 8px;border-radius:4px;transition:all 0.2s;
+  cursor:pointer;font-size:1.1em;padding:var(--sp-2xs) var(--sp-md);border-radius:4px;transition:all 0.2s;
 }
 .achv-hall-close:hover{border-color:var(--red);color:var(--red)}
 /* Progress bar */
 .achv-progress-wrap{
-  height:8px;background:rgba(255,255,255,0.04);border-radius:4px;overflow:hidden;margin-bottom:6px;
+  height:8px;background:rgba(255,255,255,0.04);border-radius:4px;overflow:hidden;margin-bottom:var(--sp-sm);
 }
 .achv-progress-fill{
   height:100%;border-radius:4px;transition:width 0.6s ease;
@@ -2496,51 +2555,51 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 }
 .achv-progress-label{
   font-family:'Share Tech Mono',monospace;font-size:0.72em;color:var(--dim);text-align:right;
-  margin-bottom:10px;
+  margin-bottom:var(--sp-md-lg);
 }
 /* Filter tabs */
-.achv-filters{display:flex;gap:4px;margin-bottom:12px;flex-wrap:wrap}
+.achv-filters{display:flex;gap:var(--sp-xs);margin-bottom:var(--sp-lg);flex-wrap:wrap}
 .achv-filter-btn{
-  padding:3px 10px;font-family:'Rajdhani',sans-serif;font-size:0.72em;font-weight:600;
+  padding:var(--sp-xs-sm) var(--sp-md-lg);font-family:'Rajdhani',sans-serif;font-size:0.72em;font-weight:600;
   background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);color:var(--dim);
   border-radius:12px;cursor:pointer;transition:all 0.2s;
 }
 .achv-filter-btn:hover{border-color:rgba(255,255,255,0.2);color:var(--text)}
 .achv-filter-btn.active{border-color:#fbbf24;color:#fbbf24;background:rgba(251,191,36,0.08)}
 /* Scrollable body */
-.achv-hall-body{flex:1;overflow-y:auto;padding-right:4px;scrollbar-width:thin;scrollbar-color:#1a3050 transparent}
+.achv-hall-body{flex:1;overflow-y:auto;padding-right:var(--sp-xs);scrollbar-width:thin;scrollbar-color:#1a3050 transparent}
 .achv-hall-body::-webkit-scrollbar{width:5px}
 .achv-hall-body::-webkit-scrollbar-thumb{background:#1a3050;border-radius:3px}
 /* Category group */
-.achv-cat{margin-bottom:14px}
+.achv-cat{margin-bottom:var(--sp-xl)}
 .achv-cat-title{
   font-family:'Orbitron',monospace;font-size:0.68em;color:var(--dim);letter-spacing:2px;
-  text-transform:uppercase;margin-bottom:6px;padding-bottom:3px;
+  text-transform:uppercase;margin-bottom:var(--sp-sm);padding-bottom:var(--sp-xs-sm);
   border-bottom:1px solid rgba(255,255,255,0.04);
-  display:flex;align-items:center;gap:6px;
+  display:flex;align-items:center;gap:var(--sp-sm);
 }
 .achv-cat-count{
   font-family:'Share Tech Mono',monospace;font-size:0.9em;color:rgba(255,255,255,0.2);margin-left:auto;
 }
-.achv-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.achv-grid{display:grid;grid-template-columns:1fr 1fr;gap:var(--sp-sm)}
 /* Achievement card */
 .achv-card{
-  padding:8px 10px;background:rgba(10,18,30,0.7);border:1px solid rgba(255,255,255,0.06);
+  padding:var(--sp-md) var(--sp-md-lg);background:rgba(10,18,30,0.7);border:1px solid rgba(255,255,255,0.06);
   border-radius:6px;cursor:default;transition:all 0.3s;position:relative;overflow:hidden;
 }
 .achv-card.unlocked{border-color:rgba(251,191,36,0.2);background:rgba(15,22,38,0.85)}
 .achv-card.unlocked:hover{border-color:rgba(251,191,36,0.35);box-shadow:0 0 10px rgba(251,191,36,0.08)}
 .achv-card.locked{opacity:0.4;filter:grayscale(0.7)}
 .achv-card.locked:hover{opacity:0.65;filter:grayscale(0.3)}
-.achv-card-top{display:flex;align-items:center;gap:6px;margin-bottom:3px}
+.achv-card-top{display:flex;align-items:center;gap:var(--sp-sm);margin-bottom:var(--sp-xs-sm)}
 .achv-card-icon{font-size:1.1em;flex-shrink:0}
 .achv-card-name{font-size:0.78em;font-weight:700;color:var(--bright);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .achv-card.locked .achv-card-name{color:var(--dim)}
 .achv-card-desc{font-size:0.62em;color:#6a8aaa;line-height:1.3}
 .achv-card.locked .achv-card-desc{color:#3a5a6a}
 .achv-card-reward{
-  font-size:0.58em;font-weight:600;color:var(--green);margin-top:3px;
-  background:rgba(34,197,94,0.06);border-radius:2px;padding:1px 5px;display:inline-block;
+  font-size:0.58em;font-weight:600;color:var(--green);margin-top:var(--sp-xs-sm);
+  background:rgba(34,197,94,0.06);border-radius:2px;padding:var(--sp-3xs) var(--sp-sm-md);display:inline-block;
 }
 .achv-card.locked .achv-card-reward{color:#2a4a3a;background:rgba(34,197,94,0.03)}
 .achv-card-tier{
@@ -2555,7 +2614,7 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 .achv-card-hint{
   display:none;position:absolute;left:50%;bottom:calc(100% + 6px);transform:translateX(-50%);
   background:rgba(6,10,18,0.97);border:1px solid rgba(251,191,36,0.25);border-radius:5px;
-  padding:5px 10px;font-size:0.65em;color:#fbbf24;white-space:nowrap;z-index:5;
+  padding:var(--sp-sm-md) var(--sp-md-lg);font-size:0.65em;color:#fbbf24;white-space:nowrap;z-index:5;
   box-shadow:0 4px 12px rgba(0,0,0,0.5);pointer-events:none;
 }
 .achv-card-hint::after{
@@ -2565,21 +2624,21 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 .achv-card.locked:hover .achv-card-hint{display:block;animation:fadeIn 0.2s}
 /* Milestones section in hall */
 .achv-milestones{
-  margin-top:12px;padding-top:10px;border-top:1px solid rgba(251,191,36,0.1);
+  margin-top:var(--sp-lg);padding-top:var(--sp-md-lg);border-top:1px solid rgba(251,191,36,0.1);
 }
 .achv-ms-title{
-  font-family:'Orbitron',monospace;font-size:0.68em;color:#fbbf24;letter-spacing:2px;margin-bottom:8px;
+  font-family:'Orbitron',monospace;font-size:0.68em;color:#fbbf24;letter-spacing:2px;margin-bottom:var(--sp-md);
 }
-.achv-ms-grid{display:flex;gap:6px;flex-wrap:wrap}
+.achv-ms-grid{display:flex;gap:var(--sp-sm);flex-wrap:wrap}
 .achv-ms-item{
-  padding:5px 10px;background:rgba(10,18,30,0.7);border:1px solid rgba(255,255,255,0.06);
+  padding:var(--sp-sm-md) var(--sp-md-lg);background:rgba(10,18,30,0.7);border:1px solid rgba(255,255,255,0.06);
   border-radius:5px;font-size:0.65em;text-align:center;min-width:80px;transition:all 0.3s;
 }
 .achv-ms-item.claimed{border-color:rgba(251,191,36,0.3);background:rgba(251,191,36,0.05)}
 .achv-ms-item.unclaimed{opacity:0.4}
 .achv-ms-count{font-family:'Orbitron',monospace;font-weight:700;color:var(--bright);font-size:1.1em}
 .achv-ms-item.claimed .achv-ms-count{color:#fbbf24}
-.achv-ms-buff{color:var(--dim);font-size:0.9em;margin-top:2px}
+.achv-ms-buff{color:var(--dim);font-size:0.9em;margin-top:var(--sp-2xs)}
 .achv-ms-item.claimed .achv-ms-buff{color:var(--green)}
 
 /* ===== SCORE FLOAT (score change flying number) ===== */
@@ -2599,18 +2658,28 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 
 /* responsive adjustments for honor section */
 @media (max-width:1100px){
-  .honor-group .csb-score-item{font-size:0.82em!important}
+  .honor-group .csb-score-item{font-size:0.82em}
   .honor-group .csb-score-item .s-label{font-size:0.82em}
   .honor-group .csb-score-item .s-val{font-size:0.85em}
-  .honor-rank-badge{font-size:0.65em;padding:1px 5px}
+  .honor-rank-badge{font-size:0.65em;padding:var(--sp-3xs) var(--sp-sm-md)}
 }
 @media (max-width:768px){
-  .honor-group .csb-score-item{font-size:0.78em!important;padding:3px 5px}
-  .honor-fieldset legend{font-size:0.58em!important}
-  .honor-rank-badge{font-size:0.6em;padding:1px 4px}
-  .achv-hall{width:96vw;max-height:90vh;padding:14px 12px}
+  .honor-group .csb-score-item{font-size:0.78em;padding:var(--sp-xs-sm) var(--sp-sm-md)}
+  .honor-fieldset legend{font-size:0.58em}
+  .honor-rank-badge{font-size:0.6em;padding:var(--sp-3xs) var(--sp-xs)}
+  .achv-hall{width:96vw;max-height:90vh;padding:var(--sp-xl) var(--sp-lg)}
   .achv-grid{grid-template-columns:1fr}
   .achv-ms-grid{flex-direction:column}
+}
+
+/* === P0: 尊重用户减弱动画偏好 === */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 </style>
@@ -2656,7 +2725,7 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
     <div class="sidebar">
       <!-- Resources -->
       <div class="section" id="secResources">
-        <div class="section-title">资源 <button class="sec-toggle" onclick="G.toggleSection('secResources')">▾</button></div>
+        <div class="section-title">资源 <button class="sec-toggle" onclick="G.toggleSection('secResources')" aria-expanded="true">▾</button></div>
         <div class="sec-body">
           <div class="res-grid" id="resGrid"></div>
         </div>
@@ -2664,7 +2733,7 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 
       <!-- Actions -->
       <div class="section" id="secBuild">
-        <div class="section-title">建造 <span class="hint" id="buildHint">选一个放到培养皿里</span> <button class="sec-toggle" onclick="G.toggleSection('secBuild')">▾</button></div>
+        <div class="section-title">建造 <span class="hint" id="buildHint">点选或拖拽到培养皿</span> <button class="sec-toggle" onclick="G.toggleSection('secBuild')" aria-expanded="true">▾</button></div>
         <div class="sec-body">
           <div id="buildList"></div>
           <div class="belt-action-row">
@@ -2695,7 +2764,7 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 
       <!-- Tech Tree (科技树) -->
       <div class="section" id="techSection" style="display:none">
-        <div class="section-title">科技树 <button class="sec-toggle" onclick="G.toggleSection('techSection')">▾</button></div>
+        <div class="section-title">科技树 <button class="sec-toggle" onclick="G.toggleSection('techSection')" aria-expanded="true">▾</button></div>
         <div class="sec-body">
           <div id="techList"></div>
         </div>
@@ -2716,7 +2785,7 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
         <div class="empire-overview-header" onclick="G.toggleSection('empireOverview')">
           <span class="empire-overview-icon">🏛️</span>
           <span class="empire-overview-title">帝国总览</span>
-          <button class="colony-status-toggle" id="empireOverviewToggle">▾</button>
+          <button class="colony-status-toggle" id="empireOverviewToggle" aria-expanded="true">▾</button>
         </div>
         <div class="empire-overview-body" id="empireOverviewBody">
           <!-- ===== 左栏：核心 + 状态 ===== -->
@@ -2734,7 +2803,7 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
                 <div class="core-colony-supply" id="coreSupplyPanel">
                   <div class="core-supply-label">⚡ 能量供给</div>
                   <div class="core-supply-value" id="coreSupplyText">0/2 🌱</div>
-                  <div class="core-supply-bar"><div class="core-supply-fill" id="coreSupplyFill" style="width:0%;background:#22c55e"></div></div>
+                  <div class="core-supply-bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" aria-label="核心供能进度"><div class="core-supply-fill" id="coreSupplyFill" style="width:0%;background:#22c55e"></div></div>
                   <div class="core-supply-status-tag idle" id="coreSupplyTag">待机</div>
                 </div>
                 <div class="core-colony-status" id="coreStatus">🏠 帝国核心</div>
@@ -2782,7 +2851,7 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
                       <span class="alloc-pct ch-pct" style="color:#22c55e">34%</span>
                       <button onclick="G.adjustPopAlloc('harvest',5)">+</button>
                     </div>
-                    <div class="ch-bar"><div class="ch-bar-bg" style="background:#22c55e"></div><div class="alloc-bar-fill ch-bar-fill" style="background:#22c55e;width:34%"></div></div>
+                    <div class="ch-bar" role="progressbar" aria-valuenow="34" aria-valuemin="0" aria-valuemax="100" aria-label="采集分配"><div class="ch-bar-bg" style="background:#22c55e"></div><div class="alloc-bar-fill ch-bar-fill" style="background:#22c55e;width:34%"></div></div>
                     <span class="alloc-info ch-info">0菌 +0%</span>
                   </div>
                   <!-- 研究 -->
@@ -2793,7 +2862,7 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
                       <span class="alloc-pct ch-pct" style="color:#a855f7">33%</span>
                       <button onclick="G.adjustPopAlloc('research',5)">+</button>
                     </div>
-                    <div class="ch-bar"><div class="ch-bar-bg" style="background:#a855f7"></div><div class="alloc-bar-fill ch-bar-fill" style="background:#a855f7;width:33%"></div></div>
+                    <div class="ch-bar" role="progressbar" aria-valuenow="33" aria-valuemin="0" aria-valuemax="100" aria-label="研究分配"><div class="ch-bar-bg" style="background:#a855f7"></div><div class="alloc-bar-fill ch-bar-fill" style="background:#a855f7;width:33%"></div></div>
                     <span class="alloc-info ch-info">0菌 +0%</span>
                   </div>
                   <!-- 物流 -->
@@ -2804,7 +2873,7 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
                       <span class="alloc-pct ch-pct" style="color:#3b82f6">33%</span>
                       <button onclick="G.adjustPopAlloc('logistics',5)">+</button>
                     </div>
-                    <div class="ch-bar"><div class="ch-bar-bg" style="background:#3b82f6"></div><div class="alloc-bar-fill ch-bar-fill" style="background:#3b82f6;width:33%"></div></div>
+                    <div class="ch-bar" role="progressbar" aria-valuenow="33" aria-valuemin="0" aria-valuemax="100" aria-label="物流分配"><div class="ch-bar-bg" style="background:#3b82f6"></div><div class="alloc-bar-fill ch-bar-fill" style="background:#3b82f6;width:33%"></div></div>
                     <span class="alloc-info ch-info">0菌 +0%</span>
                   </div>
                 </div>
@@ -2863,14 +2932,14 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
       <div id="colonyStatusBar" style="display:none"></div>
       <div class="dish-view-wrap">
       <div class="dish-view">
-        <div class="pause-overlay" id="pauseOverlay">⏸ 已暂停</div>
+        <div class="pause-overlay" id="pauseOverlay" role="alertdialog" aria-modal="false" aria-label="游戏暂停" aria-hidden="true">⏸ 已暂停</div>
         <div class="dish-scroll-inner" id="dishScrollInner">
           <canvas id="bgCanvas"></canvas>
           <canvas id="partCanvas"></canvas>
           <div class="grid" id="grid"></div>
         </div>
         <!-- Achievement Popup — 培养皿内顶部 toast -->
-        <div class="achieve-popup" id="achievePopup">
+        <div class="achieve-popup" id="achievePopup" role="alertdialog" aria-modal="true" aria-label="成就达成" aria-hidden="true">
           <div class="achieve-glow"></div>
           <div class="achieve-icon">🏆</div>
           <div class="achieve-body">
@@ -2888,7 +2957,7 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
     <div class="right-panel">
       <!-- Guide / Next Goal -->
       <div class="section" id="secGoal">
-        <div class="section-title">🎯 目标 <button class="sec-toggle" onclick="G.toggleSection('secGoal')">▾</button></div>
+        <div class="section-title">🎯 目标 <button class="sec-toggle" onclick="G.toggleSection('secGoal')" aria-expanded="true">▾</button></div>
         <div class="sec-body">
           <div class="guide-box" id="guideBox">
             <div class="guide-title">下一步</div>
@@ -2902,14 +2971,14 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 
       <!-- Evolution (locked until evoLv >= 2) -->
       <div class="section sec-locked" id="evoSection">
-        <div class="section-title">进化 <button class="sec-toggle" onclick="G.toggleSection('evoSection')">▾</button></div>
+        <div class="section-title">进化 <button class="sec-toggle" onclick="G.toggleSection('evoSection')" aria-expanded="true">▾</button></div>
         <div class="sec-body">
         <div class="evo-box">
           <div class="evo-header">
             <span style="font-size:0.7em;color:var(--dim)">进化等级</span>
             <span class="evo-lv" id="evoLv">Lv.1</span>
           </div>
-          <div class="evo-bar-wrap"><div class="evo-bar" id="evoBar" style="width:0%"></div></div>
+          <div class="evo-bar-wrap"><div class="evo-bar" id="evoBar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" aria-label="进化进度" style="width:0%"></div></div>
           <div style="font-size:0.7em;color:var(--dim);margin:4px 0" id="evoCostInfo">需要: 100🧬 + 80🧪</div>
           <div style="font-size:0.65em;color:var(--dim);margin-bottom:4px" id="evoResStatus"></div>
           <button class="evo-btn" id="evoBtn" onclick="G.evolve()" disabled>进化 ▸</button>
@@ -2925,13 +2994,13 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 
       <!-- Petri Experiment -->
       <div class="section" id="secPetri" style="display:none">
-        <div class="section-title">🧫 培养皿实验 <button class="sec-toggle" onclick="G.toggleSection('secPetri')">▾</button></div>
+        <div class="section-title">🧫 培养皿实验 <button class="sec-toggle" onclick="G.toggleSection('secPetri')" aria-expanded="true">▾</button></div>
         <div class="sec-body" id="petriResultPanel"></div>
       </div>
 
       <!-- Stats -->
       <div class="section" id="secStats">
-        <div class="section-title">📊 统计 <button class="sec-toggle" onclick="G.toggleSection('secStats')">▾</button></div>
+        <div class="section-title">📊 统计 <button class="sec-toggle" onclick="G.toggleSection('secStats')" aria-expanded="true">▾</button></div>
         <div class="sec-body">
           <div class="stat-card" id="statsContent"></div>
         </div>
@@ -2939,7 +3008,7 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 
       <!-- Log -->
       <div class="section" id="secLog">
-        <div class="section-title">日志 <button class="sec-toggle" onclick="G.toggleSection('secLog')">▾</button></div>
+        <div class="section-title">日志 <button class="sec-toggle" onclick="G.toggleSection('secLog')" aria-expanded="true">▾</button></div>
         <div class="sec-body">
           <div class="log-box" id="logBox"></div>
         </div>
@@ -2948,22 +3017,22 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
   </div>
 
   <!-- Mobile Tab Bar -->
-  <div class="mobile-tab-bar" id="mobileTabBar">
-    <button class="mobile-tab" data-tab="build" onclick="G.mobileTab('build')">🏗 建造</button>
-    <button class="mobile-tab active" data-tab="dish" onclick="G.mobileTab('dish')">🔬 培养皿</button>
-    <button class="mobile-tab" data-tab="info" onclick="G.mobileTab('info')">📊 状态</button>
+  <div class="mobile-tab-bar" role="tablist" aria-label="主导航" id="mobileTabBar">
+    <button class="mobile-tab" data-tab="build" onclick="G.mobileTab('build')" role="tab" aria-selected="false">🏗 建造</button>
+    <button class="mobile-tab active" data-tab="dish" onclick="G.mobileTab('dish')" role="tab" aria-selected="true">🔬 培养皿</button>
+    <button class="mobile-tab" data-tab="info" onclick="G.mobileTab('info')" role="tab" aria-selected="false">📊 状态</button>
   </div>
 </div>
 <div class="popup-backdrop" id="popupBackdrop" onclick="G.closeTopPopup()"></div>
 
 <!-- Combo Popup -->
-<div class="combo-popup" id="comboPopup">
+<div class="combo-popup" id="comboPopup" role="alertdialog" aria-modal="true" aria-label="连击奖励" aria-hidden="true">
   <div class="combo-count" id="comboCount"></div>
   <div class="combo-bonus" id="comboBonus"></div>
 </div>
 
 <!-- Event Popup -->
-<div class="event-popup" id="eventPopup">
+<div class="event-popup" id="eventPopup" role="dialog" aria-modal="true" aria-label="随机事件" aria-hidden="true">
   <h3 id="eventTitle"></h3>
   <p id="eventDesc"></p>
   <button onclick="G.closeEvent()">确认</button>
@@ -2976,14 +3045,14 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 </div>
 
 <!-- Wonder Progress -->
-<div class="wonder-overlay" id="wonderOverlay">
+<div class="wonder-overlay" id="wonderOverlay" role="dialog" aria-modal="false" aria-label="奇观建造进度" aria-hidden="true">
   <div class="wonder-name" id="wonderName"></div>
-  <div class="wonder-bar"><div class="wonder-fill" id="wonderFill"></div></div>
+  <div class="wonder-bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" aria-label="奇观建造进度"><div class="wonder-fill" id="wonderFill"></div></div>
   <div class="wonder-pct" id="wonderPct">0%</div>
 </div>
 
 <!-- Recycle Confirm -->
-<div class="recycle-popup" id="recyclePopup">
+<div class="recycle-popup" id="recyclePopup" role="dialog" aria-modal="true" aria-label="回收确认" aria-hidden="true">
   <div class="recycle-title">♻️ 回收建筑</div>
   <div class="recycle-name" id="recycleName"></div>
   <div class="recycle-refund" id="recycleRefund"></div>
@@ -2994,7 +3063,7 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 </div>
 
 <!-- Reset Confirm -->
-<div class="reset-popup" id="resetPopup">
+<div class="reset-popup" id="resetPopup" role="dialog" aria-modal="true" aria-label="重置确认" aria-hidden="true">
   <div class="reset-title">⚠️ 重置游戏</div>
   <div class="reset-msg">所有进度将被清除，从头开始！<br><span style="color:var(--cyan);font-size:0.95em">📊 历史最高分会永久保留</span><br>（此操作不可撤销）</div>
   <div class="reset-btns">
@@ -3004,20 +3073,20 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 </div>
 
 <!-- Challenge Bar -->
-<div class="challenge-bar" id="challengeBar">
+<div class="challenge-bar" id="challengeBar" aria-label="挑战进度">
   <div style="display:flex;align-items:center;gap:8px;flex:1">
     <span class="challenge-name" id="challengeName">🎯 挑战</span>
     <span class="challenge-desc" id="challengeDesc"></span>
   </div>
   <div class="challenge-timer">
-    <div class="challenge-bar-wrap"><div class="challenge-fill" id="challengeFill"></div></div>
+    <div class="challenge-bar-wrap" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" aria-label="挑战时间进度"><div class="challenge-fill" id="challengeFill"></div></div>
     <span class="challenge-time" id="challengeTime">60s</span>
   </div>
   <button class="challenge-skip" onclick="G.skipChallenge()">跳过</button>
 </div>
 
 <!-- Offline Earnings Popup -->
-<div class="offline-popup" id="offlinePopup">
+<div class="offline-popup" id="offlinePopup" role="dialog" aria-modal="true" aria-label="离线收益" aria-hidden="true">
   <div class="offline-glow"></div>
   <div style="font-size:1.5em;margin-bottom:4px">🌙</div>
   <div style="font-family:'Orbitron',monospace;font-size:0.85em;color:var(--cyan);letter-spacing:2px;margin-bottom:6px">欢迎回来！</div>
@@ -3028,7 +3097,7 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 </div>
 
 <!-- Upgrade Popup -->
-<div class="upgrade-popup" id="upgradePopup">
+<div class="upgrade-popup" id="upgradePopup" role="dialog" aria-modal="true" aria-label="升级确认" aria-hidden="true">
   <div style="font-family:'Orbitron',monospace;font-size:0.75em;color:var(--cyan);letter-spacing:2px;margin-bottom:6px">⬆ 建筑升级</div>
   <div style="font-size:0.95em;font-weight:700;color:var(--bright);margin-bottom:4px" id="upgradeName"></div>
   <div style="font-size:0.8em;color:var(--cyan);font-weight:700;margin-bottom:4px" id="upgradeLevel"></div>
@@ -3041,7 +3110,7 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 </div>
 
 <!-- Belt Upgrade Popup -->
-<div class="upgrade-popup" id="beltUpgradePopup">
+<div class="upgrade-popup" id="beltUpgradePopup" role="dialog" aria-modal="true" aria-label="传送带升级" aria-hidden="true">
   <div style="font-family:'Orbitron',monospace;font-size:0.75em;color:#f97316;letter-spacing:2px;margin-bottom:6px">⛓ 传送带升级</div>
   <div style="font-size:0.95em;font-weight:700;color:var(--bright);margin-bottom:4px" id="beltUpgradeName"></div>
   <div style="font-size:0.8em;color:#f97316;font-weight:700;margin-bottom:4px" id="beltUpgradeLevel"></div>
@@ -3055,7 +3124,7 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 </div>
 
 <!-- Building Type Selector Popup -->
-<div class="bld-type-selector" id="bldTypeSelector">
+<div class="bld-type-selector" id="bldTypeSelector" role="dialog" aria-modal="true" aria-label="建筑类型选择" aria-hidden="true">
   <div style="font-family:'Orbitron',monospace;font-size:0.75em;color:var(--cyan);letter-spacing:2px;margin-bottom:4px">⬆ 快速升级</div>
   <div style="font-size:0.55em;color:#5a7a90;margin-bottom:8px">点击直接升级 · 无需确认</div>
   <div class="bld-type-list" id="bldTypeList"></div>
@@ -3091,7 +3160,7 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 </div>
 
 <!-- Choice Event Popup -->
-<div class="choice-popup" id="choicePopup">
+<div class="choice-popup" id="choicePopup" role="dialog" aria-modal="true" aria-label="选择决策" aria-hidden="true">
   <div style="font-size:1.2em;margin-bottom:4px">🔮</div>
   <h3 id="choiceTitle" style="font-family:'Orbitron',monospace;font-size:0.85em;color:var(--cyan);margin-bottom:6px"></h3>
   <p id="choiceDesc" style="font-size:0.78em;color:#8aa0c0;margin-bottom:14px;line-height:1.3"></p>
@@ -3108,7 +3177,7 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 </div>
 
 <!-- Prestige Popup -->
-<div class="upgrade-popup" id="prestigePopup" style="max-width:420px;max-height:85vh;overflow-y:auto">
+<div class="upgrade-popup" id="prestigePopup" role="dialog" aria-modal="true" aria-label="声望重置" aria-hidden="true" style="max-width:420px;max-height:85vh;overflow-y:auto">
   <div style="font-family:'Orbitron',monospace;font-size:0.85em;color:var(--purple);letter-spacing:2px;margin-bottom:6px">🌀 转生系统</div>
   <div style="font-size:0.75em;color:var(--dim);margin-bottom:4px">重置进度，换取永久强化</div>
   <div style="font-size:0.9em;font-weight:700;color:var(--yellow);margin-bottom:2px" id="prestigeGain"></div>
@@ -3142,18 +3211,18 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 </div>
 
 <!-- Intro / Welcome Popup -->
-<div class="intro-popup" id="introPopup">
+<div class="intro-popup" id="introPopup" role="dialog" aria-modal="true" aria-label="游戏介绍" aria-hidden="true">
   <div class="intro-glow"></div>
   <div style="font-size:1.6em;margin-bottom:4px;position:relative">🧬</div>
   <div class="intro-title">BIOSPHERE</div>
   <div class="intro-subtitle">微 生 物 帝 国</div>
 
   <!-- Tab 切换栏 -->
-  <div class="intro-tabs" id="introTabs">
+  <div class="intro-tabs" role="tablist" aria-label="教程导航" id="introTabs">
     <button class="intro-tab active" data-intro-page="welcome">🏠 欢迎</button>
-    <button class="intro-tab" data-intro-page="flowchart">📋 资源流向</button>
-    <button class="intro-tab" data-intro-page="beltguide">⛓ 传送带</button>
-    <button class="intro-tab" data-intro-page="strategy">📈 攻略</button>
+    <button class="intro-tab" data-intro-page="flowchart" role="tab" aria-selected="false">📋 资源流向</button>
+    <button class="intro-tab" data-intro-page="beltguide" role="tab" aria-selected="false">⛓ 传送带</button>
+    <button class="intro-tab" data-intro-page="strategy" role="tab" aria-selected="false">📈 攻略</button>
   </div>
 
   <!-- Page 1: 欢迎 -->
@@ -3332,7 +3401,7 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 </script>
 <script src="game.js?v=20260316s"></script>
 <!-- Nickname Popup -->
-<div class="nickname-popup" id="nicknamePopup">
+<div class="nickname-popup" id="nicknamePopup" role="dialog" aria-modal="true" aria-label="设置昵称" aria-hidden="true">
   <div style="font-family:'Orbitron',monospace;font-size:0.85em;color:var(--cyan);letter-spacing:2px;margin-bottom:10px">🧬 设置昵称</div>
   <div style="font-size:0.75em;color:var(--dim);margin-bottom:12px">给你的微生物帝国取个名字，好友可以在排行榜上看到你！</div>
   <input type="text" id="nicknameInput" maxlength="12" placeholder="输入昵称（2-12字符）"
@@ -3344,7 +3413,7 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 </div>
 
 <!-- Achievement Hall Panel -->
-<div class="achv-hall-overlay" id="achvHallOverlay" onclick="if(event.target===this)G.closeAchievementHall()">
+<div class="achv-hall-overlay" id="achvHallOverlay" role="dialog" aria-modal="true" aria-label="成就殿堂" aria-hidden="true" onclick="if(event.target===this)G.closeAchievementHall()">
   <div class="achv-hall">
     <div class="achv-hall-header">
       <span style="font-size:1.3em">🏆</span>
@@ -3352,15 +3421,15 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
       <span id="achvHallProgress" style="font-family:'Share Tech Mono',monospace;font-size:0.78em;color:var(--dim);margin-left:8px">0/37</span>
       <button class="achv-hall-close" onclick="G.closeAchievementHall()">✕</button>
     </div>
-    <div class="achv-progress-wrap"><div class="achv-progress-fill" id="achvProgressBar" style="width:0%"></div></div>
+    <div class="achv-progress-wrap" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" aria-label="成就完成度"><div class="achv-progress-fill" id="achvProgressBar" style="width:0%"></div></div>
     <div class="achv-progress-label" id="achvProgressLabel">0%</div>
-    <div class="achv-filters" id="achvFilters"></div>
+    <div class="achv-filters" id="achvFilters" role="tablist" aria-label="成就筛选"></div>
     <div class="achv-hall-body" id="achvHallBody"></div>
   </div>
 </div>
 
 <!-- Leaderboard Popup -->
-<div class="leaderboard-popup" id="leaderboardPopup">
+<div class="leaderboard-popup" id="leaderboardPopup" role="dialog" aria-modal="true" aria-label="排行榜" aria-hidden="true">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,0.08)">
     <div style="font-family:'Orbitron',monospace;font-size:0.85em;color:#fbbf24;letter-spacing:2px">🏆 排行榜</div>
     <button onclick="G.closeLeaderboard()" style="background:none;border:none;color:var(--dim);cursor:pointer;font-size:1.2em;padding:0 4px;line-height:1">✕</button>

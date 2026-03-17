@@ -4,6 +4,34 @@
 
 ---
 
+## v0.6.0 — 2026-03-17 · 拖拽建造 & UI 优化
+
+### ✨ 新功能
+- [office] 侧栏拖拽建造：从建造列表直接拖拽建筑到培养皿网格放置（替代"点选→点格"两步操作）
+- [office] 拖拽建造 ghost 浮动指示器：显示建筑 emoji + 名称，绿色/红色反映资源是否充足
+- [office] 拖拽目标格子高亮反馈：空格绿色脉冲（可放置）、占用格红色（不可放置）
+- [office] 拖拽源按钮视觉反馈：拖拽中半透明 + 缩小 + 虚线边框 (`.build-dragging`)
+- [office] 移动端触摸拖拽建造支持：`touchstart/touchmove/touchend`，拖拽中阻止页面滚动
+- [office] 拖拽与点击共存：未超过 8px 移动阈值自动回退为原有点选行为
+
+### 🎨 视觉 / UI 改进
+- [office] CSS 间距令牌统一：硬编码 `gap/padding/margin` 替换为 `var(--sp-*)` 设计令牌
+- [office] 折叠动画统一：帝国总览、科技树等折叠/展开动画时长统一为 `var(--dur-collapse)`
+- [office] CSS 模块化重构：相关样式按功能分组、注释标记，提升可维护性
+- [office] `buildHint` 默认文字更新为"点选或拖拽到培养皿"
+
+### ♿ 无障碍增强
+- [office] ARIA 属性增强：建造按钮、面板折叠、标签页等添加 `aria-label/aria-expanded/aria-selected`
+- [office] 键盘导航改进：可聚焦元素 `tabindex` 与 `role` 属性完善
+
+### 🔧 技术实现
+- [office] 拖拽建造复用 `cellClick()` 建造逻辑，通过临时 `sel` 状态桥接
+- [office] 全局 `mousemove/mouseup/touchmove/touchend` 事件委托到 `document`
+- [office] `elementFromPoint` + `.closest('.cell')` 实现拖拽目标检测
+- [office] 新增 4 个方法：`_buildDragMove`、`_buildDragEnd`、`_createBuildDragGhost`、`_cleanupBuildDrag`
+
+---
+
 ## v0.5.0 — 2026-03-17 · 升级体验优化 & 条件存档 & 玩家昵称
 
 ### ✨ 新功能

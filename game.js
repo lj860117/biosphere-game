@@ -1511,6 +1511,43 @@ const G = {
     document.addEventListener('click', audioInit);
     document.addEventListener('keydown', audioInit);
 
+    // ===== 拖拽建造：全局事件监听 =====
+    document.addEventListener('mousemove', (e) => this._buildDragMove(e.clientX, e.clientY));
+    document.addEventListener('mouseup', (e) => {
+      if (e.button !== 0) return;
+      // 拖拽建造释放
+      if (this._buildDragging) {
+        this._buildDragEnd(e.clientX, e.clientY);
+        return; // 拖拽建造中，不处理其他 mouseup
+      }
+      // 非拖拽的 mousedown → mouseup 回退为 click（selectBuilding）
+      if (this._buildDragKey && !this._buildDragging) {
+        this.selectBuilding(this._buildDragKey);
+        this._buildDragKey = null;
+        this._buildDragStartPos = null;
+      }
+    });
+    document.addEventListener('touchmove', (e) => {
+      if (!this._buildDragTouch || !this._buildDragKey) return;
+      if (e.touches.length !== 1) return;
+      const touch = e.touches[0];
+      this._buildDragMove(touch.clientX, touch.clientY);
+      if (this._buildDragging) e.preventDefault(); // 阻止滚动
+    }, { passive: false });
+    document.addEventListener('touchend', (e) => {
+      if (!this._buildDragTouch || !this._buildDragKey) return;
+      const touch = e.changedTouches[0];
+      if (this._buildDragging) {
+        this._buildDragEnd(touch.clientX, touch.clientY);
+      } else {
+        // 非拖拽的 tap → selectBuilding
+        this.selectBuilding(this._buildDragKey);
+        this._buildDragKey = null;
+        this._buildDragStartPos = null;
+      }
+      this._buildDragTouch = false;
+    });
+
     // 全局 mouseup — 取消拖拽/框选（鼠标在格子外释放时）
     document.addEventListener('mouseup', (e) => {
       if (e.button !== 0) return;
@@ -1581,11 +1618,11 @@ const G = {
     sidebar.classList.remove('mobile-active');
     rightPanel.classList.remove('mobile-active');
     center.classList.remove('mobile-hidden');
-    tabs.forEach(t => t.classList.remove('active'));
+    tabs.forEach(t => { t.classList.remove('active'); t.setAttribute('aria-selected', 'false'); });
 
     // 激活对应 tab
     const activeTab = document.querySelector(`.mobile-tab[data-tab="${tab}"]`);
-    if (activeTab) activeTab.classList.add('active');
+    if (activeTab) { activeTab.classList.add('active'); activeTab.setAttribute('aria-selected', 'true'); }
 
     if (tab === 'build') {
       sidebar.classList.add('mobile-active');
@@ -1785,8 +1822,9 @@ const G = {
   // ===== 弹窗遮罩管理 =====
   // 按优先级排列的弹窗ID列表（从高到低）
   _popupIds: [
+    'achvHallOverlay', 'comboPopup', 'achievePopup',
     'introPopup', 'resetPopup', 'choicePopup', 'offlinePopup',
-    'upgradePopup', 'beltUpgradePopup', 'recyclePopup',
+    'upgradePopup', 'beltUpgradePopup', 'recyclePopup', 'prestigePopup',
     'bldTypeSelector', 'beltTypeSelector', 'eventPopup',
     'leaderboardPopup', 'nicknamePopup'
   ],
@@ -1801,13 +1839,29 @@ const G = {
     if (bd) bd.classList.remove('show');
   },
 
+  /** ARIA: 统一弹窗显示，同步 aria-hidden */
+  _showPopup(idOrEl) {
+    const el = typeof idOrEl === 'string' ? document.getElementById(idOrEl) : idOrEl;
+    if (!el) return;
+    el.classList.add('show');
+    if (el.hasAttribute('aria-hidden')) el.setAttribute('aria-hidden', 'false');
+  },
+
+  /** ARIA: 统一弹窗隐藏，同步 aria-hidden */
+  _hidePopup(idOrEl) {
+    const el = typeof idOrEl === 'string' ? document.getElementById(idOrEl) : idOrEl;
+    if (!el) return;
+    el.classList.remove('show');
+    if (el.hasAttribute('aria-hidden')) el.setAttribute('aria-hidden', 'true');
+  },
+
   // 关闭最上层弹窗（ESC / 点击遮罩时调用）
   closeTopPopup() {
     // 按z-index从高到低检查哪个弹窗在显示
     for (const id of this._popupIds) {
       const el = document.getElementById(id);
       if (el && el.classList.contains('show')) {
-        el.classList.remove('show');
+        this._hidePopup(el);
         this._hideBackdrop();
         // 特定弹窗需要清理状态
         if (id === 'recyclePopup') this.recycleIdx = null;
@@ -1888,7 +1942,7 @@ const G = {
       </div>`;
     }
     detailEl.innerHTML = html;
-    pop.classList.add('show');
+    this._showPopup(pop);
     SFX.bigReward();
     this.screenShake(5);
     // 安全网：8秒后自动关闭
@@ -1896,14 +1950,14 @@ const G = {
   },
 
   closeOffline() {
-    document.getElementById('offlinePopup')?.classList.remove('show');
+    this._hidePopup('offlinePopup');
   },
 
   // ===== INTRO / WELCOME =====
   showIntro() {
     const pop = document.getElementById('introPopup');
     if (!pop) return;
-    pop.classList.add('show');
+    this._showPopup(pop);
     this._showBackdrop();
     SFX.milestone();
     // 初始化 tab 切换（仅绑定一次）
@@ -1915,8 +1969,9 @@ const G = {
           if (!tab) return;
           const page = tab.dataset.introPage;
           if (!page) return;
-          tabs.querySelectorAll('.intro-tab').forEach(t => t.classList.remove('active'));
+          tabs.querySelectorAll('.intro-tab').forEach(t => { t.classList.remove('active'); t.setAttribute('aria-selected', 'false'); });
           tab.classList.add('active');
+          tab.setAttribute('aria-selected', 'true');
           pop.querySelectorAll('.intro-page').forEach(p => p.classList.remove('active'));
           const target = pop.querySelector(`.intro-page[data-page="${page}"]`);
           if (target) target.classList.add('active');
@@ -1928,7 +1983,7 @@ const G = {
   },
 
   closeIntro() {
-    document.getElementById('introPopup')?.classList.remove('show');
+    this._hidePopup('introPopup');
     this._hideBackdrop();
     localStorage.setItem('bioIntroSeen', '1');
     // 首次关闭开场弹窗后，触发音频初始化
@@ -2040,6 +2095,28 @@ const G = {
         ${tagHTML}
       `;
       btn.onclick = () => { if(!locked) this.selectBuilding(key); };
+
+      // ===== 拖拽建造：从侧栏拖建筑到网格直接放置 =====
+      if (!locked) {
+        btn.setAttribute('draggable', 'false'); // 禁用原生拖拽，用自定义实现
+        btn.addEventListener('mousedown', (e) => {
+          if (e.button !== 0) return;
+          this._buildDragKey = key;
+          this._buildDragStartPos = { x: e.clientX, y: e.clientY };
+          this._buildDragging = false;
+          e.stopPropagation(); // 不要冒泡到 selectBuilding 的 click
+        });
+        // 移动端触摸拖拽
+        btn.addEventListener('touchstart', (e) => {
+          if (e.touches.length !== 1) return;
+          const touch = e.touches[0];
+          this._buildDragKey = key;
+          this._buildDragStartPos = { x: touch.clientX, y: touch.clientY };
+          this._buildDragging = false;
+          this._buildDragTouch = true;
+        }, { passive: true });
+      }
+
       row.appendChild(btn);
 
       // 升级按钮：只在有已建造的非奇观/非增益建筑时显示
@@ -2396,7 +2473,7 @@ const G = {
   },
 
   closeBeltTypeSelector() {
-    document.getElementById('beltTypeSelector')?.classList.remove('show');
+    this._hidePopup('beltTypeSelector');
   },
 
   // 弹框：选择建筑实例进行升级（快速升级版 — 点击直接升级，无需确认弹窗）
@@ -2418,7 +2495,7 @@ const G = {
 
     this._renderBldTypeList(buildingKey, bd, instances);
 
-    document.getElementById('bldTypeSelector').classList.add('show');
+    this._showPopup('bldTypeSelector');
     SFX.click();
   },
 
@@ -2654,7 +2731,7 @@ const G = {
   },
 
   closeBldTypeSelector() {
-    document.getElementById('bldTypeSelector')?.classList.remove('show');
+    this._hidePopup('bldTypeSelector');
   },
 
   // === Techs (树状图版本) ===
@@ -2860,6 +2937,8 @@ const G = {
     const pct = Math.min(100, (used / maxC) * 100);
     fillEl.style.width = pct + '%';
     fillEl.style.background = overload ? '#ef4444' : (active === maxC ? '#f59e0b' : '#22c55e');
+    // ARIA: 同步进度值
+    fillEl.closest('[role="progressbar"]')?.setAttribute('aria-valuenow', Math.round(pct));
 
     // CSS边框特效类
     bar.classList.remove('supplying', 'supply-full', 'supply-overload');
@@ -3537,7 +3616,7 @@ const G = {
       // 移动端选中建筑后自动切换到培养皿
       if (this._isMobile()) this.mobileTab('dish');
     } else {
-      document.getElementById('buildHint').textContent = '选一个放到培养皿里';
+      document.getElementById('buildHint').textContent = '点选或拖拽到培养皿';
     }
     // 选中建筑后更新小手指向
     if (this.phase === 1) this._updateGuideHand();
@@ -3744,6 +3823,144 @@ const G = {
     this._dragOverIdx = null;
     this._isDragging = false;
     this._dragStartPos = null;
+  },
+
+  // ===== BUILD DRAG — 从侧栏拖拽建筑到网格 =====
+  _buildDragKey: null,        // 正在拖拽的建筑 key
+  _buildDragStartPos: null,   // 拖拽起始坐标
+  _buildDragging: false,      // 是否已进入拖拽状态
+  _buildDragGhost: null,      // 拖拽幽灵元素
+  _buildDragOverIdx: null,    // 悬停的目标格子索引
+  _buildDragTouch: false,     // 是否为触摸拖拽
+
+  _buildDragMove(clientX, clientY) {
+    if (!this._buildDragKey || !this._buildDragStartPos) return;
+
+    // 阈值检测：移动超过 8px 才进入拖拽模式
+    if (!this._buildDragging) {
+      const dx = clientX - this._buildDragStartPos.x;
+      const dy = clientY - this._buildDragStartPos.y;
+      if (Math.sqrt(dx * dx + dy * dy) < 8) return;
+      this._buildDragging = true;
+      // 给源按钮添加拖拽中样式
+      const srcBtn = document.querySelector(`.action-btn[data-b="${this._buildDragKey}"]`);
+      if (srcBtn) srcBtn.classList.add('build-dragging');
+      // 创建 ghost
+      this._createBuildDragGhost(this._buildDragKey, clientX, clientY);
+      // 隐藏 tooltip
+      document.getElementById('tooltip')?.classList.remove('show');
+    }
+
+    // 更新 ghost 位置
+    if (this._buildDragGhost) {
+      this._buildDragGhost.style.left = (clientX - 28) + 'px';
+      this._buildDragGhost.style.top = (clientY - 28) + 'px';
+    }
+
+    // 检测鼠标下方的格子
+    const gridEl = document.getElementById('grid');
+    if (!gridEl) return;
+
+    // 清除旧高亮
+    if (this._buildDragOverIdx != null) {
+      const prevCell = gridEl.children[this._buildDragOverIdx];
+      if (prevCell) { prevCell.style.boxShadow = ''; prevCell.style.borderColor = ''; }
+      this._buildDragOverIdx = null;
+    }
+
+    // 查找鼠标下方的格子
+    const elUnder = document.elementFromPoint(clientX, clientY);
+    if (!elUnder) return;
+    const cellEl = elUnder.closest('.cell');
+    if (!cellEl || cellEl.dataset.i == null) return;
+    const idx = +cellEl.dataset.i;
+
+    this._buildDragOverIdx = idx;
+
+    // 高亮反馈
+    if (!this.grid[idx]) {
+      // 空格：绿色可放置
+      cellEl.style.boxShadow = 'inset 0 0 16px rgba(6,214,160,0.4)';
+      cellEl.style.borderColor = '#06d6a0';
+    } else {
+      // 有建筑：红色不可放置
+      cellEl.style.boxShadow = 'inset 0 0 12px rgba(239,68,68,0.3)';
+      cellEl.style.borderColor = '#ef4444';
+    }
+  },
+
+  _buildDragEnd(clientX, clientY) {
+    const key = this._buildDragKey;
+    const overIdx = this._buildDragOverIdx;
+
+    // 清理拖拽状态
+    this._cleanupBuildDrag();
+
+    if (!key || overIdx == null) return;
+
+    // 通过 sel 路径复用 cellClick 的建造逻辑
+    const prevSel = this.sel;
+    this.sel = key;
+    this.cellClick(overIdx);
+    // cellClick 内部在建造成功后不会自动清 sel（保持连续建造）
+    // 拖拽建造是一次性的，所以恢复之前的选中状态
+    if (this.sel === key) {
+      this.sel = prevSel;
+      document.querySelectorAll('.action-btn').forEach(b => {
+        b.classList.toggle('active', b.dataset.b === this.sel);
+      });
+      if (!this.sel) {
+        document.getElementById('buildHint').textContent = '点选或拖拽到培养皿';
+      }
+    }
+  },
+
+  _createBuildDragGhost(key, clientX, clientY) {
+    if (this._buildDragGhost) this._buildDragGhost.remove();
+    const bd = BLDS[key];
+    if (!bd) return;
+
+    const ghost = document.createElement('div');
+    ghost.className = 'build-drag-ghost';
+    const costOk = this.checkRes(this.scaledCost(key));
+    ghost.innerHTML = `
+      <span style="font-size:24px;filter:drop-shadow(0 0 6px ${bd.color})">${bd.emoji || '🔧'}</span>
+      <span class="build-drag-name">${bd.n}</span>
+    `;
+    ghost.style.cssText = `
+      position:fixed; z-index:10010; pointer-events:none;
+      display:flex; align-items:center; gap:6px;
+      padding:6px 12px; border-radius:6px;
+      background:${costOk ? 'rgba(6,214,160,0.15)' : 'rgba(239,68,68,0.15)'};
+      border:2px solid ${costOk ? 'rgba(6,214,160,0.6)' : 'rgba(239,68,68,0.6)'};
+      backdrop-filter:blur(6px);
+      box-shadow:0 4px 20px ${costOk ? 'rgba(6,214,160,0.2)' : 'rgba(239,68,68,0.2)'};
+      font-family:'Rajdhani',sans-serif; font-size:0.75em; font-weight:700;
+      color:${costOk ? 'var(--cyan)' : '#ef4444'};
+      transition:transform 0.1s; transform:scale(1.05);
+    `;
+    ghost.style.left = (clientX - 28) + 'px';
+    ghost.style.top = (clientY - 28) + 'px';
+    document.body.appendChild(ghost);
+    this._buildDragGhost = ghost;
+  },
+
+  _cleanupBuildDrag() {
+    if (this._buildDragGhost) { this._buildDragGhost.remove(); this._buildDragGhost = null; }
+    // 移除源按钮的拖拽中样式
+    document.querySelectorAll('.action-btn.build-dragging').forEach(b => b.classList.remove('build-dragging'));
+    // 清除格子高亮
+    if (this._buildDragOverIdx != null) {
+      const gridEl = document.getElementById('grid');
+      if (gridEl) {
+        const cell = gridEl.children[this._buildDragOverIdx];
+        if (cell) { cell.style.boxShadow = ''; cell.style.borderColor = ''; }
+      }
+    }
+    this._buildDragKey = null;
+    this._buildDragStartPos = null;
+    this._buildDragging = false;
+    this._buildDragOverIdx = null;
   },
 
   // ===== BOX SELECT SYSTEM =====
@@ -4044,7 +4261,7 @@ const G = {
     if (bd.isWonder) {
       this.wBuild = this.sel;
       this.wProg = 0;
-      document.getElementById('wonderOverlay').classList.add('show');
+      this._showPopup('wonderOverlay');
       document.getElementById('wonderName').textContent = '建造中: ' + bd.n;
       this.log('★ 开始建造奇观: ' + bd.n, 's');
       SFX.wonderStart();
@@ -4133,7 +4350,7 @@ const G = {
 
     document.getElementById('recycleName').textContent = bd.n;
     document.getElementById('recycleRefund').textContent = '返还: ' + refundStr;
-    document.getElementById('recyclePopup').classList.add('show');
+    this._showPopup('recyclePopup');
     this._showBackdrop();
     SFX.click();
   },
@@ -4175,7 +4392,7 @@ const G = {
       const [a, b] = key.split('-').map(Number);
       if (a === idx || b === idx) delete this.removedBelts[key];
     }
-    document.getElementById('recyclePopup').classList.remove('show');
+    this._hidePopup('recyclePopup');
     this._hideBackdrop();
 
     this.renderGrid();
@@ -4186,7 +4403,7 @@ const G = {
 
   cancelRecycle() {
     this.recycleIdx = null;
-    document.getElementById('recyclePopup').classList.remove('show');
+    this._hidePopup('recyclePopup');
     this._hideBackdrop();
   },
 
@@ -4284,11 +4501,11 @@ const G = {
   openAchievementHall() {
     this._achvFilter = 'all';
     this._renderAchvHall();
-    document.getElementById('achvHallOverlay').classList.add('show');
+    this._showPopup('achvHallOverlay');
   },
 
   closeAchievementHall() {
-    document.getElementById('achvHallOverlay').classList.remove('show');
+    this._hidePopup('achvHallOverlay');
   },
 
   _renderAchvHall() {
@@ -4300,13 +4517,15 @@ const G = {
     document.getElementById('achvHallProgress').textContent = `${count}/${total}`;
     document.getElementById('achvProgressBar').style.width = pct + '%';
     document.getElementById('achvProgressLabel').textContent = pct + '%';
+    // ARIA: 同步成就进度
+    document.getElementById('achvProgressBar').closest('[role="progressbar"]')?.setAttribute('aria-valuenow', pct);
 
     // Build filter tabs
     const filterWrap = document.getElementById('achvFilters');
     const tiers = ['all','bronze','silver','gold','diamond'];
     const tierLabels = { all:'全部', bronze:'🥉 铜', silver:'🥈 银', gold:'🥇 金', diamond:'💎 钻石' };
     filterWrap.innerHTML = tiers.map(t =>
-      `<button class="achv-filter-btn${this._achvFilter===t?' active':''}" onclick="G._achvFilter='${t}';G._renderAchvHall()">${tierLabels[t]}</button>`
+      `<button class="achv-filter-btn${this._achvFilter===t?' active':''}" role="tab" aria-selected="${this._achvFilter===t}" onclick="G._achvFilter='${t}';G._renderAchvHall()">${tierLabels[t]}</button>`
     ).join('');
 
     // Build body content by category
@@ -4437,10 +4656,10 @@ const G = {
     const el = document.getElementById('comboPopup');
     document.getElementById('comboCount').textContent = `${count}连建！`;
     document.getElementById('comboBonus').textContent = `+${bonus}⚡ 连击奖励`;
-    el.classList.remove('show');
+    this._hidePopup(el);
     void el.offsetWidth;
-    el.classList.add('show');
-    setTimeout(() => el.classList.remove('show'), 2000);
+    this._showPopup(el);
+    setTimeout(() => this._hidePopup(el), 2000);
   },
 
   // ===== BUILD BURST EFFECT =====
@@ -4786,7 +5005,7 @@ const G = {
     if (!pop) return;
     const input = document.getElementById('nicknameInput');
     if (input) input.value = this._playerName || '';
-    pop.classList.add('show');
+    this._showPopup(pop);
     this._showBackdrop();
     if (input) setTimeout(() => input.focus(), 100);
   },
@@ -4808,7 +5027,7 @@ const G = {
   },
 
   closeNickname() {
-    document.getElementById('nicknamePopup')?.classList.remove('show');
+    this._hidePopup('nicknamePopup');
     this._hideBackdrop();
   },
 
@@ -4919,7 +5138,7 @@ const G = {
   },
 
   closeLeaderboard() {
-    document.getElementById('leaderboardPopup')?.classList.remove('show');
+    this._hidePopup('leaderboardPopup');
     this._hideBackdrop();
   },
 
@@ -5363,6 +5582,8 @@ const G = {
       if (!el) continue;
       el.querySelector('.alloc-pct').textContent = this.popAlloc[key] + '%';
       el.querySelector('.alloc-bar-fill').style.width = this.popAlloc[key] + '%';
+      // ARIA: 同步分配进度
+      el.querySelector('.ch-bar[role="progressbar"]')?.setAttribute('aria-valuenow', this.popAlloc[key]);
       const info = el.querySelector('.alloc-info');
       if (info) info.textContent = `${bonuses[key].pop}菌 +${bonuses[key].bonus}%`;
     }
@@ -5639,13 +5860,15 @@ const G = {
     const pct = Math.min(this.wProg / wt * 100, 100);
     document.getElementById('wonderFill').style.width = pct + '%';
     document.getElementById('wonderPct').textContent = Math.floor(pct) + '%';
+    // ARIA: 同步奇观进度
+    document.getElementById('wonderFill').closest('[role="progressbar"]')?.setAttribute('aria-valuenow', Math.round(pct));
 
     if (this.wProg >= wt) {
       this.wonderComplete = true;
       this.log('★★★ 奇观完成: ' + bd.n + ' ★★★', 's');
       SFX.wonderDone();
       this.showEvent('🏛️ 奇观落成！', bd.n + '\n\n' + bd.d + '\n\n你征服了微生物宇宙！这是文明的巅峰！', 'var(--purple)');
-      document.getElementById('wonderOverlay').classList.remove('show');
+      this._hidePopup('wonderOverlay');
       this.wBuild = null;
       this.wProg = 0;
       this.showMilestone('🌟', '游戏完成！微生物帝国达到巅峰！');
@@ -7808,6 +8031,8 @@ const G = {
     const readyPct = totalNeeded > 0 ? Math.min(100, (totalHave / totalNeeded) * 100) : 0;
     document.getElementById('evoBar').style.width = readyPct + '%';
     document.getElementById('evoBar').textContent = readyPct >= 10 ? readyPct.toFixed(0)+'%' : '';
+    // ARIA: 同步进化进度
+    document.getElementById('evoBar').closest('[role="progressbar"]')?.setAttribute('aria-valuenow', Math.round(readyPct));
 
     // Dynamic evolution cost & resource status
     const evoCostInfo = document.getElementById('evoCostInfo');
@@ -7850,11 +8075,62 @@ const G = {
   },
 
   // ===== SECTION TOGGLE (折叠/展开) =====
+  /** 测量 sec-body 自然高度并设置 max-height（用于过渡动画） */
+  _measureSecBody(secBody) {
+    if (!secBody) return;
+    // 临时移除 max-height 限制来测量自然高度
+    const prev = secBody.style.maxHeight;
+    secBody.style.maxHeight = 'none';
+    const h = secBody.scrollHeight;
+    secBody.style.maxHeight = prev;
+    return h;
+  },
+
+  /** 初始化所有 sec-body 的 max-height（展开状态下） */
+  _initSecBodyHeights() {
+    document.querySelectorAll('.section .sec-body').forEach(body => {
+      const sec = body.closest('.section');
+      if (sec && !sec.classList.contains('collapsed')) {
+        body.style.maxHeight = body.scrollHeight + 'px';
+      }
+    });
+  },
+
   toggleSection(secId) {
     const sec = document.getElementById(secId);
     if (!sec) return;
-    sec.classList.toggle('collapsed');
+    const body = sec.querySelector('.sec-body');
+    const isCollapsing = !sec.classList.contains('collapsed');
+
+    if (isCollapsing) {
+      // 展开 → 折叠：先锁定当前高度，再触发过渡到 0
+      if (body) {
+        body.style.maxHeight = body.scrollHeight + 'px';
+        // 强制 reflow 让浏览器注册当前值
+        void body.offsetHeight;
+      }
+      sec.classList.add('collapsed');
+      if (body) body.style.maxHeight = '0';
+    } else {
+      // 折叠 → 展开：先移除 collapsed，测量自然高度，设置 max-height
+      sec.classList.remove('collapsed');
+      if (body) {
+        const h = body.scrollHeight;
+        body.style.maxHeight = h + 'px';
+        // 过渡结束后移除固定值，允许内容动态变化
+        const onEnd = () => {
+          body.style.maxHeight = 'none';
+          body.removeEventListener('transitionend', onEnd);
+        };
+        body.addEventListener('transitionend', onEnd);
+      }
+    }
+
     SFX.click();
+    // ARIA: 同步折叠状态
+    const toggleBtn = sec.querySelector('.sec-toggle, .colony-status-toggle');
+    if (toggleBtn) toggleBtn.setAttribute('aria-expanded', String(!isCollapsing));
+
     // 帝国总览：同步手动折叠标记
     if (secId === 'empireOverview') {
       this._empireUserCollapsed = sec.classList.contains('collapsed');
@@ -7873,8 +8149,13 @@ const G = {
       const state = JSON.parse(localStorage.getItem('bioSphereSecState') || '{}');
       for (const [id, collapsed] of Object.entries(state)) {
         const sec = document.getElementById(id);
-        if (sec && collapsed) sec.classList.add('collapsed');
+        if (sec && collapsed) {
+          sec.classList.add('collapsed');
+          // 折叠状态下 sec-body max-height 由 CSS !important 控制为 0
+        }
       }
+      // 展开状态的 sec-body 设置初始 max-height
+      requestAnimationFrame(() => this._initSecBodyHeights());
     } catch(e) {}
   },
 
@@ -8432,13 +8713,13 @@ const G = {
         pop.classList.add('show');
       },
       hide: () => {
-        document.getElementById('eventPopup').classList.remove('show');
+        this._hidePopup('eventPopup');
       }
     });
   },
 
   closeEvent() {
-    document.getElementById('eventPopup').classList.remove('show');
+    this._hidePopup('eventPopup');
     // 手动关闭时也要继续播放队列
     this._notifyBusy = false;
     this._drainNotify();
@@ -8731,14 +9012,14 @@ const G = {
 
       if (this.wBuild) {
         const bd = BLDS[this.wBuild];
-        document.getElementById('wonderOverlay').classList.add('show');
+        this._showPopup('wonderOverlay');
         document.getElementById('wonderName').textContent = '建造中: ' + (bd?.n || '');
       }
     } catch(e) { console.log('Load error:', e); }
   },
 
   reset() {
-    document.getElementById('resetPopup').classList.add('show');
+    this._showPopup('resetPopup');
     this._showBackdrop();
   },
 
@@ -8770,7 +9051,7 @@ const G = {
   },
 
   cancelReset() {
-    document.getElementById('resetPopup').classList.remove('show');
+    this._hidePopup('resetPopup');
     this._hideBackdrop();
   },
 
@@ -8866,6 +9147,8 @@ const G = {
     document.getElementById('challengeDesc').textContent = ch.d;
     document.getElementById('challengeFill').style.width = pct + '%';
     document.getElementById('challengeTime').textContent = Math.ceil(this.challengeTimer) + 's';
+    // ARIA: 同步挑战进度
+    document.getElementById('challengeFill').closest('[role="progressbar"]')?.setAttribute('aria-valuenow', Math.round(pct));
 
     // Flash when time is low
     if (this.challengeTimer < 15) {
@@ -8974,7 +9257,7 @@ const G = {
 
   cancelUpgrade() {
     this.upgradeIdx = null;
-    document.getElementById('upgradePopup')?.classList.remove('show');
+    this._hidePopup('upgradePopup');
     this._hideBackdrop();
   },
 
@@ -9264,7 +9547,7 @@ const G = {
   cancelBeltUpgrade() {
     this._beltUpgradeKey = null;
     this._beltUpgradeKeys = null;
-    document.getElementById('beltUpgradePopup')?.classList.remove('show');
+    this._hidePopup('beltUpgradePopup');
     this._hideBackdrop();
   },
 
@@ -9608,7 +9891,7 @@ const G = {
     SFX.achieve();
     this.screenShake(4);
     this.pendingChoice = null;
-    document.getElementById('choicePopup')?.classList.remove('show');
+    this._hidePopup('choicePopup');
     this._hideBackdrop();
     this.updateUI();
   },
@@ -9620,7 +9903,7 @@ const G = {
     SFX.achieve();
     this.screenShake(4);
     this.pendingChoice = null;
-    document.getElementById('choicePopup')?.classList.remove('show');
+    this._hidePopup('choicePopup');
     this._hideBackdrop();
     this.updateUI();
   },
@@ -10042,7 +10325,7 @@ const G = {
   },
 
   closePrestige() {
-    document.getElementById('prestigePopup')?.classList.remove('show');
+    this._hidePopup('prestigePopup');
     this._hideBackdrop();
   },
 
