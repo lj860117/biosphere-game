@@ -2982,18 +2982,6 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
           <div id="techList"></div>
         </div>
       </div>
-
-      <!-- ★ Q4: Mutation Lab (变异实验室) -->
-      <div class="section" id="mutLabSection" style="display:none">
-        <div class="section-title">
-          🧬 变异实验室
-          <span class="hint" id="mutLabHint"></span>
-          <button class="sec-toggle" onclick="G.toggleSection('mutLabSection')" aria-expanded="true">▾</button>
-        </div>
-        <div class="sec-body">
-          <div id="mutLabContent"></div>
-        </div>
-      </div>
     </div>
 
     <!-- CENTER: PETRI DISH -->
@@ -3213,16 +3201,28 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
         </div>
       </div>
 
-      <!-- Production Chains -->
-      <div class="section" id="chainSection" style="display:none">
-        <div class="section-title">🏭 流水线 · 传送带</div>
-        <div id="chainList" style="font-size:0.72em;color:var(--dim)"></div>
+      <!-- ★ Q4: Mutation Lab (变异实验室) -->
+      <div class="section" id="mutLabSection" style="display:none">
+        <div class="section-title">
+          🧬 变异实验室
+          <span class="hint" id="mutLabHint"></span>
+          <button class="sec-toggle" onclick="G.toggleSection('mutLabSection')" aria-expanded="true">▾</button>
+        </div>
+        <div class="sec-body">
+          <div id="mutLabContent"></div>
+        </div>
       </div>
 
       <!-- Petri Experiment -->
       <div class="section" id="secPetri" style="display:none">
         <div class="section-title">🧫 培养皿实验 <button class="sec-toggle" onclick="G.toggleSection('secPetri')" aria-expanded="true">▾</button></div>
         <div class="sec-body" id="petriResultPanel"></div>
+      </div>
+
+      <!-- Production Chains -->
+      <div class="section" id="chainSection" style="display:none">
+        <div class="section-title">🏭 流水线 · 传送带</div>
+        <div id="chainList" style="font-size:0.72em;color:var(--dim)"></div>
       </div>
 
       <!-- Stats -->
