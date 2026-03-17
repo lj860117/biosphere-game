@@ -1520,9 +1520,8 @@ const G = {
         this._buildDragEnd(e.clientX, e.clientY);
         return; // 拖拽建造中，不处理其他 mouseup
       }
-      // 非拖拽的 mousedown → mouseup 回退为 click（selectBuilding）
+      // 非拖拽的 mousedown → mouseup：仅清理状态，让 btn.onclick 自然触发 selectBuilding
       if (this._buildDragKey && !this._buildDragging) {
-        this.selectBuilding(this._buildDragKey);
         this._buildDragKey = null;
         this._buildDragStartPos = null;
       }
@@ -1540,8 +1539,7 @@ const G = {
       if (this._buildDragging) {
         this._buildDragEnd(touch.clientX, touch.clientY);
       } else {
-        // 非拖拽的 tap → selectBuilding
-        this.selectBuilding(this._buildDragKey);
+        // 非拖拽的 tap：仅清理状态，让合成 click 事件自然触发 selectBuilding
         this._buildDragKey = null;
         this._buildDragStartPos = null;
       }
@@ -2066,7 +2064,8 @@ const G = {
       row.className = 'build-row';
 
       const btn = document.createElement('button');
-      btn.className = 'action-btn' + (locked ? ' locked' : '') + (this.sel === key ? ' active' : '');
+      const canAfford = !locked && this.checkRes(this.scaledCost(key));
+      btn.className = 'action-btn' + (locked ? ' locked' : '') + (!locked && !canAfford ? ' cant-afford' : '') + (this.sel === key ? ' active' : '');
       btn.dataset.b = key;
 
       // 动态递增造价
@@ -8072,6 +8071,14 @@ const G = {
     this.updateBeltUpgradeBtn();
     this.updateSectionUnlocks();
     this.updateRedDots();
+
+    // 建筑按钮可购买状态实时刷新（轻量 DOM 操作，不重建）
+    document.querySelectorAll('#buildList .action-btn[data-b]').forEach(btn => {
+      const key = btn.dataset.b;
+      if (!key || btn.classList.contains('locked')) return;
+      const canAfford = this.checkRes(this.scaledCost(key));
+      btn.classList.toggle('cant-afford', !canAfford);
+    });
   },
 
   // ===== SECTION TOGGLE (折叠/展开) =====

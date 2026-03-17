@@ -4,6 +4,24 @@
 
 ---
 
+## v0.6.1 — 2026-03-17 · 点选修复 & 建筑置灰
+
+### 🐛 Bug 修复
+- [office] 修复点选建筑失灵：拖拽 mouseup/touchend 回退时不再主动调用 `selectBuilding()`，避免与 `btn.onclick` 双重触发导致 toggle 抵消
+- [office] 同步修复触摸端：touchend 回退也移除多余的 `selectBuilding()` 调用
+
+### ✨ 新功能
+- [office] 资源不足建筑置灰：买不起的建筑按钮自动变灰（opacity 45% + grayscale 40%），造价文字变红
+- [office] 实时状态刷新：`updateUI()` 每秒轻量遍历建造按钮，资源够时自动恢复彩色
+- [office] hover 时适度恢复透明度，方便查看建筑信息
+
+### 🔧 技术实现
+- [office] `renderBuildings()` 初始创建按钮时即判断 `checkRes(scaledCost(key))` 设置 `cant-afford` class
+- [office] `updateUI()` 末尾通过 `classList.toggle('cant-afford', !canAfford)` 实现轻量 DOM 更新
+- [office] CSS 新增 `.action-btn.cant-afford` 及其 hover、`.act-cost` 子选择器样式
+
+---
+
 ## v0.6.0 — 2026-03-17 · 拖拽建造 & UI 优化
 
 ### ✨ 新功能

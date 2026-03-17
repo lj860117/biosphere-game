@@ -370,6 +370,9 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 .action-btn:hover:not(.locked){background:rgba(6,214,160,0.04);border-color:#1a4a50;transform:translateX(2px)}
 .action-btn.active{border-color:var(--cyan);background:rgba(6,214,160,0.06);box-shadow:0 0 10px rgba(6,214,160,0.08)}
 .action-btn.locked{opacity:0.25;cursor:not-allowed;pointer-events:none}
+.action-btn.cant-afford{opacity:0.45;filter:grayscale(0.4)}
+.action-btn.cant-afford .act-cost{color:#ef4444}
+.action-btn.cant-afford:hover{opacity:0.65;filter:grayscale(0.2)}
 .action-btn.new{animation:newItem 0.5s ease-out}
 @keyframes newItem{0%{opacity:0;transform:translateY(-8px)}100%{opacity:1;transform:translateY(0)}}
 .act-icon{width:32px;height:32px;flex-shrink:0}
