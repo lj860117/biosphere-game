@@ -4,6 +4,94 @@
 
 ---
 
+## v0.9.0 — 2026-03-19 · Building System 2.0 Phase 2 — 端口系统 & 邻接重构 & 经济再平衡
+
+> **Building System 2.0 Phase 2 — UI / 渲染 / 交互层**
+> 本版本实现了 BUILDING_SYSTEM_2_0.md 设计文档中的 7 大模块，为建筑系统引入端口可视化、建筑角色区分、邻接放置预览、混合传送带模式、虚拟邻接、教学系统扩展，以及全面的经济数值再平衡。
+> 代码变更：game.js +581/-74 行，index.html +114/-9 行
+
+### ✨ 新功能 — §4 端口 UI 系统 (Port System)
+- [office] 新增 `PORT_DEFS` 常量表：22 种建筑的输入/输出端口定义（maxIn/maxOut/role）
+- [office] P2+ 阶段建筑格子左右两侧渲染端口图标（半圆=输入📥，三角=输出📤）
+- [office] 端口实时状态：已连接端口高亮着色（`linked`），未连接端口呼吸动画（`idle`）
+- [office] 端口满载时格子金色外发光提示（`.ports-full`），引导玩家优化连接
+- [office] 新增 `getUsedPorts(idx, direction)` — 统计建筑已使用的输入/输出端口数
+- [office] 新增 `hasAvailablePort(idx, direction)` — 检查是否还有可用端口（含科技加成 `_extraOutPorts`）
+- [office] 新增 `getPortEfficiencyDiscount(idx)` — 端口利用率>50%时维护费减免（最高20%）
+- [office] 建筑 tooltip 增加端口占用信息展示
+
+### ✨ 新功能 — §4.5 建筑角色视觉区分 (Building Roles)
+- [office] 基于 `PORT_DEFS.role` 为建筑格子自动添加角色样式类：
+  - `.role-source` — 源头建筑：绿色边框（如碳源采集器）
+  - `.role-bypass` — 旁路建筑：虚线边框（如氨基酸合成器）
+  - `.role-boost` — 增益建筑：蓝色外发光（如菌丝运输网）
+  - `.role-wonder` — 奇观建筑：紫金渐变边框 + 1.5x 大端口
+
+### ✨ 新功能 — §10.2 邻接放置预览高亮 (Adjacency Preview)
+- [office] 新增 `previewAdjacencyBonuses(idx, bldType)` — 计算指定位置放置建筑后可获得的邻接加成数
+- [office] 选中建筑类型后，所有空格根据预计邻接数分三级高亮：
+  - 1个加成 — 淡绿色内框（`.adj-preview-1`）
+  - 2个加成 — 中绿色内框（`.adj-preview-2`）
+  - 3+个加成 — 亮绿色脉冲内框 + 角标显示加成数（`.adj-preview-3`）
+- [office] 放置建筑后自动清除预览高亮
+
+### ✨ 新功能 — §10.3 已触发邻接指示器 (Adjacency Indicators)
+- [office] 已有建筑实时显示当前激活的邻接加成数量（右下角小标记 `.cell-adj-indicator`）
+- [office] 渲染逻辑在 `renderGrid()` 中遍历 `ADJACENCY_RULES` 检测每栋建筑的生效规则数
+
+### ✨ 新功能 — §8.4 混合传送带模式 (Hybrid Belt Mode)
+- [office] 新增 `BELT_MODE` 常量：P1=自动, P2=hybrid（自动+可选手动）, P3+=纯手动
+- [office] P2 阶段保留自动管线的同时允许玩家手动添加额外连接
+- [office] 传送带连接提示根据当前阶段模式动态变化
+
+### ✨ 新功能 — §10.5 虚拟邻接（传送带直连）
+- [office] 新增 `isEffectivelyAdjacent(idx1, idx2)` — 判断"有效邻接"关系（物理相邻 OR 传送带直连）
+- [office] 传送带直连的建筑享受物理邻接 50% 的加成效果，每栋建筑最多 2 条虚拟邻接
+- [office] 邻接加成计算（`calcAdj()`）整合虚拟邻接逻辑
+
+### ✨ 新功能 — §11 教学系统扩展 (Tutorial System)
+- [office] P2 端口教学：进入 P2 后显示端口概念引导（"手动管线预览"）
+- [office] 邻接推荐教学：P2 建筑数≥6 时提示"绿色高亮格子=邻接加成推荐位"
+- [office] P3 物流时代教学：进入 P3 后显示"自动管线已关闭，需手动规划所有连接"
+- [office] 资源竞争教学：P3 资源竞争系统启用时触发供需平衡概念引导
+- [office] 新增 4 个教学状态 flag：`_p2PortTutorialPending`、`_p3LogisticsTutorialPending`、`_adjPreviewShown`、`_competitionTutorialShown`
+- [office] 阶段升级时自动设置对应教学 flag，`once` 机制保证每条教学只显示一次
+
+### ⚖️ 经济再平衡 — v2.0 数值调整
+- [office] **维护费结构调整**：从"能量为主"改为"葡萄糖为主、能量为辅"
+  - P2: `{energy:0.15}` → `{glucose:0.15, energy:0.05}`
+  - P3: `{energy:0.25, glucose:0.08}` → `{glucose:0.20, energy:0.08}`
+  - P4: `{energy:0.35, glucose:0.10, protein:0.03}` → `{glucose:0.25, energy:0.10, protein:0.03}`
+- [office] **管理开销缓和**：阈值 8→12 栋、增长率 6%→4%、上限 180%→160%
+- [office] **资源竞争缓和**：阈值 75%→85%、最低效率 50%→60%
+- [office] **P3 缓冲期**：进入 P3 后前 180 秒阈值从 95% 渐进降到 85%，避免断崖式压力
+- [office] **P4 解锁门槛提升**：进化等级要求 Lv.3→Lv.4 + 至少已建过 1 台 P3 建筑
+- [office] **端口效率折扣**：端口利用率>50%时维护费减免最高 20%，鼓励连接优化
+
+### 🎨 视觉 / UI 调整
+- [office] 格子色标简化：移除左侧 L 型竖条（`.cell-stripe` → `display:none`），仅保留顶部 1px 细线
+- [office] SVG 背景装饰降低至 opacity 0.03（原 0.3），减少视觉干扰
+- [office] 呼吸光环移除（`.aura` → `display:none`），由端口发光取代
+- [office] 序号角标位置调整：右上角 → 左下角（`bottom:1px;left:1px`）
+- [office] 新增端口组件 CSS：`.port`、`.port.in`（半圆）、`.port.out`（三角）、`.port.linked`、`.port.idle`
+- [office] 新增邻接预览 CSS：三级高亮 + 脉冲动画 + 角标
+- [office] 新增端口容器 CSS：`.port-group` flex 布局，响应式适配（768px 以下缩小）
+
+### 🔧 技术实现
+- [office] `PORT_DEFS` 数据驱动：22 种建筑的端口配置集中定义，渲染/验证/教学统一引用
+- [office] `renderGrid()` 增量渲染扩展：端口 DOM 元素、角色 class、邻接指示器均在同一渲染循环中生成
+- [office] 邻接计算支持正向+反向双向匹配，避免 self/neighbor 类型相同时重复计算
+- [office] 传送带连接验证增加端口可用性检查（`hasAvailablePort`）
+- [office] 教学系统与阶段升级、建筑放置、建筑数量变化事件联动
+
+### 📄 设计文档
+- [office] 新增 `BUILDING_SYSTEM_2_0.md`（~47KB，1265行）：Building System 2.0 完整设计文档
+- [office] 新增 `PORT_SYSTEM_DESIGN.md`：端口系统专项设计规格
+- [office] 新增 `GAME_DESIGN_EVALUATION.md`：游戏设计整体评估报告
+- [office] 新增 5 份专项评估文档：消耗压力、传送带趣味性/可教学性/时机、四问评估
+
+---
+
 ## v0.8.3 — 2026-03-18 · 建筑辨识度增强（方案D）
 
 ### 🎨 视觉 / UI — 建筑格子辨识度优化

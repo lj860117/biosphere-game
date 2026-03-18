@@ -562,17 +562,17 @@ const COST_SCALE = 1.4; // 每多造一个同类建筑，造价×1.4
 // ===== 方案A：建筑维护费系统 =====
 // P1免维护（教学保护），P2起逐阶段开启，建筑越多维护费递增
 const MAINTENANCE = {
-  // 各阶段建筑的基础维护费（每秒）
+  // 各阶段建筑的基础维护费（每秒）— v2.0：葡萄糖为主，能量为辅
   baseCost: {
     1: {},                                         // P1完全免维护
-    2: { energy: 0.15 },                           // P2建筑：能量维护
-    3: { energy: 0.25, glucose: 0.08 },            // P3建筑：能量+葡萄糖
-    4: { energy: 0.35, glucose: 0.10, protein: 0.03 }, // P4建筑：三资源维护
+    2: { glucose: 0.15, energy: 0.05 },            // P2建筑：葡萄糖为主
+    3: { glucose: 0.20, energy: 0.08 },            // P3建筑：葡萄糖+少量能量
+    4: { glucose: 0.25, energy: 0.10, protein: 0.03 }, // P4建筑：三资源维护
     5: {},                                         // P5奇观免维护（终极奖励）
   },
-  overheadThreshold: 8,  // 超过此数量开始收取管理开销
-  overheadRate: 0.06,    // 每多1个建筑，维护费+6%
-  maxOverhead: 1.8,      // 管理开销上限 180%（即维护费最多×2.8）
+  overheadThreshold: 12, // v2.0: 原8→12，超过此数量开始收取管理开销
+  overheadRate: 0.04,    // v2.0: 原6%→4%，每多1个建筑，维护费+4%
+  maxOverhead: 1.6,      // v2.0: 原180%→160%，管理开销上限
   // 特殊建筑豁免
   exempt: ['microDyson', 'transport', 'metabolicLoop'], // 奇观、菌丝网、代谢回路免维护
 };
@@ -581,12 +581,172 @@ const MAINTENANCE = {
 // 当某资源的消耗总量接近产出时，所有消费建筑效率下降
 const RESOURCE_COMPETITION = {
   startPhase: 3,          // P3起生效（P1-P2是教学期）
-  tensionThreshold: 0.75, // 消耗/产出 > 75% 时开始竞争
-  // 竞争烈度：供需比从0.75→1.0时，效率从100%→最低值
-  minEfficiency: 0.5,     // 竞争最严重时效率不低于50%
+  tensionThreshold: 0.85, // v2.0: 原0.75→0.85，消耗/产出 > 85% 时开始竞争
+  // 竞争烈度：供需比从0.85→1.0时，效率从100%→最低值
+  minEfficiency: 0.6,     // v2.0: 原0.5→0.6，竞争最严重时效率不低于60%
   // 传送带直连的建筑享受优先供给
   beltPriorityBonus: 0.15, // 有传送带连线的消费建筑额外+15%有效供给
+  // v2.0: P3初期缓冲 — 前180秒使用渐进阈值
+  p3BufferDuration: 180,   // P3初期缓冲180秒（3分钟）
+  p3BufferThreshold: 0.95, // 缓冲期间阈值从95%渐进降到85%
 };
+
+// ===== PORT SYSTEM — 端口连接数约束 =====
+const PORT_DEFS = {
+  // Phase 1
+  glucoseCollector: { maxIn: 0, maxOut: 2, role: 'source' },
+  energyStation:    { maxIn: 2, maxOut: 3, role: 'converter' },
+  simpleExtractor:  { maxIn: 2, maxOut: 1, role: 'converter' },
+  energyBuffer:     { maxIn: 1, maxOut: 2, role: 'bypass' },
+  // Phase 2
+  nitrogenFixer:    { maxIn: 1, maxOut: 2, role: 'converter' },
+  proteinFactory:   { maxIn: 2, maxOut: 2, role: 'converter' },
+  geneExtractor:    { maxIn: 2, maxOut: 1, role: 'converter' },
+  aminoSynth:       { maxIn: 2, maxOut: 1, role: 'bypass' },
+  ribosomeCluster:  { maxIn: 2, maxOut: 2, role: 'converter' },
+  // Phase 3
+  biofilmReactor:   { maxIn: 3, maxOut: 2, role: 'converter' },
+  transport:        { maxIn: 0, maxOut: 0, role: 'boost' },
+  sporeSower:       { maxIn: 2, maxOut: 2, role: 'converter' },
+  metabolicLoop:    { maxIn: 0, maxOut: 0, role: 'boost' },
+  biomassConverter: { maxIn: 2, maxOut: 1, role: 'bypass' },
+  quantumExtractor: { maxIn: 2, maxOut: 1, role: 'bypass' },
+  fermentVacuole:   { maxIn: 2, maxOut: 2, role: 'bypass' },
+  // Phase 4
+  qsController:    { maxIn: 1, maxOut: 2, role: 'converter' },
+  nanoAssembler:    { maxIn: 2, maxOut: 2, role: 'converter' },
+  pheromoneStation: { maxIn: 2, maxOut: 1, role: 'bypass' },
+  resonanceChamber: { maxIn: 2, maxOut: 3, role: 'converter' },
+  // Phase 5
+  microDyson:       { maxIn: 0, maxOut: 4, role: 'wonder' },
+};
+
+/** 获取建筑已使用的端口数 */
+function getUsedPorts(idx, direction) {
+  const belts = G._activeBelts || [];
+  const type = G.grid[idx]?.type;
+  if (!type) return 0;
+  let count = 0;
+  for (const belt of belts) {
+    if (belt.fi !== idx && belt.ti !== idx) continue;
+    const otherIdx = belt.fi === idx ? belt.ti : belt.fi;
+    const otherType = G.grid[otherIdx]?.type;
+    if (!otherType) continue;
+    if (direction === 'in') {
+      if (FLOW_MAP.some(f => f.from === otherType && f.to === type)) count++;
+    } else {
+      if (FLOW_MAP.some(f => f.from === type && f.to === otherType)) count++;
+    }
+  }
+  return count;
+}
+
+/** 检查建筑是否还有可用端口 */
+function hasAvailablePort(idx, direction) {
+  const type = G.grid[idx]?.type;
+  if (!type) return false;
+  const def = PORT_DEFS[type];
+  if (!def) return true;
+  const max = direction === 'in' ? def.maxIn : def.maxOut;
+  // 科技加成：自适应物流 +1 输出端口
+  const techExtra = (direction === 'out' && G._extraOutPorts) ? G._extraOutPorts : 0;
+  return getUsedPorts(idx, direction) < (max + techExtra);
+}
+
+/**
+ * 计算建筑的端口效率折扣
+ * 端口利用率(已连/总端口) > 50% 时，维护费按比例减免
+ * @returns {number} 维护费乘数 (0.80~1.00)
+ */
+function getPortEfficiencyDiscount(idx) {
+  const type = G.grid[idx]?.type;
+  if (!type) return 1.0;
+  const def = PORT_DEFS[type];
+  if (!def) return 1.0;
+  const totalPorts = def.maxIn + def.maxOut;
+  if (totalPorts === 0) return 1.0;
+  const usedIn = getUsedPorts(idx, 'in');
+  const usedOut = getUsedPorts(idx, 'out');
+  const utilization = (usedIn + usedOut) / totalPorts;
+  if (utilization <= 0.5) return 1.0;
+  const discount = (utilization - 0.5) * 0.4; // 最大0.2 = 20%减免
+  return 1.0 - discount;
+}
+
+// ===== v2.0 BELT MODE — P2 hybrid传送带模式 =====
+const BELT_MODE = {
+  1: 'auto',      // P1: 纯自动
+  2: 'hybrid',    // P2: 自动+可选手动
+  3: 'manual',    // P3+: 纯手动
+};
+
+/**
+ * v2.0 §10.2 — 计算某格子放置指定建筑后的邻接加成数
+ * @param {number} idx - 格子索引
+ * @param {string} bldType - 建筑类型
+ * @returns {{ count: number, bonuses: Array }}
+ */
+function previewAdjacencyBonuses(idx, bldType) {
+  const neighbors = G.getNeighbors(idx);
+  const bonuses = [];
+
+  for (const rule of ADJACENCY_RULES) {
+    // 只计算当前阶段已解锁的规则
+    if (rule.phase && rule.phase > G.phase) continue;
+
+    // 正向：新建筑作为self，邻居中有匹配的neighbor
+    if (rule.self === '*' || rule.self === bldType) {
+      for (const nIdx of neighbors) {
+        const nType = G.grid[nIdx]?.type;
+        if (!nType) continue;
+        if (rule.neighbor !== nType) continue;
+        bonuses.push({
+          rule: rule,
+          neighborIdx: nIdx,
+          bonus: rule.bonus,
+          isReverse: false,
+        });
+      }
+    }
+
+    // 反向：新建筑作为neighbor，对已有建筑(self)的加成
+    if (rule.neighbor === bldType) {
+      for (const nIdx of neighbors) {
+        const nType = G.grid[nIdx]?.type;
+        if (!nType) continue;
+        if (rule.self !== '*' && rule.self !== nType) continue;
+        // 避免与正向重复（当self和neighbor类型相同时）
+        if ((rule.self === '*' || rule.self === bldType) && rule.neighbor === bldType && nType === bldType) continue;
+        bonuses.push({
+          rule: rule,
+          neighborIdx: nIdx,
+          bonus: rule.bonus,
+          isReverse: true,
+        });
+      }
+    }
+  }
+
+  return { count: bonuses.length, bonuses };
+}
+
+/**
+ * v2.0 §10.5 — 检查两个建筑是否具有"有效邻接"关系
+ * 有效邻接 = 物理相邻(上下左右) OR 传送带直连
+ * @returns {'physical'|'virtual'|false}
+ */
+function isEffectivelyAdjacent(idx1, idx2) {
+  // 物理相邻
+  if (G.getNeighbors(idx1).includes(idx2)) return 'physical';
+
+  // 传送带直连（虚拟邻接）
+  const belts = G._activeBelts || [];
+  const connected = belts.some(b =>
+    (b.fi === idx1 && b.ti === idx2) ||
+    (b.fi === idx2 && b.ti === idx1)
+  );
+  return connected ? 'virtual' : false;
+}
 
 const PHASES = [
   { id:1, name:'采集', color:'var(--green)', desc:'建造采集器收集基础资源', icon:'🌱' },
@@ -758,6 +918,14 @@ const BLDS = {
     cost:{ nitrogen:20, energy:40, dna:10 }, prod:{ dna:0.7 }, cons:{ nitrogen:0.6, energy:1.2 },
     color:'#818cf8', bg:'bg-purple', emoji:'💎', tier:3, techReq:'biofilmTech',
   },
+  fermentVacuole: {
+    n:'发酵液泡', phase:3,
+    d:'生物质+蛋白质→能量（替代路线）',
+    ratio:'0.5🧱 + 0.3🧪 → 2.0⚡/s',
+    cost:{ biomass:20, protein:15, energy:35 },
+    prod:{ energy:2.0 }, cons:{ biomass:0.5, protein:0.3 },
+    color:'#f59e0b', bg:'bg-amber', emoji:'🫧', tier:3, techReq:'biofilmTech',
+  },
 
   // Phase 4 — 旁路建筑（新增）
   resonanceChamber: {
@@ -866,6 +1034,17 @@ const ADJACENCY_RULES = [
   { self:'resonanceChamber',  neighbor:'qsController',    bonus:0.18, name:'QS共振', icon:'📡', stackable:true, maxStack:2, phase:4 },
   { self:'resonanceChamber',  neighbor:'pheromoneStation', bonus:0.12, name:'信号反馈', icon:'📡', stackable:true, maxStack:1, phase:4 },
   { self:'resonanceChamber',  neighbor:'resonanceChamber', bonus:0.10, name:'共振叠加', icon:'🌀', stackable:true, maxStack:2, phase:4 },
+
+  // ═══════════════════════════════════════════════════
+  // ⑥ 发酵液泡邻接
+  // ═══════════════════════════════════════════════════
+  { self:'fermentVacuole',   neighbor:'biofilmReactor',   bonus:0.15, name:'发酵直供', icon:'🧱', stackable:true, maxStack:2, phase:3 },
+  { self:'fermentVacuole',   neighbor:'proteinFactory',   bonus:0.12, name:'蛋白催化', icon:'🧪', stackable:true, maxStack:1, phase:3 },
+  { self:'fermentVacuole',   neighbor:'energyStation',    bonus:0.08, name:'能量串联', icon:'⚡', stackable:true, maxStack:1, phase:3 },
+  { self:'fermentVacuole',   neighbor:'fermentVacuole',   bonus:0.10, name:'液泡矩阵', icon:'🫧', stackable:true, maxStack:2, phase:3 },
+  // 反向：发酵液泡作为邻居对其他建筑的增益
+  { self:'biofilmReactor',   neighbor:'fermentVacuole',   bonus:0.08, name:'能量回流', icon:'🫧', stackable:true, maxStack:1, phase:3 },
+  { self:'sporeSower',       neighbor:'fermentVacuole',   bonus:0.10, name:'发酵驱动', icon:'🫧', stackable:true, maxStack:1, phase:3 },
 ];
 
 // ===== TECHS =====
@@ -884,9 +1063,9 @@ const TECHS = {
   },
   rapidMetabolism: {
     n:'快速代谢', phase:1, cost:{ dna:8, energy:15 }, time:20,
-    d:'加速ATP合成反应', ef:'ATP合成酶产出+25%，消耗+15%',
+    d:'加速ATP合成反应', ef:'ATP合成酶产出+25%，邻接碳源采集器时额外+10%',
     req:['pureCulture'], exclusive:['efficientHarvest'],
-    fn: s => { s._energyBonus = (s._energyBonus || 0) + 0.25; s._energyCostPenalty = (s._energyCostPenalty || 0) + 0.15 },
+    fn: s => { s._energyBonus = (s._energyBonus || 0) + 0.25; s._energyAdjBonus = 0.10 },
   },
   basicMetab: {
     n:'基础代谢学', phase:2, cost:{ dna:12 }, time:25,
@@ -914,9 +1093,9 @@ const TECHS = {
   // Phase 3 分支
   adaptiveLogistics: {
     n:'自适应物流', phase:3, cost:{ dna:22, biomass:8 }, time:30,
-    d:'智能物流路径规划', ef:'菌丝运输网加成从10%提升到15%',
+    d:'智能物流路径规划', ef:'菌丝运输网加成→20%，全局+1输出端口，传送带容量+30%',
     req:['biofilmTech'], exclusive:['symbioticNetwork'],
-    fn: s => { s._transportBonus = (s._transportBonus || 0) + 0.05 },
+    fn: s => { s._transportBonus = (s._transportBonus || 0) + 0.05; s._extraOutPorts = 1; s._beltCapBonus = 0.30 },
   },
   symbioticNetwork: {
     n:'共生网络', phase:3, cost:{ protein:18, biomass:10 }, time:35,
@@ -972,6 +1151,7 @@ const SVG = {
   biomassConverter:`<svg viewBox="0 0 64 64" fill="none"><rect x="10" y="12" width="44" height="40" rx="3" fill="#051210" stroke="#2dd4bf" stroke-width="1.5"/><path d="M22 25 L32 20 L42 25 L42 38 L32 43 L22 38 Z" fill="#2dd4bf" opacity="0.08" stroke="#2dd4bf" stroke-width="1"/><circle cx="32" cy="32" r="5" fill="#2dd4bf" opacity="0.2"><animate attributeName="r" values="4;6;4" dur="2s" repeatCount="indefinite"/></circle><path d="M28 32 L36 32M32 28 L32 36" stroke="#2dd4bf" stroke-width="1.5" opacity="0.4"/></svg>`,
   quantumExtractor:`<svg viewBox="0 0 64 64" fill="none"><rect x="10" y="12" width="44" height="40" rx="3" fill="#0a0818" stroke="#818cf8" stroke-width="1.5"/><circle cx="32" cy="30" r="10" fill="none" stroke="#818cf8" stroke-width="0.8" opacity="0.3"/><circle cx="32" cy="30" r="5" fill="none" stroke="#818cf8" stroke-width="1.2" opacity="0.5"><animate attributeName="r" values="4;7;4" dur="2.5s" repeatCount="indefinite"/></circle><circle cx="32" cy="30" r="2" fill="#818cf8" opacity="0.6"/><path d="M24 42 L32 38 L40 42" fill="none" stroke="#818cf8" stroke-width="1" opacity="0.4"/></svg>`,
   resonanceChamber:`<svg viewBox="0 0 64 64" fill="none"><rect x="10" y="12" width="44" height="40" rx="3" fill="#0f0520" stroke="#c084fc" stroke-width="1.5"/><circle cx="32" cy="30" r="12" fill="none" stroke="#c084fc" stroke-width="0.8" opacity="0.2"/><circle cx="32" cy="30" r="8" fill="none" stroke="#c084fc" stroke-width="1" opacity="0.3"><animateTransform attributeName="transform" type="rotate" from="0 32 30" to="360 32 30" dur="5s" repeatCount="indefinite"/></circle><circle cx="32" cy="30" r="3" fill="#c084fc" opacity="0.4"><animate attributeName="opacity" values="0.2;0.6;0.2" dur="2s" repeatCount="indefinite"/></circle><text x="32" y="46" text-anchor="middle" fill="#c084fc" font-size="6" opacity="0.4">QS</text></svg>`,
+  fermentVacuole:`<svg viewBox="0 0 64 64" fill="none"><rect x="10" y="12" width="44" height="40" rx="3" fill="#1a1205" stroke="#f59e0b" stroke-width="1.5"/><ellipse cx="32" cy="30" rx="16" ry="14" fill="#f59e0b" opacity="0.06" stroke="#f59e0b" stroke-width="1"/><circle cx="24" cy="26" r="4" fill="#f59e0b" opacity="0.15"><animate attributeName="r" values="3;5;3" dur="2.5s" repeatCount="indefinite"/></circle><circle cx="38" cy="34" r="3" fill="#f59e0b" opacity="0.12"><animate attributeName="r" values="2;4;2" dur="3s" repeatCount="indefinite"/></circle><circle cx="30" cy="36" r="2.5" fill="#f59e0b" opacity="0.1"><animate attributeName="r" values="1.5;3.5;1.5" dur="2s" repeatCount="indefinite"/></circle><path d="M22 42l3 0-1.5 4 3 0-5 7 1.5-4.5-3 0z" fill="#f59e0b" opacity="0.5"/><circle cx="20" cy="20" r="3" fill="#10b981" opacity="0.2" stroke="#10b981" stroke-width="0.6"/><circle cx="44" cy="20" r="3" fill="#ec4899" opacity="0.2" stroke="#ec4899" stroke-width="0.6"/></svg>`,
 };
 
 // ===== ★ MUTATION LAB — 变异实验室 =====
@@ -1114,6 +1294,13 @@ const MUTATIONS = {
     ef: { maintReduce: 0.20, noShutdown: true },
     category:'defense',
   },
+  branchPipeline: {
+    n:'分支管线', rarity:'rare', icon:'🔀',
+    d:'随机1种建筑类型 +1 输出端口',
+    flavor:'突变让细胞膜多长出一个分泌通道。',
+    ef: { extraOutPort: 1, targetRandom: true },
+    category:'logistics',
+  },
 
   // === 史诗突变（改变玩法）===
   crispr: {
@@ -1144,6 +1331,13 @@ const MUTATIONS = {
     ef: { freeBuildChance: 0.10 },
     category:'resource',
   },
+  hubNode: {
+    n:'枢纽节点', rarity:'epic', icon:'🔄',
+    d:'随机1种建筑类型 +1 输入和 +1 输出端口',
+    flavor:'膜蛋白的双向改造创造了前所未有的物质交换效率。',
+    ef: { extraInPort: 1, extraOutPort: 1, targetRandom: true },
+    category:'logistics',
+  },
 
   // === 传说突变（极其稀有）===
   pangaea: {
@@ -1165,7 +1359,7 @@ const MUTATIONS = {
 // 变异实验室配置
 const MUT_LAB_CONFIG = {
   unlockPhase: 3,           // P3解锁
-  unlockEvoLv: 3,           // 需进化Lv.3
+  unlockEvoLv: 4,           // v2.0: 原3→4，需进化Lv.4
   unlockTech: 'biofilmTech', // 需研究生物膜技术
   baseSlots: 3,             // 基础突变槽数
   maxSlots: 6,              // 最大突变槽（含内共生加成）
@@ -1326,9 +1520,13 @@ const GUIDE = {
     { check: s => s.techs.pureCulture.done && s.eL < 2 && s.canEvolve(), text:'资源就绪！点击底部「进化」按钮升到Lv.2 — 将解锁固氮装置和蛋白质工厂', icon:'✨' },
   ],
   2: [
+    // v2.0 §11.2: P2预热期端口教学
+    { check: s => s._p2PortTutorialPending, text:'📥📤 手动管线预览｜从本阶段开始，你可以手动添加管线来优化产线。每种建筑有输入📥和输出📤端口，端口数=最多连几条管线。不想手动？系统仍会自动帮你连接基础管线！', icon:'🔗', once:'p2PortTutorial' },
     // ── P2a · 代谢基础：固氮 + 蛋白 ──
     { check: s => s.bldCount('nitrogenFixer') === 0, text:'▸ P2a · 代谢基础｜建造「固氮装置」获取氮源 (0.3⚡→1🔵/s) — 蛋白质工厂的原料来源！', icon:'💨' },
     { check: s => s.bldCount('nitrogenFixer') > 0 && s.bldCount('proteinFactory') === 0, text:'▸ P2a · 代谢基础｜建造「蛋白质工厂」(0.8🔵+0.5⚡→0.6🧪/s) — 用氮源合成蛋白质', icon:'⚗️' },
+    // v2.0 §11.2: 首次放置建筑邻接推荐
+    { check: s => s.phase === 2 && !s._adjPreviewShown && s.totalBuildings() >= 6, text:'💡 绿色高亮的格子表示放在那里可以获得邻接加成！选中建筑后查看推荐位', icon:'📐', once:'adjPreviewHint' },
     { check: s => s.bldCount('proteinFactory') > 0 && !s.techs.basicMetab.done, text:'▸ P2a → P2b｜研究「基础代谢学」— 解锁代谢进阶：高效DNA提取器 + 旁路建筑 + 互斥科技路线！', icon:'📖' },
     // ── P2b · 代谢进阶：旁路 + 互斥 ──
     { check: s => s.techs.basicMetab.done && s.bldCount('geneExtractor') === 0, text:'▸ P2b · 代谢进阶｜建造「DNA提取器」(0.5🧪+1⚡→0.8🧬/s) — 比简易提取器快2倍！', icon:'🏭' },
@@ -1338,6 +1536,8 @@ const GUIDE = {
     { check: s => s.totalBuildings() >= 5 && Object.values(s._maintenanceCost||{}).reduce((a,b)=>a+b,0) > 0.3, text:'🔧 注意！每个建筑都需要维护费。建筑越多维护开销越大 — 悬停建筑查看维护详情，用邻接和传送带提升效率来覆盖维护成本！', icon:'🔧' },
   ],
   3: [
+    // v2.0 §11.3: P3物流时代教学面板
+    { check: s => s._p3LogisticsTutorialPending, text:'🔧 物流时代｜自动管线已关闭，从现在起需要手动规划所有连接。端口是你的核心约束——合理分配每条管线！选中建筑→点击目标→连接', icon:'🔗', once:'p3LogisticsTutorial' },
     { check: s => !s.techs.biofilmTech.done, text:'研究「生物膜技术」— 解锁生物膜反应器，进入高级材料时代', icon:'📖' },
     { check: s => s.techs.biofilmTech.done && s.bldCount('biofilmReactor') === 0, text:'建造「生物膜反应器」— 需要葡萄糖+氮源+能量（三料输入），记得连传送带！', icon:'🧱' },
     // ★ 教学：生物膜反应器已建但同步度低时，引导玩家理解供给同步
@@ -1345,7 +1545,9 @@ const GUIDE = {
     { check: s => Object.values(s._syncBonuses || {}).some(sb => sb.sync >= 0.5 && sb.sync < 0.85), text:'🔄 同步生效中！传送带颜色变绿表示供给平衡，继续优化让所有输入都满载 → 金色光效=完美同步！', icon:'✨' },
     { check: s => s.bldCount('biofilmReactor') > 0 && s.bldCount('transport') === 0 && Object.values(s._syncBonuses || {}).some(sb => sb.sync >= 0.5), text:'建造「菌丝运输网」— 全局产出+10%！多造叠加效率', icon:'🔗' },
     { check: s => s.bldCount('transport') > 0, text:'多造运输网叠加效率，目标+30%以上！别忘了升级传送带（点线条→升级）', icon:'📈' },
-    // ★ 资源竞争教学
+    // v2.0 §11.3: 资源竞争启用教学（P3+3分钟）
+    { check: s => s._competitionEnabled && !s._competitionTutorialShown, text:'⚖️ 供需平衡｜资源竞争系统已启用！当某种资源的消耗接近产出时，所有消费建筑效率会下降。保持充足的资源供给，或者减少不必要的消费者', icon:'⚖️', once:'competitionTutorial' },
+    // ★ 资源竞争教学（已激活后持续提示）
     { check: s => Object.values(s._competitionPenalty||{}).some(p => p < 0.95), text:'⚖️ 资源供需紧张！当消耗接近产出时效率会下降 — 查看「供需」指标，增产关键资源或拆除低效消费建筑！', icon:'⚖️' },
     // ★ Q4：变异实验室教学
     { check: s => s._mutLabUnlocked && s._mutSlots.length === 0 && !s._mutBrewing, text:'🧬 变异实验室已解锁！在侧栏点击「培育突变」消耗DNA+蛋白质获取随机增益', icon:'🧬' },
@@ -1446,6 +1648,26 @@ const FLOW_MAP = [
   { from:'resonanceChamber', to:'biofilmReactor',      res:'nitrogen', icon:'🔵', color:'#c084fc', label:'氮源' },
   { from:'resonanceChamber', to:'geneExtractor',       res:'protein',  icon:'🧪', color:'#c084fc', label:'蛋白质' },
   { from:'resonanceChamber', to:'biomassConverter',    res:'protein',  icon:'🧪', color:'#c084fc', label:'蛋白质' },
+  // Phase 3 — 发酵液泡（需要生物质+蛋白质，产出能量）
+  { from:'biofilmReactor',   to:'fermentVacuole',     res:'biomass',  icon:'🧱', color:'#10b981', label:'生物质' },
+  { from:'biomassConverter', to:'fermentVacuole',     res:'biomass',  icon:'🧱', color:'#10b981', label:'生物质' },
+  { from:'nanoAssembler',    to:'fermentVacuole',     res:'biomass',  icon:'🧱', color:'#10b981', label:'生物质' },
+  { from:'proteinFactory',   to:'fermentVacuole',     res:'protein',  icon:'🧪', color:'#ec4899', label:'蛋白质' },
+  { from:'aminoSynth',       to:'fermentVacuole',     res:'protein',  icon:'🧪', color:'#ec4899', label:'蛋白质' },
+  // 发酵液泡的能量输出（供给所有消耗能量的建筑）
+  { from:'fermentVacuole',   to:'simpleExtractor',    res:'energy',   icon:'⚡', color:'#f59e0b', label:'ATP' },
+  { from:'fermentVacuole',   to:'nitrogenFixer',      res:'energy',   icon:'⚡', color:'#f59e0b', label:'ATP' },
+  { from:'fermentVacuole',   to:'proteinFactory',     res:'energy',   icon:'⚡', color:'#f59e0b', label:'ATP' },
+  { from:'fermentVacuole',   to:'geneExtractor',      res:'energy',   icon:'⚡', color:'#f59e0b', label:'ATP' },
+  { from:'fermentVacuole',   to:'ribosomeCluster',    res:'energy',   icon:'⚡', color:'#f59e0b', label:'ATP' },
+  { from:'fermentVacuole',   to:'biofilmReactor',     res:'energy',   icon:'⚡', color:'#f59e0b', label:'ATP' },
+  { from:'fermentVacuole',   to:'sporeSower',         res:'energy',   icon:'⚡', color:'#f59e0b', label:'ATP' },
+  { from:'fermentVacuole',   to:'biomassConverter',   res:'energy',   icon:'⚡', color:'#f59e0b', label:'ATP' },
+  { from:'fermentVacuole',   to:'quantumExtractor',   res:'energy',   icon:'⚡', color:'#f59e0b', label:'ATP' },
+  { from:'fermentVacuole',   to:'qsController',       res:'energy',   icon:'⚡', color:'#f59e0b', label:'ATP' },
+  { from:'fermentVacuole',   to:'nanoAssembler',      res:'energy',   icon:'⚡', color:'#f59e0b', label:'ATP' },
+  { from:'fermentVacuole',   to:'pheromoneStation',   res:'energy',   icon:'⚡', color:'#f59e0b', label:'ATP' },
+  { from:'fermentVacuole',   to:'resonanceChamber',   res:'energy',   icon:'⚡', color:'#f59e0b', label:'ATP' },
 ];
 
 // ===== PETRI DISH EXPERIMENT RECIPES =====
@@ -1717,6 +1939,15 @@ const PRESTIGE = {
       d: lv => `传送带效率 +${(lv * 12)}% (当前Lv.${lv})`,
       fn: (s, lv) => { s._beltBonus = (s._beltBonus || 0) + lv * 0.12; },
     },
+    {
+      id: 'inf_port',
+      n: '管线工程学',
+      icon: '🔀',
+      baseCost: 95,
+      costScale: 1.4,
+      d: lv => `随机1种建筑 +${lv} 输出端口 (当前Lv.${lv}，每种上限+2)`,
+      fn: (s, lv) => { s._presPortExpand = lv; },
+    },
   ],
 
   // 计算无限加成当前等级的成本
@@ -1835,6 +2066,14 @@ const G = {
   _mutCategoryLock: null,  // CRISPR锁定的类别（如果有）
   _mutBrewCount: 0,        // 总培育次数（统计）
   _mutActiveEffects: {},   // 当前生效的突变效果缓存
+
+  // v2.0: 教学系统状态flag
+  _p2PortTutorialPending: false,   // P2端口教学待显示
+  _p3LogisticsTutorialPending: false, // P3物流时代教学待显示
+  _adjPreviewShown: false,          // 邻接预览教学已显示
+  _competitionEnabled: false,       // 资源竞争系统已启用
+  _competitionTutorialShown: false, // 资源竞争教学已显示
+  _portFullShown: false,            // 首次端口满提示已显示
 
   // ===== INIT =====
   init() {
@@ -3609,6 +3848,12 @@ const G = {
         // 方案D：用建筑自身color作为边框色，让同色系建筑也有独特视觉签名
         cell.style.borderColor = bd.color + '70';
 
+        // v2.0 §4.5: 建筑角色视觉区分
+        const portDef = PORT_DEFS[btype];
+        if (portDef) {
+          cell.classList.add('role-' + portDef.role);
+        }
+
         // 主题色 L 型色标（左竖条 + 顶横条）
         const stripe = document.createElement('div');
         stripe.className = 'cell-stripe';
@@ -3663,12 +3908,7 @@ const G = {
           cell.appendChild(seqEl);
         }
 
-        // 呼吸光环
-        const aura = document.createElement('div');
-        aura.className = 'aura';
-        aura.style.color = bd.color;
-        aura.style.animationDelay = (Math.random()*2)+'s';
-        cell.appendChild(aura);
+        // v2.0: 呼吸光环已移除（端口发光取代）
 
         // 工作指示灯
         const dot = document.createElement('div');
@@ -3708,42 +3948,70 @@ const G = {
         adjBadge.style.display = 'none';
         cell.appendChild(adjBadge);
 
-        // 输入端口（消耗的资源）
-        const consKeys = Object.keys(bd.cons || {});
-        if (consKeys.length > 0 && !bd.isBoost && !bd.isWonder) {
-          const inPorts = document.createElement('div');
-          inPorts.className = 'cell-ports in';
-          consKeys.forEach(k => {
-            const r = RES[k];
-            if (!r) return;
-            const port = document.createElement('div');
-            port.className = 'cell-port';
-            port.style.borderColor = r.c + '80';
-            port.style.color = r.c;
-            port.style.boxShadow = '0 0 3px ' + r.c + '30';
-            port.textContent = r.icon;
-            inPorts.appendChild(port);
-          });
-          cell.appendChild(inPorts);
+        // v2.0 §4 — 端口UI视觉渲染（基于PORT_DEFS，P2+才显示）
+        if (this.phase >= 2 && portDef && (portDef.maxIn > 0 || portDef.maxOut > 0)) {
+          const techExtra = this._extraOutPorts || 0;
+          const usedIn = getUsedPorts(i, 'in');
+          const usedOut = getUsedPorts(i, 'out');
+          const totalMaxIn = portDef.maxIn;
+          const totalMaxOut = portDef.maxOut + techExtra;
+
+          // 输入端口（左侧半圆形）
+          if (totalMaxIn > 0) {
+            const inGroup = document.createElement('div');
+            inGroup.className = 'port-group in';
+            for (let p = 0; p < totalMaxIn; p++) {
+              const port = document.createElement('div');
+              const isLinked = p < usedIn;
+              port.className = 'port in' + (isLinked ? ' linked' : ' idle');
+              if (isLinked) {
+                port.style.setProperty('--port-color', bd.color);
+              }
+              inGroup.appendChild(port);
+            }
+            cell.appendChild(inGroup);
+          }
+
+          // 输出端口（右侧箭头形）
+          if (totalMaxOut > 0) {
+            const outGroup = document.createElement('div');
+            outGroup.className = 'port-group out';
+            for (let p = 0; p < totalMaxOut; p++) {
+              const port = document.createElement('div');
+              const isLinked = p < usedOut;
+              port.className = 'port out' + (isLinked ? ' linked' : ' idle');
+              if (isLinked) {
+                port.style.setProperty('--port-color', bd.color);
+              }
+              outGroup.appendChild(port);
+            }
+            cell.appendChild(outGroup);
+          }
+
+          // 端口全满标记
+          if (usedIn >= totalMaxIn && usedOut >= totalMaxOut) {
+            cell.classList.add('ports-full');
+          }
         }
 
-        // 输出端口（产出的资源）
-        const prodKeys = Object.keys(bd.prod || {});
-        if (prodKeys.length > 0 && !bd.isBoost) {
-          const outPorts = document.createElement('div');
-          outPorts.className = 'cell-ports out';
-          prodKeys.forEach(k => {
-            const r = RES[k];
-            if (!r) return;
-            const port = document.createElement('div');
-            port.className = 'cell-port';
-            port.style.borderColor = r.c + '80';
-            port.style.color = r.c;
-            port.style.boxShadow = '0 0 3px ' + r.c + '30';
-            port.textContent = r.icon;
-            outPorts.appendChild(port);
-          });
-          cell.appendChild(outPorts);
+        // v2.0 §10.3 — 已触发邻接加成指示器
+        const adjResult = this.getAdjacencyBonus(i);
+        if (adjResult.details.length > 0) {
+          const indicator = document.createElement('div');
+          indicator.className = 'cell-adj-indicator';
+          const count = adjResult.details.length;
+          if (count >= 5) {
+            indicator.textContent = '★';
+            indicator.style.color = '#facc15';
+          } else if (count >= 3) {
+            indicator.textContent = '●●';
+            indicator.style.color = '#22c55e';
+          } else {
+            indicator.textContent = '●';
+            indicator.style.color = '#22c55e';
+          }
+          indicator.title = '📐 邻接加成 (' + count + '条): ' + adjResult.details.map(d => d.icon + d.name + ' +' + Math.round(d.bonus*100) + '%').join(', ') + ' | 总计: +' + Math.round(adjResult.bonus*100) + '%';
+          cell.appendChild(indicator);
         }
 
         // Hover tooltip数据
@@ -3988,8 +4256,29 @@ const G = {
             }
             const ohPct = Math.round((oh - 1) * 100);
             econStr = `<br><span style="color:#f97316;font-size:0.9em">🔧 维护: ${parts.join(' ')}/s${ohPct > 0 ? ` <span style="color:#ef4444">(+${ohPct}%管理开销)</span>` : ''}</span>`;
+            // v2.0: 端口效率折扣显示
+            const portDisc = getPortEfficiencyDiscount(idx);
+            if (portDisc < 1.0) {
+              const discPct = Math.round((1 - portDisc) * 100);
+              econStr += `<br><span style="color:#22c55e;font-size:0.9em">🔀 端口效率折扣: -${discPct}% 维护费</span>`;
+            }
           }
         }
+      }
+      // v2.0: 端口信息显示
+      let portStr = '';
+      const gridType = self.grid[idx]?.type;
+      if (gridType && PORT_DEFS[gridType]) {
+        const portDef = PORT_DEFS[gridType];
+        const usedIn = getUsedPorts(idx, 'in');
+        const usedOut = getUsedPorts(idx, 'out');
+        const techExtra = self._extraOutPorts || 0;
+        const maxOutEff = portDef.maxOut + techExtra;
+        const freeIn = portDef.maxIn - usedIn;
+        const freeOut = maxOutEff - usedOut;
+        const portColor = (freeIn === 0 && freeOut === 0) ? '#facc15' : (freeIn > 0 || freeOut > 0) ? '#06d6a0' : '#888';
+        portStr = `<br><span style="color:${portColor};font-size:0.9em">📥 输入: ${usedIn}/${portDef.maxIn}${freeIn > 0 ? ` (空闲${freeIn})` : ''} 📤 输出: ${usedOut}/${maxOutEff}${freeOut > 0 ? ` (空闲${freeOut})` : ''}</span>`;
+        if (freeIn === 0 && freeOut === 0) portStr += `<br><span style="color:#facc15;font-size:0.85em">✨ 端口满载！</span>`;
       }
       // 资源竞争影响
       if (self.phase >= 3) {
@@ -4005,7 +4294,7 @@ const G = {
         }
       }
       document.getElementById('ttName').innerHTML = `${bd.emoji||''} ${bd.n}${lvlStr} <span style="color:${bd.color};font-size:0.85em">[T${bd.tier||1}]</span>`;
-      document.getElementById('ttDesc').innerHTML = `${bd.d}${multStr}${rateStr}${beltStr}${adjStr}${syncStr}${econStr}<br><span style="color:var(--color-info);font-family:'Share Tech Mono',monospace">${bd.ratio}</span><br><span style="color:var(--color-muted-dark);font-size:0.85em">拖拽移动 · 双击升级 · 右键回收 · 空白拖拽框选</span>`;
+      document.getElementById('ttDesc').innerHTML = `${bd.d}${multStr}${rateStr}${beltStr}${adjStr}${syncStr}${portStr}${econStr}<br><span style="color:var(--color-info);font-family:'Share Tech Mono',monospace">${bd.ratio}</span><br><span style="color:var(--color-muted-dark);font-size:0.85em">拖拽移动 · 双击升级 · 右键回收 · 空白拖拽框选</span>`;
       tt.classList.add('show');
       tt.style.left = Math.min(e.clientX + 12, window.innerWidth - 240) + 'px';
       tt.style.top = Math.min(e.clientY + 12, window.innerHeight - 100) + 'px';
@@ -4193,6 +4482,13 @@ const G = {
     document.querySelectorAll('.action-btn').forEach(b => {
       b.classList.toggle('active', b.dataset.b === this.sel);
     });
+
+    // v2.0 §10.2: 邻接放置预览高亮
+    this._clearAdjPreview();
+    if (this.sel && this.phase >= 2) {
+      this._showAdjPreview(this.sel);
+    }
+
     if (this.sel) {
       document.getElementById('buildHint').textContent = '点击培养皿中的空格放置';
       // 移动端选中建筑后自动切换到培养皿
@@ -4202,6 +4498,32 @@ const G = {
     }
     // 选中建筑后更新小手指向
     if (this.phase === 1) this._updateGuideHand();
+  },
+
+  // v2.0 §10.2: 显示邻接放置预览高亮
+  _showAdjPreview(bldType) {
+    const cells = document.querySelectorAll('.cell');
+    for (let i = 0; i < this.grid.length; i++) {
+      if (this.grid[i]) continue; // 已占用格子跳过
+      const result = previewAdjacencyBonuses(i, bldType);
+      if (result.count === 0) continue;
+      const cell = cells[i];
+      if (!cell) continue;
+      const level = Math.min(result.count, 3);
+      cell.classList.add('adj-preview-' + level);
+      const badge = document.createElement('div');
+      badge.className = 'adj-preview-badge';
+      badge.textContent = result.count >= 3 ? '×' + result.count + '+' : '×' + result.count;
+      cell.appendChild(badge);
+    }
+  },
+
+  // v2.0: 清除邻接预览高亮
+  _clearAdjPreview() {
+    document.querySelectorAll('.adj-preview-1,.adj-preview-2,.adj-preview-3').forEach(el => {
+      el.classList.remove('adj-preview-1', 'adj-preview-2', 'adj-preview-3');
+    });
+    document.querySelectorAll('.adj-preview-badge').forEach(el => el.remove());
   },
 
   // ===== BELT GUIDANCE TOOLTIP =====
@@ -4869,10 +5191,11 @@ const G = {
       }
     }
 
-    // 传送带连接提示 — 阶段1自动连接，阶段2+弹框提示手动连接
+    // v2.0 §8.4: 传送带连接提示 — P1自动 / P2 hybrid / P3+手动
     const beltInfoAfter = this._checkBeltConnections(idx, this.sel);
-    if (this.phase === 1) {
-      // 阶段1: 保留自动连接，新手友好
+    const currentBeltMode = BELT_MODE[Math.min(this.phase, 3)] || 'manual';
+    if (currentBeltMode === 'auto') {
+      // P1: 保留自动连接，新手友好
       if (beltInfoAfter.count > 0) {
         this.log(`🔗 传送带已自动连接 ×${beltInfoAfter.count}`, 's');
       } else {
@@ -4881,8 +5204,17 @@ const G = {
           this.log('🔗 传送带已自动规划，放心建造！', 's');
         }
       }
+    } else if (currentBeltMode === 'hybrid') {
+      // P2: 自动传送带仍在，但可手动添加优化
+      if (beltInfoAfter.count > 0) {
+        this.log(`🔗 自动连接 ×${beltInfoAfter.count} | 💡 你也可以手动添加管线来优化产线`, 's');
+      }
+      const hasFlowRole = FLOW_MAP.some(f => f.from === this.sel || f.to === this.sel);
+      if (hasFlowRole) {
+        this._showBeltGuide(idx, bd);
+      }
     } else {
-      // 阶段2+: 不再自动连接，弹框提示手动连接
+      // P3+: 纯手动
       if (beltInfoAfter.count > 0) {
         this.log(`🔗 检测到 ${beltInfoAfter.count} 条可用连接`, 's');
       }
@@ -4891,6 +5223,9 @@ const G = {
         this._showBeltGuide(idx, bd);
       }
     }
+
+    // v2.0: 放置后清除邻接预览
+    this._clearAdjPreview();
 
     // 爽感系统
     this.stats.totalBuilt++;
@@ -6083,6 +6418,44 @@ const G = {
       details.push({ name: rule.name, icon: rule.icon, bonus: ruleBonus, count: stacks });
     }
 
+    // v2.0 §10.5: 虚拟邻接（传送带直连建筑，加成为物理邻接的50%，最多2条）
+    const belts = this._activeBelts || [];
+    const virtualNeighborTypes = {};
+    let virtualCount = 0;
+    const MAX_VIRTUAL = 2;
+
+    for (const belt of belts) {
+      if (virtualCount >= MAX_VIRTUAL) break;
+      let otherIdx = -1;
+      if (belt.fi === idx) otherIdx = belt.ti;
+      else if (belt.ti === idx) otherIdx = belt.fi;
+      else continue;
+
+      // 跳过已是物理邻居的（已在上面统计）
+      if (neighbors.includes(otherIdx)) continue;
+
+      const otherType = this.grid[otherIdx]?.type;
+      if (!otherType) continue;
+      virtualNeighborTypes[otherType] = (virtualNeighborTypes[otherType] || 0) + 1;
+      virtualCount++;
+    }
+
+    if (virtualCount > 0) {
+      for (const rule of ADJACENCY_RULES) {
+        if (rule.phase && rule.phase > this.phase) continue;
+        if (rule.self !== '*' && rule.self !== selfType) continue;
+        const vCount = virtualNeighborTypes[rule.neighbor] || 0;
+        if (vCount === 0) continue;
+
+        const stacks = rule.stackable ? Math.min(vCount, rule.maxStack || 1) : (vCount > 0 ? 1 : 0);
+        if (stacks === 0) continue;
+
+        const ruleBonus = rule.bonus * stacks * 0.5; // 虚拟邻接50%
+        totalBonus += ruleBonus;
+        details.push({ name: rule.name + '(管线)', icon: '🔗', bonus: ruleBonus, count: stacks });
+      }
+    }
+
     // ★ Q4：突变邻接加成增幅
     const mutAdjBonus = this._mutActiveEffects.adjacencyBonus || 0;
     if (mutAdjBonus > 0 && totalBonus > 0) {
@@ -6430,7 +6803,13 @@ const G = {
       if (g.type === 'glucoseCollector' && this._collectorBonus) techBonus += this._collectorBonus;
       if (g.type === 'energyStation') {
         if (this._energyBonus) techBonus += this._energyBonus;
-        if (this._energyCostPenalty) techConsPenalty += this._energyCostPenalty;
+        // v2.0: 快速代谢邻接加成 — 邻接碳源采集器时额外+10%
+        if (this._energyAdjBonus) {
+          const adjCells = this.getAdjacentCells(idx);
+          if (adjCells.some(ni => this.grid[ni]?.type === 'glucoseCollector')) {
+            techBonus += this._energyAdjBonus;
+          }
+        }
       }
       if (g.type === 'nitrogenFixer' && this._nitrogenBonus) techBonus += this._nitrogenBonus;
       if (g.type === 'proteinFactory' && this._proteinBonus) techBonus += this._proteinBonus;
@@ -6483,8 +6862,10 @@ const G = {
         const bldLv = this.buildingLevels[idx] || 1;
         // 高等级建筑维护费略高（等级带来的规模开销）
         const lvMult = 1 + (bldLv - 1) * 0.15;
+        // v2.0: 端口效率折扣 — 端口利用率高的建筑维护费更低
+        const portDiscount = getPortEfficiencyDiscount(idx);
         for (let k in baseMaint) {
-          const cost = baseMaint[k] * maint.overhead * lvMult * maintReduce * Math.max(0.1, mutMaintMod);
+          const cost = baseMaint[k] * maint.overhead * lvMult * maintReduce * Math.max(0.1, mutMaintMod) * portDiscount;
           r[k] = (r[k]||0) - cost;
           maint.total[k] = (maint.total[k]||0) + cost;
           breakdown[k].maint += cost;
@@ -6543,6 +6924,16 @@ const G = {
     const tension = {};
     const penalty = {};
     if (this.phase >= RESOURCE_COMPETITION.startPhase) {
+      // v2.0: P3缓冲期 — 前180秒阈值从95%渐进降到85%
+      let effectiveThreshold = RESOURCE_COMPETITION.tensionThreshold;
+      if (this.phase === 3 && this._p3EntryTime) {
+        const elapsed = (Date.now() - this._p3EntryTime) / 1000;
+        if (elapsed < RESOURCE_COMPETITION.p3BufferDuration) {
+          const bufferT = RESOURCE_COMPETITION.p3BufferThreshold;
+          const normalT = RESOURCE_COMPETITION.tensionThreshold;
+          effectiveThreshold = bufferT - (bufferT - normalT) * (elapsed / RESOURCE_COMPETITION.p3BufferDuration);
+        }
+      }
       for (let k in RES) {
         // 分离该资源的总产出和总消耗（含维护费）
         // r[k]是净值，需要回溯计算。用简化方式：正值=净产出，负值=净消耗
@@ -6570,9 +6961,9 @@ const G = {
         if (totalProd > 0.01) {
           const ratio = totalCons / totalProd;
           tension[k] = ratio;
-          if (ratio > RESOURCE_COMPETITION.tensionThreshold) {
+          if (ratio > effectiveThreshold) {
             // 超过阈值→开始惩罚产出
-            const severity = Math.min((ratio - RESOURCE_COMPETITION.tensionThreshold) / (1 - RESOURCE_COMPETITION.tensionThreshold), 1);
+            const severity = Math.min((ratio - effectiveThreshold) / (1 - effectiveThreshold), 1);
             const eff = 1 - severity * (1 - RESOURCE_COMPETITION.minEfficiency);
             // ★ Q4：突变竞争抵抗
             const mutResist = this._mutActiveEffects.competitionResist || 0;
@@ -6820,6 +7211,9 @@ const G = {
     if (this._mutLabUnlocked) return;
     const cfg = MUT_LAB_CONFIG;
     if (this.phase >= cfg.unlockPhase && this.eL >= cfg.unlockEvoLv && this.techs[cfg.unlockTech]?.done) {
+      // v2.0: 额外解锁条件 — 至少已建造过1台P3建筑
+      const hasP3Bld = this.grid.some(g => g && BLDS[g.type]?.phase === 3);
+      if (!hasP3Bld) return;
       this._mutLabUnlocked = true;
       this.log('🧬 变异实验室已解锁！在侧栏查看', 's');
       this.showMilestone('🧬', '变异实验室解锁！');
@@ -7395,6 +7789,20 @@ const G = {
     }
 
     this.phase++;
+    // v2.0: 记录P3进入时间（用于资源竞争缓冲期）
+    if (this.phase === 3) this._p3EntryTime = Date.now();
+
+    // v2.0 §11: 阶段升级时设置教学flag
+    if (this.phase === 2) {
+      this._p2PortTutorialPending = true; // 触发P2端口教学
+    }
+    if (this.phase === 3) {
+      this._p3LogisticsTutorialPending = true; // 触发P3物流时代教学
+      // P3+180秒后启用资源竞争教学
+      setTimeout(() => {
+        this._competitionEnabled = true;
+      }, 180000);
+    }
     const p = PHASES[this.phase - 1];
     // 进入阶段3时停止帮助按钮脉冲
     if (this.phase >= 3) this._stopHelpPulse();
@@ -7538,6 +7946,14 @@ const G = {
         currentIdx = i;
         guideText = steps[i].text;
         guideIcon = steps[i].icon;
+        // v2.0: once教学 — 显示后自动关闭pending flag
+        if (steps[i].once) {
+          const key = steps[i].once;
+          if (key === 'p2PortTutorial') this._p2PortTutorialPending = false;
+          if (key === 'p3LogisticsTutorial') this._p3LogisticsTutorialPending = false;
+          if (key === 'adjPreviewHint') this._adjPreviewShown = true;
+          if (key === 'competitionTutorial') this._competitionTutorialShown = true;
+        }
         break;
       }
     }
@@ -8185,9 +8601,9 @@ const G = {
       const pairMap = {}; // "min-max" -> { fi, ti, flows:[], colors:[], icons:[], labels:[] }
       const usedEdges = new Set(); // 已占用的通道，"min-max" 形式
 
-      // 阶段1: 自动连接传送带（新手引导期）
-      // 阶段2+: 跳过自动连接，只保留手动传送带
-      if (this.phase === 1) {
+      // v2.0 §8.4: P1自动, P2 hybrid(自动+可选手动), P3+纯手动
+      const beltMode = BELT_MODE[Math.min(this.phase, 3)] || 'manual';
+      if (beltMode === 'auto' || beltMode === 'hybrid') {
         // Step 1: 为每个 flow，每个 from 实例找最近的 to 实例
         // ★ 使用全局最优匹配（抢占式），避免老建筑"占住"最近位
         const rawLinks = []; // { fi, ti, flow }
@@ -8257,10 +8673,33 @@ const G = {
           }
         }
 
-        // Step 2: 按格子对合并
+        // Step 2: 按格子对合并（v2.0: 增加端口约束检查）
+        // portUsage 跟踪每个建筑已使用的输入/输出端口数
+        const portUsage = {}; // idx -> { in: count, out: count }
+        const getPortUsage = (idx) => {
+          if (!portUsage[idx]) portUsage[idx] = { in: 0, out: 0 };
+          return portUsage[idx];
+        };
         for (const link of rawLinks) {
           const key = Math.min(link.fi, link.ti) + '-' + Math.max(link.fi, link.ti);
           if (this.removedBelts[key]) continue;
+
+          // v2.0: 端口约束检查 — 自动连接也遵守端口限制
+          const fromType = this.grid[link.fi]?.type;
+          const toType = this.grid[link.ti]?.type;
+          if (fromType && toType) {
+            const fromPort = PORT_DEFS[fromType];
+            const toPort = PORT_DEFS[toType];
+            if (fromPort) {
+              const usage = getPortUsage(link.fi);
+              const techExtra = this._extraOutPorts || 0;
+              if (usage.out >= fromPort.maxOut + techExtra) continue; // 输出端口已满
+            }
+            if (toPort) {
+              const usage = getPortUsage(link.ti);
+              if (usage.in >= toPort.maxIn) continue; // 输入端口已满
+            }
+          }
 
           if (!pairMap[key]) {
             const blocked = isBeltPathBlocked(link.fi, link.ti, occupiedCells);
@@ -8270,6 +8709,9 @@ const G = {
           if (!pairMap[key]) {
             pairMap[key] = { fi: link.fi, ti: link.ti, flows: [], colors: [], icons: [], labels: [], isManual: false };
             usedEdges.add(key);
+            // v2.0: 更新端口使用计数
+            getPortUsage(link.fi).out++;
+            getPortUsage(link.ti).in++;
           }
           const entry = pairMap[key];
           if (!entry.colors.includes(link.flow.color)) {
@@ -9604,8 +10046,18 @@ const G = {
         const penalty = this._competitionPenalty || {};
         // 找出最紧张的资源
         let worstRes = null, worstTension = 0;
+        // v2.0: 使用动态阈值（考虑P3缓冲期）
+        let uiThreshold = RESOURCE_COMPETITION.tensionThreshold;
+        if (this.phase === 3 && this._p3EntryTime) {
+          const elapsed = (Date.now() - this._p3EntryTime) / 1000;
+          if (elapsed < RESOURCE_COMPETITION.p3BufferDuration) {
+            const bufferT = RESOURCE_COMPETITION.p3BufferThreshold;
+            const normalT = RESOURCE_COMPETITION.tensionThreshold;
+            uiThreshold = bufferT - (bufferT - normalT) * (elapsed / RESOURCE_COMPETITION.p3BufferDuration);
+          }
+        }
         for (let k in tension) {
-          if (tension[k] > worstTension && tension[k] > RESOURCE_COMPETITION.tensionThreshold) {
+          if (tension[k] > worstTension && tension[k] > uiThreshold) {
             worstTension = tension[k];
             worstRes = k;
           }
@@ -10680,7 +11132,17 @@ const G = {
         // 科技树分支状态
         _collectorBonus: this._collectorBonus,
         _energyBonus: this._energyBonus,
-        _energyCostPenalty: this._energyCostPenalty,
+        _energyAdjBonus: this._energyAdjBonus,
+        _extraOutPorts: this._extraOutPorts,
+        _beltCapBonus: this._beltCapBonus,
+        _p3EntryTime: this._p3EntryTime,
+        // v2.0: 教学flag持久化
+        _p2PortTutorialPending: this._p2PortTutorialPending,
+        _p3LogisticsTutorialPending: this._p3LogisticsTutorialPending,
+        _adjPreviewShown: this._adjPreviewShown,
+        _competitionEnabled: this._competitionEnabled,
+        _competitionTutorialShown: this._competitionTutorialShown,
+        _portFullShown: this._portFullShown,
         _nitrogenBonus: this._nitrogenBonus,
         _proteinBonus: this._proteinBonus,
         _transportBonus: this._transportBonus,
@@ -10800,7 +11262,17 @@ const G = {
       // 科技树分支状态恢复
       if (s._collectorBonus) this._collectorBonus = s._collectorBonus;
       if (s._energyBonus) this._energyBonus = s._energyBonus;
-      if (s._energyCostPenalty) this._energyCostPenalty = s._energyCostPenalty;
+      if (s._energyAdjBonus) this._energyAdjBonus = s._energyAdjBonus;
+      if (s._extraOutPorts) this._extraOutPorts = s._extraOutPorts;
+      if (s._beltCapBonus) this._beltCapBonus = s._beltCapBonus;
+      if (s._p3EntryTime) this._p3EntryTime = s._p3EntryTime;
+      // v2.0: 恢复教学flag
+      if (s._p2PortTutorialPending) this._p2PortTutorialPending = s._p2PortTutorialPending;
+      if (s._p3LogisticsTutorialPending) this._p3LogisticsTutorialPending = s._p3LogisticsTutorialPending;
+      if (s._adjPreviewShown) this._adjPreviewShown = s._adjPreviewShown;
+      if (s._competitionEnabled) this._competitionEnabled = s._competitionEnabled;
+      if (s._competitionTutorialShown) this._competitionTutorialShown = s._competitionTutorialShown;
+      if (s._portFullShown) this._portFullShown = s._portFullShown;
       if (s._nitrogenBonus) this._nitrogenBonus = s._nitrogenBonus;
       if (s._proteinBonus) this._proteinBonus = s._proteinBonus;
       if (s._transportBonus) this._transportBonus = s._transportBonus;
@@ -11570,6 +12042,21 @@ const G = {
         return true;
       }
 
+      // v2.0: 端口约束检查 — 手动连接也遵守端口限制
+      if (!hasAvailablePort(fromIdx, 'out')) {
+        const fromBldName = BLDS[this.grid[fromIdx].type]?.n || '建筑';
+        const fromDef = PORT_DEFS[this.grid[fromIdx].type];
+        const maxOut = (fromDef?.maxOut || 0) + (this._extraOutPorts || 0);
+        this.log(`⚠️ ${fromBldName} 输出端口已满 (${maxOut}/${maxOut})`, 'w');
+        return true;
+      }
+      if (!hasAvailablePort(idx, 'in')) {
+        const toBldName = BLDS[this.grid[idx].type]?.n || '建筑';
+        const toDef = PORT_DEFS[this.grid[idx].type];
+        this.log(`⚠️ ${toBldName} 输入端口已满 (${toDef?.maxIn || 0}/${toDef?.maxIn || 0})`, 'w');
+        return true;
+      }
+
       // 确定传输的资源（基于两端建筑的 prod/cons 匹配）
       const fromBld = BLDS[this.grid[fromIdx].type];
       const toBld = BLDS[this.grid[idx].type];
@@ -11651,6 +12138,26 @@ const G = {
       this.updateUI();
       // ★ Q2：成功连接后重置闲置计时器
       this._resetBeltIdleTimer();
+
+      // v2.0 §11.4: 首次端口满一次性提示
+      if (!this._portFullShown) {
+        const fromType = this.grid[fromIdx]?.type;
+        const toType = this.grid[toIdx]?.type;
+        const checkPortFull = (idx, type) => {
+          if (!type) return false;
+          const def = PORT_DEFS[type];
+          if (!def) return false;
+          const techExtra = this._extraOutPorts || 0;
+          const totalOut = def.maxOut + techExtra;
+          return (getUsedPorts(idx, 'in') >= def.maxIn && getUsedPorts(idx, 'out') >= totalOut);
+        };
+        if (checkPortFull(fromIdx, fromType) || checkPortFull(toIdx, toType)) {
+          this._portFullShown = true;
+          const fullType = checkPortFull(fromIdx, fromType) ? fromType : toType;
+          const fullBd = BLDS[fullType];
+          this.showEvent('端口已满！', `${fullBd?.emoji || ''} ${fullBd?.n || fullType}的端口都已连接\n\n解决方案：\n1. 多建一台同类建筑分担负载\n2. 升级传送带提高单条管线吞吐量\n3. 研究科技或获取突变来扩展端口`, '#facc15');
+        }
+      }
       return true;
     }
   },
