@@ -4,6 +4,61 @@
 
 ---
 
+## v0.9.1 — 2026-03-19 · 终局高潮系统 — 史诗终章与文明编年史
+
+> **Endgame Climax System**
+> 本版本为游戏终局添加了宏大的高潮演出系统,包括史诗级音效、文明编年史弹窗和视觉特效,为玩家的完整旅程画上震撼的句点。
+> 代码变更：game.js +430/-11 行，index.html +430/-11 行
+
+### ✨ 新功能 — 史诗终章音效 (Finale Soundtrack)
+- [office] 新增 `wonderFinale()` 音效方法：4阶段渐进式史诗终章
+  - Phase 1: 深沉冲击波（低频基础音 + 白噪声）
+  - Phase 2: 上行色彩音阶（12个音符从低到高，伴随微失谐增加厚度）
+  - Phase 3: 持续大和弦（C大调+附加音，8个音符持续2.5秒）
+  - Phase 4: 高频余韵闪烁（8次随机高频闪烁）
+  - 最终定音：低沉而温暖的低音三和弦
+- [office] 音效持续时间约4秒,比之前的 `wonderDone` 更宏大、更持久
+
+### ✨ 新功能 — 文明编年史弹窗 (Chronicle Popup)
+- [office] 新增 `chroniclePopup` 弹窗系统：展示玩家的完整游戏旅程
+- [office] 编年史内容包括：
+  - 📜 标题："文明编年史"
+  - 🌟 副标题："从一团原始液泡到征服微生物宇宙的史诗旅程"
+  - 🗺️ 旅程回顾（`chronicleJourney`）：展示关键里程碑
+  - 📊 统计数据（`chronicleStats`）：游戏时长、总产出等
+  - 💭 结语引言（`chronicleQuote`）：富有哲理的结束语
+- [office] 弹窗优先级：最高级（`_popupIds` 数组首位）
+- [office] 金色主题设计：边框、按钮、背景均采用金色系
+
+### ✨ 新功能 — 终局视觉效果 (Finale Visual Effects)
+- [office] **闪光覆盖层**（`wonderFlash`）：白色闪光渐变动画
+- [office] **涟漪扩散**（`wonderRipple`）：从中心扩散的金色涟漪
+- [office] **余晖覆盖**（`afterglowOverlay`）：金色余晖渐隐效果
+- [office] **金色飘字**（`finale-golden-float`）：固定定位 + 上浮动画
+  - Orbitron 字体 + 金色 + 发光阴影
+  - 动画：2.5秒 ease-out，上移80px + 放大1.3倍
+- [office] **粒子喷发**（`finale-particle`）：随机方向的粒子爆发
+  - CSS 变量控制动画方向（`--dx`, `--dy`）
+  - 渐隐 + 缩放消失效果
+
+### 🎨 视觉 / UI 调整
+- [office] 新增 `.chronicle-*` 系列 CSS 类：弹窗标题、副标题、旅程、统计、引言、按钮
+- [office] 新增 `.finale-*` 系列 CSS 类：金色飘字、粒子喷发
+- [office] 新增 `.wonder-flash-overlay`、`.wonder-ripple`、`.afterglow-overlay` 覆盖层样式
+- [office] 所有终局动画均支持 `prefers-reduced-motion` 无障碍偏好
+
+### 🔧 技术实现
+- [office] 弹窗管理增强：`_popupIds` 新增 `chroniclePopup` 并置于首位（最高优先级）
+- [office] `hidePopup()` 方法新增 `chroniclePopup` 清理逻辑
+- [office] 技能树显示修复：使用空字符串 `''` 替代 `'block'`，让 CSS 的 `display:flex` 生效
+- [office] 新增 HTML 结构：闪光、涟漪、余晖、编年史弹窗等 DOM 元素
+
+### 🐛 Bug 修复
+- [office] 修复技能树（`skill-tree`）display 样式被错误覆盖的问题
+- [office] 确保编年史弹窗关闭时正确清理状态
+
+---
+
 ## v0.9.0 — 2026-03-19 · Building System 2.0 Phase 2 — 端口系统 & 邻接重构 & 经济再平衡
 
 > **Building System 2.0 Phase 2 — UI / 渲染 / 交互层**

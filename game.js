@@ -239,6 +239,37 @@ const SFX = (() => {
       });
     },
 
+    // ★ 终局高潮 — 史诗终章音效（比wonderDone更宏大、更持久）
+    wonderFinale() {
+      if (!sfxOn) return;
+      // Phase 1: 深沉冲击波 (0s)
+      playTone(40, 1.0, 'sine', 0.4);
+      playTone(80, 0.8, 'sine', 0.25);
+      playNoise(0.4, 0.2, 'lowpass', 200);
+      // Phase 2: 上行色彩音阶 — 从深到高 (0.3s - 1.5s)
+      const ascend = [131, 165, 196, 262, 330, 392, 523, 659, 784, 1047, 1319, 1568];
+      ascend.forEach((f, i) => {
+        const t = 0.3 + i * 0.1;
+        playTone(f, 0.5, 'sine', 0.08 + i * 0.005, 0, t);
+        playTone(f * 1.005, 0.4, 'triangle', 0.04, 5, t); // 微失谐增加厚度
+      });
+      // Phase 3: 持续大和弦 — C大调+附加音 (1.5s)
+      const chord = [262, 330, 392, 523, 659, 784, 1047, 1319];
+      chord.forEach(f => {
+        playTone(f, 2.5, 'sine', 0.08, 0, 1.5);
+        playTone(f, 2.0, 'triangle', 0.04, 2, 1.6);
+      });
+      // Phase 4: 高频余韵闪烁 (2.5s - 4s)
+      for (let i = 0; i < 8; i++) {
+        const shimmerF = 1500 + Math.random() * 2000;
+        playTone(shimmerF, 0.3, 'sine', 0.03, 0, 2.5 + i * 0.2);
+      }
+      // 最终定音 — 低沉而温暖 (3.5s)
+      playTone(131, 3.0, 'sine', 0.12, 0, 3.5);
+      playTone(262, 2.5, 'sine', 0.08, 0, 3.5);
+      playTone(392, 2.0, 'triangle', 0.05, 0, 3.5);
+    },
+
     // 里程碑/事件弹窗 — 通知铃
     milestone() {
       if (!sfxOn) return;
@@ -2440,6 +2471,7 @@ const G = {
   // ===== 弹窗遮罩管理 =====
   // 按优先级排列的弹窗ID列表（从高到低）
   _popupIds: [
+    'chroniclePopup',
     'achvHallOverlay', 'comboPopup', 'achievePopup',
     'introPopup', 'resetPopup', 'choicePopup', 'offlinePopup',
     'upgradePopup', 'beltUpgradePopup', 'recyclePopup', 'prestigePopup',
@@ -2488,6 +2520,7 @@ const G = {
         this._hidePopup(el);
         this._hideBackdrop();
         // 特定弹窗需要清理状态
+        if (id === 'chroniclePopup') { /* closeChronicle已处理清理 */ }
         if (id === 'recyclePopup') this.recycleIdx = null;
         if (id === 'upgradePopup') this.upgradeIdx = null;
         if (id === 'beltUpgradePopup') { this._beltUpgradeKey = null; this._beltUpgradeKeys = null; }
@@ -3619,7 +3652,8 @@ const G = {
     }
 
     list.appendChild(tree);
-    section.style.display = hasVisible ? 'block' : 'none';
+    // ★ 用空字符串让 CSS 的 display:flex 生效（而非覆盖为 block）
+    section.style.display = hasVisible ? '' : 'none';
   },
 
   // === Core Colony Bar (帝国核心展示 + 供给状态) ===
@@ -7170,6 +7204,19 @@ const G = {
     // ARIA: 同步奇观进度
     document.getElementById('wonderFill').closest('[role="progressbar"]')?.setAttribute('aria-valuenow', Math.round(pct));
 
+    // ★ 终局高潮 — 最后冲刺效果（进度 >85%）
+    if (pct > 85 && !this._wonderSprintActive) {
+      this._wonderSprintActive = true;
+      const overlay = document.getElementById('wonderOverlay');
+      if (overlay) overlay.classList.add('sprint');
+      this.log('⚡ 奇观即将完成！最后冲刺！', 's');
+      SFX.phaseUp(); // 上升音效暗示高潮来临
+    }
+    // 冲刺中每20%进度播放加速心跳
+    if (this._wonderSprintActive && this.wProg % Math.max(1, Math.floor(wt * 0.03)) === 0) {
+      SFX.build(); // 轻微建造音作为心跳节奏
+    }
+
     // ★ 改进2：奇观建造事件触发 — 检查是否到达触发时间点
     if (!this._wonderEventsTriggered) this._wonderEventsTriggered = [];
     for (const wev of WONDER_EVENTS) {
@@ -7190,16 +7237,53 @@ const G = {
       }
     }
 
+    // ★ 终局高潮 — 4阶段完成序列（替换原简单完成处理）
     if (this.wProg >= wt) {
       this.wonderComplete = true;
-      this.log('★★★ 奇观完成: ' + bd.n + ' ★★★', 's');
-      SFX.wonderDone();
-      this.showEvent('🏛️ 奇观落成！', bd.n + '\n\n' + bd.d + '\n\n你征服了微生物宇宙！这是文明的巅峰！', 'var(--purple)');
+      this._wonderSprintActive = false;
+      const overlay = document.getElementById('wonderOverlay');
+      if (overlay) overlay.classList.remove('sprint');
       this._hidePopup('wonderOverlay');
+
+      // ===== 阶段A: 冲击时刻 — 屏幕震动 + 闪光 =====
+      this.log('★★★ 奇观完成: ' + bd.n + ' ★★★', 's');
+      this.screenShake(20); // 强烈震动
+      SFX.wonderFinale();   // 史诗终章音效
+
+      // 全屏闪光
+      const flash = document.getElementById('wonderFlash');
+      if (flash) { flash.classList.add('active'); setTimeout(() => flash.classList.remove('active'), 2000); }
+
+      // 金色涟漪扩散
+      const ripple = document.getElementById('wonderRipple');
+      if (ripple) { ripple.classList.add('active'); setTimeout(() => ripple.classList.remove('active'), 2500); }
+
+      // 终局粒子喷发
+      this._spawnFinaleParticles();
+
+      // 金色飘字
+      const finaleTexts = ['★ 文明巅峰 ★', '✦ 微生物帝国 ✦', '🌟 征服宇宙 🌟'];
+      finaleTexts.forEach((txt, i) => {
+        setTimeout(() => {
+          this._showFinaleFloat(txt, window.innerWidth * (0.2 + Math.random() * 0.6), window.innerHeight * (0.2 + Math.random() * 0.4));
+        }, 400 + i * 600);
+      });
+
+      // ===== 阶段B: 延迟展示事件弹窗 =====
+      setTimeout(() => {
+        this.showEvent('🏛️ 奇观落成！', bd.n + '\n\n' + bd.d + '\n\n你征服了微生物宇宙！这是文明的巅峰！', 'var(--purple)');
+        this.showMilestone('🌟', '游戏完成！微生物帝国达到巅峰！');
+      }, 1200);
+
+      // ===== 阶段C: 文明编年史弹窗 =====
+      setTimeout(() => {
+        this._showChronicle();
+      }, 3000);
+
+      // 清理奇观建造状态
       this.wBuild = null;
       this.wProg = 0;
-      this._wonderEventsTriggered = [];  // 清理事件记录
-      this.showMilestone('🌟', '游戏完成！微生物帝国达到巅峰！');
+      this._wonderEventsTriggered = [];
       this.updateGuide();
     }
   },
@@ -8274,6 +8358,163 @@ const G = {
     el.style.top = (y || window.innerHeight / 2) + 'px';
     document.body.appendChild(el);
     setTimeout(() => el.remove(), 1500);
+  },
+
+  // ===== ★ 终局高潮系统 — 辅助方法 =====
+
+  // 终局粒子喷发 — 从屏幕中央爆射金色/紫色粒子
+  _spawnFinaleParticles() {
+    const cx = window.innerWidth / 2, cy = window.innerHeight / 2;
+    const colors = ['#fbbf24', '#f59e0b', '#a855f7', '#ec4899', '#f97316', '#22c55e'];
+    for (let i = 0; i < 40; i++) {
+      const p = document.createElement('div');
+      p.className = 'finale-particle';
+      const angle = (Math.PI * 2 / 40) * i + (Math.random() - 0.5) * 0.3;
+      const dist = 150 + Math.random() * 300;
+      const dx = Math.cos(angle) * dist;
+      const dy = Math.sin(angle) * dist;
+      const dur = 1.5 + Math.random() * 1.5;
+      p.style.setProperty('--dx', dx + 'px');
+      p.style.setProperty('--dy', dy + 'px');
+      p.style.setProperty('--dur', dur + 's');
+      p.style.left = cx + 'px';
+      p.style.top = cy + 'px';
+      p.style.background = colors[Math.floor(Math.random() * colors.length)];
+      p.style.width = (4 + Math.random() * 6) + 'px';
+      p.style.height = p.style.width;
+      p.style.boxShadow = `0 0 6px ${p.style.background}`;
+      document.body.appendChild(p);
+      setTimeout(() => p.remove(), dur * 1000 + 100);
+    }
+  },
+
+  // 终局金色飘字
+  _showFinaleFloat(text, x, y) {
+    const el = document.createElement('div');
+    el.className = 'finale-golden-float';
+    el.textContent = text;
+    el.style.left = x + 'px';
+    el.style.top = y + 'px';
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 2800);
+  },
+
+  // 文明编年史 — 数据收集与渲染
+  _showChronicle() {
+    const t = this.stats.onlineTime;
+    const hrs = Math.floor(t / 3600);
+    const min = Math.floor((t % 3600) / 60);
+    const sec = t % 60;
+    const timeStr = hrs > 0 ? `${hrs}时${min}分${sec}秒` : `${min}分${sec}秒`;
+
+    // 旅程回顾 — 5个阶段
+    const phases = [
+      { icon: '🔮', name: 'P1 采集', desc: '从一团原始液泡开始，学会采集葡萄糖' },
+      { icon: '🦠', name: 'P2 代谢', desc: '原核聚落成形，代谢网络初步建立' },
+      { icon: '🔬', name: 'P3 物流', desc: '生物膜枢纽运转，传送带连接万物' },
+      { icon: '🏗️', name: 'P4 自动化', desc: '菌落中枢崛起，自动化帝国成形' },
+      { icon: '✨', name: 'P5 圣殿', desc: '生命圣殿落成，微型戴森球照亮宇宙' },
+    ];
+    const journeyEl = document.getElementById('chronicleJourney');
+    if (journeyEl) {
+      journeyEl.innerHTML = `
+        <div class="chronicle-journey-title">🗺 文明旅程</div>
+        ${phases.map(p => `
+          <div class="chronicle-phase">
+            <span class="chronicle-phase-icon">${p.icon}</span>
+            <span class="chronicle-phase-name">${p.name}</span>
+            <span class="chronicle-phase-desc">${p.desc}</span>
+          </div>
+        `).join('')}
+      `;
+    }
+
+    // 统计数据
+    const techDone = Object.values(this.techs).filter(t => t.done).length;
+    const techTotal = Object.keys(TECHS).length;
+    const achieves = Object.keys(this.achievements).length;
+    const challenges = Object.keys(this.completedChallenges).length;
+    const score = this.calcScore();
+    const { rank } = this._scoreRank(score);
+
+    const statsData = [
+      { label: '⏱ 在线时长', value: timeStr },
+      { label: '🏆 总分', value: formatNum(score) + ' [' + rank + ']' },
+      { label: '🏗️ 总建造', value: this.stats.totalBuilt + '' },
+      { label: '♻️ 总回收', value: this.stats.totalRecycled + '' },
+      { label: '🧬 进化次数', value: this.stats.totalEvo + '' },
+      { label: '📖 科技完成', value: `${techDone}/${techTotal}` },
+      { label: '🟢 峰值葡萄糖', value: formatNum(this.stats.peakGlucose) },
+      { label: '⚡ 峰值能量', value: formatNum(this.stats.peakEnergy) },
+      { label: '🧬 峰值DNA', value: formatNum(this.stats.peakDna) },
+      { label: '🦠 峰值种群', value: formatNum(this.stats.peakPop || 0) },
+      { label: '🏆 成就', value: `${achieves}/${ACHIEVE.length}` },
+      { label: '🎯 挑战', value: `${challenges}/${CHALLENGES.length}` },
+    ];
+    const statsEl = document.getElementById('chronicleStats');
+    if (statsEl) {
+      statsEl.innerHTML = statsData.map(s => `
+        <div class="chronicle-stat">
+          <span class="chronicle-stat-label">${s.label}</span>
+          <span class="chronicle-stat-value">${s.value}</span>
+        </div>
+      `).join('');
+    }
+
+    // 结尾引言 — 根据游戏时间选择不同语录
+    const quotes = [
+      '"从一滴培养液到整个微观宇宙，你创造了不可能的奇迹。"',
+      '"每一个微小的选择，都在改写文明的进程。"',
+      '"当戴森球的光芒照亮培养皿，你知道这一切都值得。"',
+      '"这不是终点，而是新传奇的序章。"',
+    ];
+    const quoteEl = document.getElementById('chronicleQuote');
+    if (quoteEl) {
+      quoteEl.textContent = quotes[Math.floor(Math.random() * quotes.length)];
+    }
+
+    // 显示弹窗
+    this._showBackdrop();
+    this._showPopup('chroniclePopup');
+
+    // ===== 阶段D: 余晖效果 — 编年史关闭后自动激活 =====
+    // 余晖在编年史显示时就开始（但视觉上被弹窗遮挡，关闭后才明显感知）
+    this._startAfterglow();
+  },
+
+  // 关闭文明编年史
+  closeChronicle() {
+    this._hidePopup('chroniclePopup');
+    this._hideBackdrop();
+    // 关闭后显示余晖提示
+    this.log('✨ 戴森球的光芒持续照耀着你的微生物帝国...', 's');
+    this.showMilestone('✨', '余晖笼罩大地... 传奇永不落幕');
+  },
+
+  // 余晖系统 — 金色环境光持续一段时间
+  _startAfterglow() {
+    this._afterglowActive = true;
+    const overlay = document.getElementById('afterglowOverlay');
+    if (overlay) overlay.classList.add('active');
+    // 余晖持续120秒后淡出
+    this._afterglowTimer = setTimeout(() => {
+      this._stopAfterglow();
+    }, 120000);
+    // 余晖期间周期性金色飘字
+    this._afterglowFloatInterval = setInterval(() => {
+      if (!this._afterglowActive) return;
+      const texts = ['✦', '✧', '☆', '★', '✨'];
+      const txt = texts[Math.floor(Math.random() * texts.length)];
+      this._showFinaleFloat(txt, Math.random() * window.innerWidth, window.innerHeight * 0.8 + Math.random() * window.innerHeight * 0.15);
+    }, 4000);
+  },
+
+  _stopAfterglow() {
+    this._afterglowActive = false;
+    const overlay = document.getElementById('afterglowOverlay');
+    if (overlay) overlay.classList.remove('active');
+    if (this._afterglowTimer) { clearTimeout(this._afterglowTimer); this._afterglowTimer = null; }
+    if (this._afterglowFloatInterval) { clearInterval(this._afterglowFloatInterval); this._afterglowFloatInterval = null; }
   },
 
   flashRes(k) {
@@ -10249,11 +10490,16 @@ const G = {
       } else {
         const h = body.scrollHeight;
         body.style.maxHeight = h + 'px';
+        let fired = false;
         const onEnd = () => {
+          if (fired) return;
+          fired = true;
           body.style.maxHeight = 'none';
           body.removeEventListener('transitionend', onEnd);
         };
         body.addEventListener('transitionend', onEnd);
+        // ★ 超时保护
+        setTimeout(onEnd, 400);
       }
     }
 
@@ -10324,7 +10570,9 @@ const G = {
         body.style.maxHeight = '';
         return;
       }
-      body.style.maxHeight = body.scrollHeight + 'px';
+      // ★ 初始化时直接设 'none'，不限制高度——避免内容尚未渲染时
+      //   scrollHeight 为 0 导致 max-height 卡在过小值
+      body.style.maxHeight = 'none';
     });
   },
 
@@ -10355,11 +10603,16 @@ const G = {
           const h = body.scrollHeight;
           body.style.maxHeight = h + 'px';
           // 过渡结束后移除固定值，允许内容动态变化
+          let fired = false;
           const onEnd = () => {
+            if (fired) return;
+            fired = true;
             body.style.maxHeight = 'none';
             body.removeEventListener('transitionend', onEnd);
           };
           body.addEventListener('transitionend', onEnd);
+          // ★ 超时保护：如果 transitionend 未触发，400ms 后强制设为 'none'
+          setTimeout(onEnd, 400);
         }
       }
     }
@@ -10733,9 +10986,13 @@ const G = {
     }
 
     // 计算位置
+    // ★ SVG箭头旋转135°后尖端在overlay内约(41,41)处
+    //   要让尖端指向按钮中心: handPos = btnCenter - tipOffset
     const rect = targetEl.getBoundingClientRect();
-    const handX = rect.left + rect.width / 2 - 24;
-    const handY = rect.top - 8;
+    const tipOffX = 41; // 旋转后箭头尖端在overlay内的X偏移
+    const tipOffY = 41; // 旋转后箭头尖端在overlay内的Y偏移
+    const handX = rect.left + rect.width / 2 - tipOffX;
+    const handY = rect.top + rect.height / 2 - tipOffY;
 
     hand.style.display = 'block';
     hand.style.left = handX + 'px';
@@ -10959,7 +11216,7 @@ const G = {
       });
     }
 
-    section.style.display = hasActive ? 'block' : 'none';
+    section.style.display = hasActive ? '' : 'none';
   },
 
   // ===== NOTIFICATION QUEUE =====
@@ -11171,6 +11428,9 @@ const G = {
         _mutHistory: this._mutHistory || [],
         _mutCategoryLock: this._mutCategoryLock || null,
         _mutBrewCount: this._mutBrewCount || 0,
+        // ★ 终局高潮系统
+        _afterglowActive: this._afterglowActive || false,
+        _wonderSprintActive: this._wonderSprintActive || false,
       };
       localStorage.setItem('bioSphereV3', JSON.stringify(s));
       if (!silent) this.log('▸ 已保存', 's');
@@ -11301,6 +11561,12 @@ const G = {
       this._mutHistory = s._mutHistory || [];
       this._mutCategoryLock = s._mutCategoryLock || null;
       this._mutBrewCount = s._mutBrewCount || 0;
+      // ★ 终局高潮系统状态恢复
+      this._wonderSprintActive = s._wonderSprintActive || false;
+      if (s._afterglowActive) {
+        // 存档时余晖仍然激活，恢复后继续显示（缩短剩余时间）
+        setTimeout(() => this._startAfterglow(), 500);
+      }
       // Re-apply milestone buffs
       const achieveCount = Object.keys(this.achievements).length;
       for (const ms of ACHIEVE_MILESTONES) {
