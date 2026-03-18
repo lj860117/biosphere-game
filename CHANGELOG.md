@@ -4,6 +4,25 @@
 
 ---
 
+## v0.8.3 — 2026-03-18 · 建筑辨识度增强（方案D）
+
+### 🎨 视觉 / UI — 建筑格子辨识度优化
+- [office] Emoji 放大到 1.8em，成为格子视觉中心，辨识更醒目
+- [office] 名称标签改为徽章式：深色半透明底 + 纯白字 + 圆角，类似游戏 HUD
+- [office] L 型色标：左侧色条加粗到 4px + 顶部新增 2px 色条，形成 L 型快速颜色索引
+- [office] SVG 背景装饰 opacity 从 0.2 提升到 0.3，saturate 从 0.5 提升到 0.6，增加视觉层次
+- [office] 独特边框色：每种建筑使用自身 color 字段（半透明）作为边框色，同色系建筑也可区分
+- [office] 序号角标移至右上角：避免与底部名称徽章重叠，显示格式改为 `#1/3`，用建筑主题色着色
+
+### 🔧 技术实现
+- [office] 新增 `.cell-stripe-top` CSS 类实现顶部色条
+- [office] 渲染逻辑新增 `stripeTop` 元素创建，与 `stripe` 配合形成 L 型色标
+- [office] `cell.style.borderColor` 行内样式设置独特边框色，重置时正确清除
+- [office] `cell-seq` 位置从 `bottom:0;right:1px` 改为 `top:1px;right:1px`
+- [office] 序号角标 `seqEl.style.color = bd.color` 实现主题色着色
+
+---
+
 ## v0.8.2 — 2026-03-18 · 折叠增强 + 引导自动展开
 
 ### ✨ 新功能 — 引导系统自动展开折叠面板

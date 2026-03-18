@@ -3,6 +3,44 @@
 // 单菌株 → 单代谢 → 简单物流 → 自动化 → 小奇观
 // =============================================================
 
+// ===== 数字格式化工具 — 大数字 K/M/B/T 缩写 =====
+/**
+ * formatNum(n, decimals) — 资源值/分数等整数型数字的格式化
+ *   ≥1T  → "1.23T"    ≥1B  → "1.23B"
+ *   ≥1M  → "1.23M"    ≥10K → "12.3K"
+ *   ≥1K  → "1,234"    <1K  → 原始整数
+ *   负数同理，带负号
+ */
+function formatNum(n, decimals) {
+  if (n == null || isNaN(n)) return '0';
+  const abs = Math.abs(n);
+  const sign = n < 0 ? '-' : '';
+  if (abs >= 1e12) return sign + (abs / 1e12).toFixed(decimals != null ? decimals : 2) + 'T';
+  if (abs >= 1e9)  return sign + (abs / 1e9).toFixed(decimals != null ? decimals : 2) + 'B';
+  if (abs >= 1e6)  return sign + (abs / 1e6).toFixed(decimals != null ? decimals : 2) + 'M';
+  if (abs >= 1e4)  return sign + (abs / 1e3).toFixed(decimals != null ? decimals : 1) + 'K';
+  if (abs >= 1e3)  return sign + Math.floor(abs).toLocaleString();
+  return sign + String(Math.floor(abs));
+}
+
+/**
+ * formatRate(v, decimals) — 速率型数字的格式化（带 +/- 和 /s）
+ *   大数值自动缩写，小数值保留精度
+ */
+function formatRate(v, decimals) {
+  if (v == null || isNaN(v)) return '0/s';
+  const abs = Math.abs(v);
+  const sign = v > 0 ? '+' : v < 0 ? '-' : '';
+  const d = decimals != null ? decimals : (abs >= 1e4 ? 1 : abs >= 100 ? 1 : 2);
+  let str;
+  if (abs >= 1e12) str = (abs / 1e12).toFixed(2) + 'T';
+  else if (abs >= 1e9)  str = (abs / 1e9).toFixed(2) + 'B';
+  else if (abs >= 1e6)  str = (abs / 1e6).toFixed(2) + 'M';
+  else if (abs >= 1e4)  str = (abs / 1e3).toFixed(1) + 'K';
+  else str = abs.toFixed(d);
+  return sign + str + '/s';
+}
+
 // ===== AUDIO ENGINE — Web Audio API 合成音效 + 程序化背景音乐 =====
 const SFX = (() => {
   let ctx = null;
@@ -2198,6 +2236,12 @@ const G = {
 
   // 关闭最上层弹窗（ESC / 点击遮罩时调用）
   closeTopPopup() {
+    // 优先检查动态插入的高z-index overlay（不在 _popupIds 中）
+    const mutReplace = document.getElementById('mutReplaceOverlay');
+    if (mutReplace) {
+      this.mutCancelReplace();
+      return;
+    }
     // 按z-index从高到低检查哪个弹窗在显示
     for (const id of this._popupIds) {
       const el = document.getElementById(id);
@@ -2208,6 +2252,14 @@ const G = {
         if (id === 'recyclePopup') this.recycleIdx = null;
         if (id === 'upgradePopup') this.upgradeIdx = null;
         if (id === 'beltUpgradePopup') { this._beltUpgradeKey = null; this._beltUpgradeKeys = null; }
+        if (id === 'choicePopup') {
+          if (this.pendingChoice?._isWonderEvent) {
+            // 奇观建造事件被ESC/遮罩关闭时，清除暂停标志，恢复建造进度
+            this._wonderEventPending = false;
+            this.log('⚠️ 建造事件已跳过，奇观继续建造', 'w');
+          }
+          this.pendingChoice = null;
+        }
         return;
       }
     }
@@ -2259,7 +2311,7 @@ const G = {
     if (hasEarnings) {
       const timeStr = elapsed >= 3600 ? `${Math.floor(elapsed/3600)}小时${Math.floor((elapsed%3600)/60)}分钟` :
                       elapsed >= 60 ? `${Math.floor(elapsed/60)}分钟` : `${Math.floor(elapsed)}秒`;
-      const earningStr = Object.entries(earnings).map(([k,v]) => `+${v}${RES[k]?.icon||k}`).join(' ');
+      const earningStr = Object.entries(earnings).map(([k,v]) => `+${formatNum(v)}${RES[k]?.icon||k}`).join(' ');
 
       // Show welcome back popup
       setTimeout(() => {
@@ -2279,7 +2331,7 @@ const G = {
     for (let k in earnings) {
       html += `<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid rgba(255,255,255,0.03)">
         <span style="color:var(--dim)">${RES[k]?.icon||''} ${RES[k]?.n||k}</span>
-        <span style="color:var(--green);font-weight:700;font-family:'Orbitron',monospace">+${earnings[k]}</span>
+        <span style="color:var(--green);font-weight:700;font-family:'Orbitron',monospace">+${formatNum(earnings[k])}</span>
       </div>`;
     }
     detailEl.innerHTML = html;
@@ -2380,12 +2432,14 @@ const G = {
       if (r.phase > this.phase) card.classList.add('hidden');
       card.innerHTML = `
         <div class="res-flash" id="resFlash-${k}" style="background:${r.c}15"></div>
-        <div style="display:flex;align-items:center;gap:4px">
+        <div style="display:flex;align-items:center;gap:3px">
           <span class="res-icon">${r.icon}</span>
           <span class="res-name">${r.n}</span>
         </div>
-        <div class="res-val" id="resVal-${k}">0</div>
-        <div class="res-rate" id="resRate-${k}"></div>
+        <div style="display:flex;align-items:baseline;gap:4px;margin-top:1px">
+          <div class="res-val" id="resVal-${k}">0</div>
+          <div class="res-rate" id="resRate-${k}"></div>
+        </div>
       `;
       // ★ Q1：资源卡片悬停显示收支明细
       const resKey = k;
@@ -2420,26 +2474,26 @@ const G = {
     // 产出（含物流加成）
     const totalProd = bd.prod + bd.logistics;
     if (totalProd > 0.01) {
-      lines.push(`<div class="rb-row rb-pos"><span class="rb-label">🏭 建筑产出</span><span class="rb-val">+${bd.prod.toFixed(2)}/s</span></div>`);
+      lines.push(`<div class="rb-row rb-pos"><span class="rb-label">🏭 建筑产出</span><span class="rb-val">${formatRate(bd.prod)}</span></div>`);
       if (bd.logistics > 0.01) {
-        lines.push(`<div class="rb-row rb-pos rb-sub"><span class="rb-label">　🔗 物流加成</span><span class="rb-val">+${bd.logistics.toFixed(2)}/s</span></div>`);
+        lines.push(`<div class="rb-row rb-pos rb-sub"><span class="rb-label">　🔗 物流加成</span><span class="rb-val">${formatRate(bd.logistics)}</span></div>`);
       }
     }
     // 建筑消耗
     if (bd.bldCons > 0.01) {
-      lines.push(`<div class="rb-row rb-neg"><span class="rb-label">⚙️ 建筑消耗</span><span class="rb-val">-${bd.bldCons.toFixed(2)}/s</span></div>`);
+      lines.push(`<div class="rb-row rb-neg"><span class="rb-label">⚙️ 建筑消耗</span><span class="rb-val">${formatRate(-bd.bldCons)}</span></div>`);
     }
     // 维护费
     if (bd.maint > 0.01) {
-      lines.push(`<div class="rb-row rb-neg"><span class="rb-label">🔧 维护费</span><span class="rb-val">-${bd.maint.toFixed(2)}/s</span></div>`);
+      lines.push(`<div class="rb-row rb-neg"><span class="rb-label">🔧 维护费</span><span class="rb-val">${formatRate(-bd.maint)}</span></div>`);
     }
     // 种群食物消耗
     if (bd.popFood > 0.001) {
-      lines.push(`<div class="rb-row rb-neg"><span class="rb-label">🦠 种群消耗</span><span class="rb-val">-${bd.popFood.toFixed(2)}/s</span></div>`);
+      lines.push(`<div class="rb-row rb-neg"><span class="rb-label">🦠 种群消耗</span><span class="rb-val">${formatRate(-bd.popFood)}</span></div>`);
     }
     // 竞争惩罚
     if (bd.competition > 0.01) {
-      lines.push(`<div class="rb-row rb-warn"><span class="rb-label">⚖️ 竞争损耗</span><span class="rb-val">-${bd.competition.toFixed(2)}/s</span></div>`);
+      lines.push(`<div class="rb-row rb-warn"><span class="rb-label">⚖️ 竞争损耗</span><span class="rb-val">${formatRate(-bd.competition)}</span></div>`);
     }
     // 如果完全没有数据
     if (lines.length === 0) {
@@ -2448,7 +2502,7 @@ const G = {
     // 净值
     const netColor = net > 0.01 ? 'var(--green)' : net < -0.01 ? 'var(--red)' : 'var(--dim)';
     const netSign = net > 0 ? '+' : '';
-    const netStr = `<div class="rb-net" style="color:${netColor}"><span>净值</span><span>${netSign}${net.toFixed(2)}/s</span></div>`;
+    const netStr = `<div class="rb-net" style="color:${netColor}"><span>净值</span><span>${formatRate(net)}</span></div>`;
 
     let tt = document.getElementById('resBreakdownTip');
     if (!tt) {
@@ -2509,9 +2563,9 @@ const G = {
 
       // 动态递增造价
       const actualCost = this.scaledCost(key);
-      const costStr = Object.entries(actualCost).map(([k,v]) => `${v} ${RES[k]?.icon||k}`).join(' + ');
+      const costStr = Object.entries(actualCost).map(([k,v]) => `${formatNum(v)} ${RES[k]?.icon||k}`).join(' + ');
       const count = this.bldCount(key);
-      const countTag = count > 0 ? `<span style="font-size:0.75em;color:var(--color-muted);margin-left:4px">×${count}</span>` : '';
+      const countTag = count > 0 ? `<span style="font-size:0.85em;color:var(--cyan);font-weight:700;margin-left:6px">×${count}</span>` : '';
 
       let tagHTML = '';
       if (b.isWonder) tagHTML = '<span class="act-tag" style="color:var(--purple);border:1px solid var(--purple);background:rgba(168,85,247,0.15)">奇观</span>';
@@ -2686,7 +2740,7 @@ const G = {
         if (unitCost) {
           const grpCost = {};
           for (let r in unitCost) grpCost[r] = unitCost[r] * toUp.length;
-          grpCostStr = Object.entries(grpCost).map(([k,v]) => `${v}${RES[k]?.icon||k}`).join('+');
+          grpCostStr = Object.entries(grpCost).map(([k,v]) => `${formatNum(v)}${RES[k]?.icon||k}`).join('+');
           totalUpgradable += toUp.length;
           for (let r in grpCost) totalCostAll[r] = (totalCostAll[r] || 0) + grpCost[r];
         }
@@ -2725,7 +2779,7 @@ const G = {
     const maxBtn = document.getElementById('beltUpgradeMaxBtn');
     if (allBtn) {
       if (totalUpgradable >= 1) {
-        const costStr = Object.entries(totalCostAll).map(([k,v]) => `${v}${RES[k]?.icon||k}`).join('+');
+        const costStr = Object.entries(totalCostAll).map(([k,v]) => `${formatNum(v)}${RES[k]?.icon||k}`).join('+');
         const canAfford = this.checkRes(totalCostAll);
         allBtn.style.display = '';
         allBtn.disabled = !canAfford;
@@ -2738,7 +2792,7 @@ const G = {
     if (maxBtn) {
       const maxCost = this._calcBeltUpgradeToMaxCost(groups);
       if (maxCost && totalUpgradable >= 1) {
-        const costStr = Object.entries(maxCost).map(([k,v]) => `${v}${RES[k]?.icon||k}`).join('+');
+        const costStr = Object.entries(maxCost).map(([k,v]) => `${formatNum(v)}${RES[k]?.icon||k}`).join('+');
         const canAfford = this.checkRes(maxCost);
         maxBtn.style.display = '';
         maxBtn.disabled = !canAfford;
@@ -2952,7 +3006,7 @@ const G = {
       const lv = this.buildingLevels[idx] || 1;
       const isMax = lv >= 5;
       const cost = this.getUpgradeCost(idx);
-      const costStr = cost ? Object.entries(cost).map(([k,v]) => `${v}${RES[k]?.icon||k}`).join('+') : '';
+      const costStr = cost ? Object.entries(cost).map(([k,v]) => `${formatNum(v)}${RES[k]?.icon||k}`).join('+') : '';
       const mult = this.getUpgradeMultiplier(idx).toFixed(1);
       const nextMult = isMax ? mult : (1 + lv * 0.4).toFixed(1);
 
@@ -3009,7 +3063,7 @@ const G = {
     if (upgradeAllBtn) {
       if (upgradableCount >= 1) {
         // 「全部升1级」按钮 — 显示每个升1级的总费用
-        const costStr = Object.entries(totalCost).map(([k,v]) => `${v}${RES[k]?.icon||k}`).join('+');
+        const costStr = Object.entries(totalCost).map(([k,v]) => `${formatNum(v)}${RES[k]?.icon||k}`).join('+');
         const canAfford = this.checkRes(totalCost);
         upgradeAllBtn.style.display = '';
         upgradeAllBtn.disabled = !canAfford;
@@ -3023,7 +3077,7 @@ const G = {
       // 「全部升满」按钮 — 计算将所有建筑升到Lv5的总费用
       const maxCost = this._calcUpgradeToMaxCost(buildingKey, instances);
       if (maxCost && upgradableCount >= 1) {
-        const costStr = Object.entries(maxCost).map(([k,v]) => `${v}${RES[k]?.icon||k}`).join('+');
+        const costStr = Object.entries(maxCost).map(([k,v]) => `${formatNum(v)}${RES[k]?.icon||k}`).join('+');
         const canAfford = this.checkRes(maxCost);
         upgradeMaxBtn.style.display = '';
         upgradeMaxBtn.disabled = !canAfford;
@@ -3081,9 +3135,9 @@ const G = {
     // 反馈：日志 + 音效 + 粒子 + 震屏
     const combo = this._upgradeCombo;
     if (combo >= 3) {
-      this.log(`⬆×${combo} ${bd.n} → Lv.${lv}  产出×${this.getUpgradeMultiplier(idx).toFixed(1)}`, 's');
+      this.log(`⬆×${combo} ${bd.n} → Lv.${lv}  产出×${formatNum(this.getUpgradeMultiplier(idx), 1)}`, 's');
     } else {
-      this.log(`⬆ ${bd.n} → Lv.${lv}  产出×${this.getUpgradeMultiplier(idx).toFixed(1)}`, 's');
+      this.log(`⬆ ${bd.n} → Lv.${lv}  产出×${formatNum(this.getUpgradeMultiplier(idx), 1)}`, 's');
     }
     SFX.coreUpgrade();
     this.buildBurst(idx);
@@ -3219,7 +3273,7 @@ const G = {
       node.className = cls;
       node.id = 'tech-' + key;
 
-      const costStr = Object.entries(t.cost).map(([k, v]) => `${v} ${RES[k]?.icon || k}`).join(' + ');
+      const costStr = Object.entries(t.cost).map(([k, v]) => `${formatNum(v)} ${RES[k]?.icon || k}`).join(' + ');
 
       let statusStr;
       if (done) {
@@ -3542,6 +3596,7 @@ const G = {
       // 保留 cell 和 data-i，去掉 occupied/bg-*/upgraded/max-level 等
       cell.className = 'cell';
       cell.innerHTML = '';
+      cell.style.borderColor = '';
       delete cell.dataset.btype;
 
       if (this.grid[i]) {
@@ -3551,12 +3606,18 @@ const G = {
         const cellLv = this.buildingLevels[i] || 1;
         if (cellLv > 1) cell.classList.add('upgraded');
         if (cellLv >= 5) cell.classList.add('max-level');
+        // 方案D：用建筑自身color作为边框色，让同色系建筑也有独特视觉签名
+        cell.style.borderColor = bd.color + '70';
 
-        // 主题色左侧竖条
+        // 主题色 L 型色标（左竖条 + 顶横条）
         const stripe = document.createElement('div');
         stripe.className = 'cell-stripe';
         stripe.style.background = bd.color;
         cell.appendChild(stripe);
+        const stripeTop = document.createElement('div');
+        stripeTop.className = 'cell-stripe-top';
+        stripeTop.style.background = bd.color;
+        cell.appendChild(stripeTop);
 
         // SVG图标（缩小，作为背景装饰）
         const icon = document.createElement('div');
@@ -3590,12 +3651,15 @@ const G = {
         }
         cell.appendChild(tierEl);
 
-        // 序号角标（同类型多个时显示 #1 #2 ...）
+        // 序号角标（同类型多个时显示 #序号/总数，用建筑色着色）
         const typeTotal = seqCounters[btype] || 1;
         if (typeTotal > 1 || !bd.isWonder) {
           const seqEl = document.createElement('div');
           seqEl.className = 'cell-seq';
-          seqEl.textContent = '#' + (seqMap[i] || 1);
+          seqEl.style.color = bd.color;
+          seqEl.textContent = typeTotal > 1
+            ? '#' + (seqMap[i] || 1) + '/' + typeTotal
+            : '#1';
           cell.appendChild(seqEl);
         }
 
@@ -3808,7 +3872,7 @@ const G = {
       const tt = document.getElementById('tooltip');
       const lvl = self.buildingLevels[idx] || 1;
       const lvlStr = lvl >= 5 ? ' <span style="color:var(--color-max)">★MAX</span>' : ` <span style="color:var(--color-upgrade)">Lv.${lvl}</span>`;
-      const multStr = lvl > 1 ? `<br><span style="color:var(--color-upgrade)">产出倍率: ${self.getUpgradeMultiplier(idx).toFixed(1)}x</span>` : '';
+      const multStr = lvl > 1 ? `<br><span style="color:var(--color-upgrade)">产出倍率: ${formatNum(self.getUpgradeMultiplier(idx), 1)}x</span>` : '';
       const beltMult = self.getBeltMultiplierForBuilding(idx);
       let capInfo = '';
       if (bd.cons && Object.keys(bd.cons).length > 0 && FLOW_MAP.some(f => f.to === bd.key || f.to === self.grid[idx]?.type)) {
@@ -3831,7 +3895,7 @@ const G = {
         if (demand > 0 && totalCap > 0) {
           const ratio = Math.min(100, Math.round(totalCap / demand * 100));
           const capColor = ratio >= 100 ? 'var(--cyan)' : ratio >= 60 ? 'var(--yellow)' : 'var(--orange)';
-          capInfo = ` <span style="color:${capColor};font-size:0.85em">📦${totalCap.toFixed(1)}/${demand.toFixed(1)} (${ratio}%)</span>`;
+          capInfo = ` <span style="color:${capColor};font-size:0.85em">📦${formatNum(totalCap, 1)}/${formatNum(demand, 1)} (${ratio}%)</span>`;
         }
       }
       const beltStr = beltMult === 0 ? `<br><span style="color:#ef4444;font-weight:700">🚫 资源阻塞 — 需要传送带连接输入资源！</span>` : beltMult < 1 ? `<br><span style="color:var(--orange)">⚠ 传送带效率: ${Math.round(beltMult*100)}%${capInfo} — 升级传送带或增加并行管线</span>` : (beltMult > 1 ? `<br><span style="color:var(--cyan)">✦ 传送带加成: ${Math.round(beltMult*100)}%${capInfo}</span>` : (capInfo ? `<br><span style="color:var(--color-info)">⛓ 传送带${capInfo}</span>` : ''));
@@ -3860,8 +3924,8 @@ const G = {
           const _gProdMult = self._prodMult || 1;
           const mult = self.gEff * popMult * (self.lEff || 1) * bldMult * beltMult * _gProdMult;
           const prodParts = prodEntries.map(([res, base]) => {
-            const actual = (base * mult).toFixed(1);
-            return `<span style="color:${RES[res]?.c || bd.color}">+${actual} ${RES[res]?.icon||''} ${RES[res]?.n||res}/s</span>`;
+            const actual = base * mult;
+            return `<span style="color:${RES[res]?.c || bd.color}">+${formatNum(actual, 1)} ${RES[res]?.icon||''} ${RES[res]?.n||res}/s</span>`;
           });
           rateStr = `<br>${prodParts.join('  ')}`;
         }
@@ -3872,8 +3936,8 @@ const G = {
           const popMult = 1 + hPop * 0.003 * (self._popEffMult || 1);
           const mult = self.gEff * popMult * (self.lEff || 1) * bldMult * beltMult;
           const consParts = consEntries.map(([res, base]) => {
-            const actual = (base * mult).toFixed(1);
-            return `<span style="color:${RES[res]?.c || '#f97316'}">-${actual} ${RES[res]?.icon||''} ${RES[res]?.n||res}/s</span>`;
+            const actual = base * mult;
+            return `<span style="color:${RES[res]?.c || '#f97316'}">-${formatNum(actual, 1)} ${RES[res]?.icon||''} ${RES[res]?.n||res}/s</span>`;
           });
           rateStr += `<br>${consParts.join('  ')}`;
         }
@@ -3919,8 +3983,8 @@ const G = {
             const oh = self._maintenanceOverhead || 1;
             const parts = [];
             for (let mk in baseMaint) {
-              const cost = (baseMaint[mk] * oh * lvMult).toFixed(2);
-              parts.push(`-${cost}${RES[mk]?.icon||mk}`);
+              const cost = baseMaint[mk] * oh * lvMult;
+              parts.push(`-${formatNum(cost, 2)}${RES[mk]?.icon||mk}`);
             }
             const ohPct = Math.round((oh - 1) * 100);
             econStr = `<br><span style="color:#f97316;font-size:0.9em">🔧 维护: ${parts.join(' ')}/s${ohPct > 0 ? ` <span style="color:#ef4444">(+${ohPct}%管理开销)</span>` : ''}</span>`;
@@ -4766,7 +4830,7 @@ const G = {
       const missing = [];
       for (let k in actualCost) {
         const have = this.res[k] || 0;
-        if (have < actualCost[k]) missing.push(`${RES[k]?.icon||k} 差 ${Math.ceil(actualCost[k] - have)}`);
+        if (have < actualCost[k]) missing.push(`${RES[k]?.icon||k} 差 ${formatNum(Math.ceil(actualCost[k] - have))}`);
       }
       this.showCursorTooltip(`资源不足！${missing.join('  ')}`);
       SFX.buildFail();
@@ -4836,7 +4900,7 @@ const G = {
     // 引导任务完成反馈：如果建造的建筑正好是引导目标
     if (this._prevGuideKey === this.sel) {
       const score = this.calcScore();
-      this.showUnlockFloat(`✓ ${bd.n} 完成！  +${score.toLocaleString()} 分`);
+      this.showUnlockFloat(`✓ ${bd.n} 完成！  +${formatNum(score)} 分`);
     }
   },
 
@@ -4864,7 +4928,7 @@ const G = {
       refund[k] = Math.floor(actualCost * this.RECYCLE_RATE);
     }
 
-    const refundStr = Object.entries(refund).map(([k,v]) => `+${v} ${RES[k]?.icon||k}`).join('  ');
+    const refundStr = Object.entries(refund).map(([k,v]) => `+${formatNum(v)} ${RES[k]?.icon||k}`).join('  ');
 
     document.getElementById('recycleName').textContent = bd.n;
     document.getElementById('recycleRefund').textContent = '返还: ' + refundStr;
@@ -4890,7 +4954,7 @@ const G = {
       this.res[k] = (this.res[k] || 0) + refund[k];
     }
 
-    const refundStr = Object.entries(refund).map(([k,v]) => `+${v}${RES[k]?.icon||k}`).join(' ');
+    const refundStr = Object.entries(refund).map(([k,v]) => `+${formatNum(v)}${RES[k]?.icon||k}`).join(' ');
     this.log(`♻️ 回收 ${bd.n} → ${refundStr}`, 'ev');
     SFX.recycle();
 
@@ -5349,7 +5413,7 @@ const G = {
       const opacity = isCurrent ? 'opacity:1' : 'opacity:0.7';
       return `<div style="padding:3px 6px;${bg};${opacity};display:flex;align-items:center;gap:6px;border-radius:2px;margin:1px 0">
         <span style="font-family:'Orbitron',monospace;color:${r.color};${weight};font-size:0.95em;min-width:32px">${arrow}${r.rank}</span>
-        <span style="color:var(--color-muted);font-size:0.85em">≥${r.min.toLocaleString()}</span>
+        <span style="color:var(--color-muted);font-size:0.85em">≥${formatNum(r.min)}</span>
         <span style="color:var(--color-info);font-size:0.85em;margin-left:auto">${r.desc}</span>
       </div>`;
     }).join('');
@@ -5366,7 +5430,7 @@ const G = {
     tip.innerHTML = `
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid rgba(255,255,255,0.06)">
         <span style="color:var(--text);font-weight:700;font-size:0.85em">📊 评级说明</span>
-        <span style="color:${curColor};font-family:'Orbitron',monospace;font-weight:700;font-size:0.95em">当前: ${rank} (${score.toLocaleString()}分)</span>
+        <span style="color:${curColor};font-family:'Orbitron',monospace;font-weight:700;font-size:0.95em">当前: ${rank} (${formatNum(score)}分)</span>
       </div>
       ${rows}
       <div style="text-align:center;margin-top:8px;padding-top:6px;border-top:1px solid rgba(255,255,255,0.04);color:var(--dim);font-size:0.75em">
@@ -5412,7 +5476,7 @@ const G = {
     const _highScore = parseInt(localStorage.getItem('bioHighScore') || '0', 10);
     const historyRows = _resets > 0 ? `
       <div style="border-top:1px solid rgba(251,191,36,0.1);margin-top:4px;padding-top:4px">
-        <div class="stat-row"><span class="stat-label">📜 历史最高分</span><span class="stat-value" style="color:#fbbf24">${Math.max(this.calcScore(), _highScore).toLocaleString()}</span></div>
+        <div class="stat-row"><span class="stat-label">📜 历史最高分</span><span class="stat-value" style="color:#fbbf24">${formatNum(Math.max(this.calcScore(), _highScore))}</span></div>
         <div class="stat-row"><span class="stat-label">🔄 重置次数</span><span class="stat-value">${_resets}</span></div>
       </div>` : '';
 
@@ -5422,10 +5486,10 @@ const G = {
       <div class="stat-row"><span class="stat-label">♻️ 总回收数</span><span class="stat-value">${this.stats.totalRecycled}</span></div>
       <div class="stat-row"><span class="stat-label">🧬 进化次数</span><span class="stat-value">${this.stats.totalEvo}</span></div>
       <div class="stat-row"><span class="stat-label">📖 研究完成</span><span class="stat-value">${Object.values(this.techs).filter(t=>t.done).length}/${Object.keys(TECHS).length}</span></div>
-      <div class="stat-row"><span class="stat-label">🟢 峰值葡萄糖</span><span class="stat-value">${this.stats.peakGlucose}</span></div>
-      <div class="stat-row"><span class="stat-label">⚡ 峰值能量</span><span class="stat-value">${this.stats.peakEnergy}</span></div>
-      <div class="stat-row"><span class="stat-label">🧬 峰值DNA</span><span class="stat-value">${this.stats.peakDna}</span></div>
-      <div class="stat-row"><span class="stat-label">🦠 峰值种群</span><span class="stat-value">${this.stats.peakPop || 0}</span></div>
+      <div class="stat-row"><span class="stat-label">🟢 峰值葡萄糖</span><span class="stat-value">${formatNum(this.stats.peakGlucose)}</span></div>
+      <div class="stat-row"><span class="stat-label">⚡ 峰值能量</span><span class="stat-value">${formatNum(this.stats.peakEnergy)}</span></div>
+      <div class="stat-row"><span class="stat-label">🧬 峰值DNA</span><span class="stat-value">${formatNum(this.stats.peakDna)}</span></div>
+      <div class="stat-row"><span class="stat-label">🦠 峰值种群</span><span class="stat-value">${formatNum(this.stats.peakPop || 0)}</span></div>
       <div class="stat-row"><span class="stat-label">🏆 成就</span><span class="stat-value">${Object.keys(this.achievements).length}/${ACHIEVE.length}</span></div>
       <div class="stat-row"><span class="stat-label">🎯 挑战完成</span><span class="stat-value">${Object.keys(this.completedChallenges).length}/${CHALLENGES.length}</span></div>${historyRows}
       <div style="text-align:center;padding:6px 0 2px;border-top:1px solid rgba(255,255,255,0.06);margin-top:4px">
@@ -5449,15 +5513,15 @@ const G = {
 
     const highScore = parseInt(localStorage.getItem('bioHighScore') || '0', 10);
     const resets = parseInt(localStorage.getItem('bioResetCount') || '0', 10);
-    const highLine = resets > 0 ? `\n📜 历史最高: ${Math.max(score, highScore).toLocaleString()}  |  重置: ${resets}次` : '';
+    const highLine = resets > 0 ? `\n📜 历史最高: ${formatNum(Math.max(score, highScore))}  |  重置: ${resets}次` : '';
 
     const card = [
       `🧫 ═══ 微生物帝国 ═══ 🧫`,
       ``,
-      `🏆 总分: ${score.toLocaleString()}  [${rank}]`,
+      `🏆 总分: ${formatNum(score)}  [${rank}]`,
       `⏱ 在线: ${timeStr}  |  📡 阶段: P${this.phase}`,
-      `🧬 进化: Lv.${this.eL}  |  📈 效率: ${(this.gEff*100).toFixed(0)}%`,
-      `🏗️ 建筑: ${this.totalBuildings()}  |  🦠 峰值种群: ${this.stats.peakPop || 0}`,
+      `🧬 进化: Lv.${this.eL}  |  📈 效率: ${Math.round(this.gEff*100)}%`,
+      `🏗️ 建筑: ${this.totalBuildings()}  |  🦠 峰值种群: ${formatNum(this.stats.peakPop || 0)}`,
       `📖 科技: ${techDone}/${Object.keys(TECHS).length}  |  🏆 成就: ${achieves}/${ACHIEVE.length}`,
       `🎯 挑战: ${challenges}/${CHALLENGES.length}${this.wonderComplete ? '  |  ☀️ 戴森球已完成!' : ''}${highLine}`,
       ``,
@@ -5738,7 +5802,7 @@ const G = {
         <div class="lb-row ${isMe ? 'lb-me' : ''}">
           <div class="lb-rank">${medal}</div>
           <div class="lb-name" ${isMe ? 'style="color:var(--cyan)"' : ''}>${this._escHtml(e.name || '???')}${isMe ? ' <span style="font-size:0.8em;color:var(--cyan)">(我)</span>' : ''}</div>
-          <div class="lb-score" style="color:${rankColor}">${(e.score || 0).toLocaleString()}</div>
+          <div class="lb-score" style="color:${rankColor}">${formatNum(e.score || 0)}</div>
           <div class="lb-grade" style="color:${rankColor};background:${rankColor}15;border:1px solid ${rankColor}30">${e.rank || 'E'}</div>
           <div class="lb-detail">${detailBits.join(' ')}</div>
         </div>`;
@@ -5752,7 +5816,7 @@ const G = {
           <div class="lb-row lb-me">
             <div class="lb-rank"><span style="color:var(--dim)">—</span></div>
             <div class="lb-name" style="color:var(--cyan)">${this._escHtml(this._playerName)} <span style="font-size:0.8em">(我)</span></div>
-            <div class="lb-score" style="color:${myColor}">${myScore.toLocaleString()}</div>
+            <div class="lb-score" style="color:${myColor}">${formatNum(myScore)}</div>
             <div class="lb-grade" style="color:${myColor};background:${myColor}15;border:1px solid ${myColor}30">${rank}</div>
             <div class="lb-detail">P${this.phase} ${this.totalBuildings()}🏗${this.wonderComplete ? ' ☀️' : ''}</div>
           </div>
@@ -5821,7 +5885,7 @@ const G = {
       html += `<span class="mini-lb-entry" style="display:inline-flex;align-items:center;gap:4px;${isMe ? 'color:var(--cyan)' : ''}">
         <span>${medals[i]}</span>
         <span style="max-width:80px;overflow:hidden;text-overflow:ellipsis">${this._escHtml(e.name || '???')}</span>
-        <span style="color:${rankColor};font-weight:600;font-family:'Share Tech Mono',monospace">${(e.score || 0).toLocaleString()}</span>
+        <span style="color:${rankColor};font-weight:600;font-family:'Share Tech Mono',monospace">${formatNum(e.score || 0)}</span>
         <span style="color:${rankColor};font-size:0.85em;padding:1px 4px;border-radius:3px;background:${rankColor}15;border:1px solid ${rankColor}30">${e.rank || 'E'}</span>
       </span>`;
     });
@@ -6275,9 +6339,9 @@ const G = {
     const researchPop = pop * (this.popAlloc.research / 100);
     const logisticsPop = pop * (this.popAlloc.logistics / 100);
     return {
-      harvest: { pop: Math.floor(harvestPop), bonus: (harvestPop * 0.003 * popEffMult * 100).toFixed(1) },
-      research: { pop: Math.floor(researchPop), bonus: (researchPop * 0.002 * 100).toFixed(1) },
-      logistics: { pop: Math.floor(logisticsPop), bonus: (logisticsPop * 0.0005 * 100).toFixed(1) },
+      harvest: { pop: Math.floor(harvestPop), bonus: formatNum(harvestPop * 0.003 * popEffMult * 100, 1) },
+      research: { pop: Math.floor(researchPop), bonus: formatNum(researchPop * 0.002 * 100, 1) },
+      logistics: { pop: Math.floor(logisticsPop), bonus: formatNum(logisticsPop * 0.0005 * 100, 1) },
     };
   },
 
@@ -6588,7 +6652,7 @@ const G = {
       // 构建详细的效果说明
       let effectDetail = t.ef;
       if (effDelta > 0) {
-        effectDetail += `\n\n✦ 全局效率: ${(oldEff*100).toFixed(0)}% → ${(this.gEff*100).toFixed(0)}%`;
+        effectDetail += `\n\n✦ 全局效率: ${Math.round(oldEff*100)}% → ${Math.round(this.gEff*100)}%`;
         effectDetail += `\n（所有建筑产出提升${Math.round(effDelta*100)}%）`;
       }
       
@@ -6601,7 +6665,7 @@ const G = {
       this.log('◆ 研究完成: ' + t.n + ' — ' + t.ef, 's');
       SFX.researchDone();
       if (effDelta > 0) {
-        this.log(`  ↳ 全局效率 ${(oldEff*100).toFixed(0)}% → ${(this.gEff*100).toFixed(0)}%`, 'ev');
+        this.log(`  ↳ 全局效率 ${Math.round(oldEff*100)}% → ${Math.round(this.gEff*100)}%`, 'ev');
       }
       this.showEvent('研究突破: ' + t.n, t.d + '\n\n效果: ' + effectDetail, 'var(--cyan)');
       this.stats.totalTech++;
@@ -6925,7 +6989,7 @@ const G = {
     const rarity = MUT_RARITY[mut.rarity];
     this.log(`🧬 替换突变: ${oldMut.icon}${oldMut.n} → ${mut.icon}${mut.n}（${rarity.n}）`, 's');
     SFX.evolve();
-    this._hidePopup('mutReplaceOverlay');
+    document.getElementById('mutReplaceOverlay')?.remove();
     this._updateMutLabUI();
     this.updateRates();
     this.updateUI();
@@ -6935,7 +6999,7 @@ const G = {
   mutCancelReplace() {
     this._mutPendingActivate = null;
     this._mutOffers = [];
-    this._hidePopup('mutReplaceOverlay');
+    document.getElementById('mutReplaceOverlay')?.remove();
     this._updateMutLabUI();
   },
 
@@ -7104,7 +7168,7 @@ const G = {
       html += '<div class="mut-offer-actions">';
       const rerollCost = MUT_LAB_CONFIG.rerollCost;
       const canReroll = Object.entries(rerollCost).every(([k, v]) => (this.res[k] || 0) >= v);
-      html += `<button class="mut-btn mut-btn-reroll ${canReroll ? '' : 'disabled'}" onclick="G.mutReroll()">🔄 重新培育 (${Object.entries(rerollCost).map(([k,v]) => RES[k].icon + v).join(' ')})</button>`;
+      html += `<button class="mut-btn mut-btn-reroll ${canReroll ? '' : 'disabled'}" onclick="G.mutReroll()">🔄 重新培育 (${Object.entries(rerollCost).map(([k,v]) => RES[k].icon + formatNum(v)).join(' ')})</button>`;
       html += `<button class="mut-btn mut-btn-skip" onclick="G.mutSkipOffers()">跳过</button>`;
       html += '</div>';
     } else {
@@ -7116,7 +7180,7 @@ const G = {
         <span class="mut-brew-btn-icon">🧪</span>
         <span class="mut-brew-btn-text">
           <span class="mut-brew-btn-name">培育突变</span>
-          <span class="mut-brew-btn-cost">${Object.entries(cost).map(([k,v]) => RES[k].icon + v).join(' ')} · ${time}秒</span>
+          <span class="mut-brew-btn-cost">${Object.entries(cost).map(([k,v]) => RES[k].icon + formatNum(v)).join(' ')} · ${time}秒</span>
         </span>
       </button>`;
     }
@@ -7159,15 +7223,15 @@ const G = {
     const pct = Math.min(100, (this._mutBrewing.progress / this._mutBrewing.total * 100));
     fill.style.width = pct.toFixed(1) + '%';
     const textEl = fill.parentElement?.querySelector('.mut-brew-text');
-    if (textEl) textEl.textContent = `🧪 培育中... ${pct.toFixed(1)}%`;
+    if (textEl) textEl.textContent = `🧪 培育中... ${formatNum(pct, 1)}%`;
   },
 
   // ★ Q4：突变替换弹窗
   _showMutReplaceUI(newMutId) {
     const mut = MUTATIONS[newMutId];
     const rarity = MUT_RARITY[mut.rarity];
-    let html = `<div class="mut-replace-overlay" id="mutReplaceOverlay">
-      <div class="mut-replace-panel">
+    let html = `<div class="mut-replace-overlay" id="mutReplaceOverlay" onclick="if(event.target===this)G.mutCancelReplace()">
+      <div class="mut-replace-panel" onclick="event.stopPropagation()">
         <div class="mut-replace-title">🧬 突变槽已满 — 选择替换</div>
         <div class="mut-replace-new">
           <div class="mut-replace-new-header">新突变</div>
@@ -7180,18 +7244,27 @@ const G = {
             <div class="mut-offer-desc">${mut.d}</div>
           </div>
         </div>
-        <div class="mut-replace-current-title">选择要替换的突变（锁定项不可替换）：</div>
+        <div class="mut-replace-current-title">👇 点击要替换的突变（锁定项不可替换）：</div>
         <div class="mut-replace-slots">`;
     for (let i = 0; i < this._mutSlots.length; i++) {
       const slot = this._mutSlots[i];
       const old = MUTATIONS[slot.id];
       const oldRarity = MUT_RARITY[old.rarity];
-      html += `<div class="mut-replace-slot ${slot.locked ? 'locked' : ''}" onclick="${slot.locked ? '' : 'G.mutReplaceSlot(' + i + ')'}">
-        <span class="mut-replace-slot-icon">${old.icon}</span>
-        <span class="mut-replace-slot-name">${old.n}</span>
-        <span class="mut-replace-slot-rarity" style="color:${oldRarity.color}">${oldRarity.icon}</span>
-        ${slot.locked ? '<span class="mut-replace-slot-lock">🔒</span>' : ''}
-      </div>`;
+      if (slot.locked) {
+        html += `<div class="mut-replace-slot locked">
+          <span class="mut-replace-slot-icon">${old.icon}</span>
+          <span class="mut-replace-slot-name">${old.n}</span>
+          <span class="mut-replace-slot-rarity" style="color:${oldRarity.color}">${oldRarity.n}</span>
+          <span class="mut-replace-slot-lock">🔒</span>
+        </div>`;
+      } else {
+        html += `<div class="mut-replace-slot" onclick="G.mutReplaceSlot(${i})">
+          <span class="mut-replace-slot-icon">${old.icon}</span>
+          <span class="mut-replace-slot-name">${old.n}</span>
+          <span class="mut-replace-slot-rarity" style="color:${oldRarity.color}">${oldRarity.n}</span>
+          <span style="margin-left:auto;font-size:0.65em;color:#ef4444;font-weight:700">⇄ 替换</span>
+        </div>`;
+      }
     }
     html += `</div>
         <button class="mut-btn mut-btn-skip" onclick="G.mutCancelReplace()">取消（保持现有）</button>
@@ -7218,7 +7291,7 @@ const G = {
       const met = self.eL >= reqLv;
       const diff = reqLv - self.eL;
       const cost = self.evoCost();
-      const costParts = Object.entries(cost).map(([k,v]) => `${v}${RES[k]?.icon||k}`).join(' + ');
+      const costParts = Object.entries(cost).map(([k,v]) => `${formatNum(v)}${RES[k]?.icon||k}`).join(' + ');
       let detail = met
         ? `✓ 已达成 — 当前 Lv.${self.eL}`
         : `还需提升 ${diff} 级\n下次进化费用: ${costParts}`;
@@ -7237,7 +7310,7 @@ const G = {
       const b = BLDS[bldKey];
       const count = self.bldCount(bldKey);
       const met = count > 0;
-      const costParts = Object.entries(b.cost).map(([k,v]) => `${v}${RES[k]?.icon||k}`).join(' + ');
+      const costParts = Object.entries(b.cost).map(([k,v]) => `${formatNum(v)}${RES[k]?.icon||k}`).join(' + ');
       let detail = met
         ? `✓ 已建造 ${count} 座`
         : `✗ 尚未建造\n建造费用: ${costParts}`;
@@ -7255,7 +7328,7 @@ const G = {
     function techReq(techKey) {
       const t = TECHS[techKey];
       const met = self.techs[techKey]?.done;
-      const costParts = Object.entries(t.cost).map(([k,v]) => `${v}${RES[k]?.icon||k}`).join(' + ');
+      const costParts = Object.entries(t.cost).map(([k,v]) => `${formatNum(v)}${RES[k]?.icon||k}`).join(' + ');
       let detail = met
         ? `✓ 已完成研究`
         : `✗ 尚未研究\n研究费用: ${costParts}\n研究时间: ${t.time}秒`;
@@ -7682,7 +7755,7 @@ const G = {
             if (popDelta > 0) this.pop = origPop + popDelta * eventScale;
             // 效率加成不缩放（避免效率膨胀）
           }
-          const scaleTag = eventScale > 1.5 ? ` (×${eventScale.toFixed(1)})` : '';
+          const scaleTag = eventScale > 1.5 ? ` (×${formatNum(eventScale, 1)})` : '';
           this.log('▸ ' + ev.n + ' — ' + ev.d + scaleTag, ev.ty === 'e' ? 'e' : ev.ty === 'w' ? 'w' : 's');
           if (ev.ty === 'e') SFX.eventBad();
           else SFX.eventGood();
@@ -8115,29 +8188,72 @@ const G = {
       // 阶段1: 自动连接传送带（新手引导期）
       // 阶段2+: 跳过自动连接，只保留手动传送带
       if (this.phase === 1) {
-        // Step 1: 为每个 flow，每个 from 实例找最近的 to 实例（1:1）
+        // Step 1: 为每个 flow，每个 from 实例找最近的 to 实例
+        // ★ 使用全局最优匹配（抢占式），避免老建筑"占住"最近位
         const rawLinks = []; // { fi, ti, flow }
         for (const flow of FLOW_MAP) {
           const froms = bldMap[flow.from];
           const tos = bldMap[flow.to];
           if (!froms || !tos) continue;
 
+          // 构建候选 pairs 并过滤距离 >4 的
           const pairs = [];
           for (const fi of froms) {
             for (const ti of tos) {
-              pairs.push({ fi, ti, dist: manhattan(fi, ti) });
+              const d = manhattan(fi, ti);
+              if (d <= 4) pairs.push({ fi, ti, dist: d });
             }
           }
+          if (pairs.length === 0) continue;
           pairs.sort((a, b) => a.dist - b.dist);
 
-          const usedFrom = new Set();
-          const usedTo = new Set();
+          // ★ 抢占式匹配：如果当前 pair 比已匹配的距离更短，则抢占
+          // matchTo[ti] = { fi, dist }  记录每个 to 当前被谁匹配以及距离
+          // matchFrom[fi] = ti          记录每个 from 匹配了哪个 to
+          const matchTo = {};   // ti -> { fi, dist }
+          const matchFrom = {}; // fi -> ti
+
           for (const p of pairs) {
-            if (usedFrom.has(p.fi) || usedTo.has(p.ti)) continue;
-            if (p.dist > 4) continue;
-            rawLinks.push({ fi: p.fi, ti: p.ti, flow });
-            usedFrom.add(p.fi);
-            usedTo.add(p.ti);
+            // from 已经匹配了，跳过
+            if (matchFrom[p.fi] !== undefined) continue;
+
+            const existing = matchTo[p.ti];
+            if (!existing) {
+              // to 空闲，直接匹配
+              matchTo[p.ti] = { fi: p.fi, dist: p.dist };
+              matchFrom[p.fi] = p.ti;
+            } else if (p.dist < existing.dist) {
+              // ★ 当前 from 比原先匹配的更近 → 抢占
+              // 释放原先的 from，让它后续重新匹配
+              delete matchFrom[existing.fi];
+              matchTo[p.ti] = { fi: p.fi, dist: p.dist };
+              matchFrom[p.fi] = p.ti;
+            }
+            // else: 当前 from 距离不比已匹配的近，跳过
+          }
+
+          // ★ 被抢占的 from 还没匹配，再做一轮补救
+          const unmatchedFroms = froms.filter(fi => matchFrom[fi] === undefined);
+          if (unmatchedFroms.length > 0) {
+            const usedTos = new Set(Object.keys(matchTo).map(Number));
+            for (const fi of unmatchedFroms) {
+              let bestTi = -1, bestDist = 999;
+              for (const ti of tos) {
+                if (usedTos.has(ti)) continue;
+                const d = manhattan(fi, ti);
+                if (d <= 4 && d < bestDist) { bestDist = d; bestTi = ti; }
+              }
+              if (bestTi >= 0) {
+                matchTo[bestTi] = { fi, dist: bestDist };
+                matchFrom[fi] = bestTi;
+                usedTos.add(bestTi);
+              }
+            }
+          }
+
+          // 收集结果
+          for (const [ti, m] of Object.entries(matchTo)) {
+            rawLinks.push({ fi: m.fi, ti: Number(ti), flow });
           }
         }
 
@@ -9355,13 +9471,23 @@ const G = {
     for (let k in RES) {
       const card = document.getElementById('res-' + k);
       if (card) {
-        card.classList.toggle('hidden', RES[k].phase > this.phase);
+        const wasHidden = card.classList.contains('hidden');
+        const shouldShow = RES[k].phase <= this.phase;
+        card.classList.toggle('hidden', !shouldShow);
+        // ★ 新资源解锁脉冲动画：从 hidden → 可见 时触发
+        if (wasHidden && shouldShow && this._gameReady) {
+          card.classList.add('res-unlock-anim');
+          card.addEventListener('animationend', () => {
+            card.classList.remove('res-unlock-anim');
+          }, { once: true });
+        }
       }
       const valEl = document.getElementById('resVal-' + k);
       if (valEl) {
         const newVal = Math.floor(this.res[k] || 0);
-        const oldVal = parseInt(valEl.textContent) || 0;
-        valEl.textContent = newVal;
+        const oldVal = valEl._rawVal || 0;
+        valEl.textContent = formatNum(newVal);
+        valEl._rawVal = newVal;
         // 大幅增长时弹跳动画
         if (newVal - oldVal > 10) {
           valEl.classList.add('res-jump');
@@ -9372,10 +9498,10 @@ const G = {
       if (rateEl) {
         const v = this.rates[k] || 0;
         if (v > 0.01) {
-          rateEl.textContent = '+' + v.toFixed(1) + '/s';
+          rateEl.textContent = formatRate(v);
           rateEl.className = 'res-rate pos';
         } else if (v < -0.01) {
-          rateEl.textContent = v.toFixed(1) + '/s';
+          rateEl.textContent = formatRate(v);
           rateEl.className = 'res-rate neg';
         } else {
           rateEl.textContent = '';
@@ -9384,13 +9510,13 @@ const G = {
       }
     }
 
-    document.getElementById('statPop').textContent = Math.floor(this.pop) + '/' + this._popCap();
+    document.getElementById('statPop').textContent = formatNum(Math.floor(this.pop)) + '/' + formatNum(this._popCap());
     // 显示种群食物消耗 — 始终显示
     const popFoodRow = document.getElementById('rowPopFood');
     if (popFoodRow) {
       if (this.pop > 0) {
-        const foodCost = (this.pop * 0.005).toFixed(1);
-        document.getElementById('statPopFood').textContent = `-${foodCost}🟢/s`;
+        const foodCost = this.pop * 0.005;
+        document.getElementById('statPopFood').textContent = formatRate(-foodCost) + '🟢';
         document.getElementById('statPopFood').style.color = this.res.glucose >= this.pop * 0.005 ? '#8a6a3a' : '#ef4444';
       } else {
         document.getElementById('statPopFood').textContent = '—';
@@ -9456,9 +9582,9 @@ const G = {
         maintRow.style.display = '';
         const mc = this._maintenanceCost || {};
         const parts = [];
-        if (mc.energy) parts.push(`-${mc.energy.toFixed(1)}⚡`);
-        if (mc.glucose) parts.push(`-${mc.glucose.toFixed(1)}🟢`);
-        if (mc.protein) parts.push(`-${mc.protein.toFixed(1)}🧪`);
+        if (mc.energy) parts.push(`-${formatNum(mc.energy, 1)}⚡`);
+        if (mc.glucose) parts.push(`-${formatNum(mc.glucose, 1)}🟢`);
+        if (mc.protein) parts.push(`-${formatNum(mc.protein, 1)}🧪`);
         const overheadPct = Math.round((this._maintenanceOverhead - 1) * 100);
         maintEl.textContent = parts.length > 0 ? parts.join(' ') + (overheadPct > 0 ? ` (+${overheadPct}%开销)` : '') : '无';
         // 颜色：维护费越高越红
@@ -9497,7 +9623,7 @@ const G = {
         compRow.style.display = 'none';
       }
     }
-    document.getElementById('statEff').textContent = (this.gEff * 100).toFixed(0) + '%';
+    document.getElementById('statEff').textContent = Math.round(this.gEff * 100) + '%';
     // 物流效率 = 仓储加成(lEff) × 传送带平均效率
     const beltsActive = this._activeBelts || [];
     let beltAvgEff = 1;
@@ -9529,7 +9655,7 @@ const G = {
     if (scoreEl) {
       const score = this.calcScore();
       const { rank, color: rankColor, glow } = this._scoreRank(score);
-      scoreEl.textContent = score.toLocaleString();
+      scoreEl.textContent = formatNum(score);
       scoreEl.style.color = rankColor;
       const rankEl = document.getElementById('statRank');
       if (rankEl) {
@@ -9555,7 +9681,7 @@ const G = {
           highRow.style.display = '';
           const hsEl = document.getElementById('statHighScore');
           const hrEl = document.getElementById('statHighRank');
-          if (hsEl) hsEl.textContent = highScore.toLocaleString();
+          if (hsEl) hsEl.textContent = formatNum(highScore);
           if (hrEl) {
             const { rank: hRank, color: hColor } = this._scoreRank(highScore);
             hrEl.textContent = hRank;
@@ -9594,7 +9720,7 @@ const G = {
     const evoCostInfo = document.getElementById('evoCostInfo');
     if (evoCostInfo) {
       const parts = [];
-      for (let k in evoCost) parts.push(`${evoCost[k]}${RES[k]?.icon||k}`);
+      for (let k in evoCost) parts.push(`${formatNum(evoCost[k])}${RES[k]?.icon||k}`);
       evoCostInfo.textContent = '需要: ' + parts.join(' + ');
     }
 
@@ -9605,7 +9731,7 @@ const G = {
         const cur = Math.floor(this.res[k] || 0);
         const need = evoCost[k];
         const ok = cur >= need;
-        html += `<span style="color:${ok ? 'var(--green)' : 'var(--red)'}"> ${RES[k]?.icon||k} ${cur}/${need}</span>`;
+        html += `<span style="color:${ok ? 'var(--green)' : 'var(--red)'}"> ${RES[k]?.icon||k} ${formatNum(cur)}/${formatNum(need)}</span>`;
         html += `<span style="margin:0 6px;color:var(--color-separator)">|</span>`;
       }
       const allReady = readyPct >= 100;
@@ -9649,6 +9775,11 @@ const G = {
     'mutLab':   'mutLabSection', // 变异实验室引导 → 变异面板
   },
 
+  /** ★ 判断某个 section 的 sec-body 是否有独立滚动（由 CSS flex 控制高度） */
+  _hasIndependentScroll(secId) {
+    return secId === 'secBuild' || secId === 'techSection';
+  },
+
   /** 确保目标 section 处于展开状态（引导系统调用） */
   _ensureSectionExpanded(secId) {
     if (!secId) return;
@@ -9659,13 +9790,19 @@ const G = {
     const body = sec.querySelector('.sec-body');
     sec.classList.remove('collapsed');
     if (body) {
-      const h = body.scrollHeight;
-      body.style.maxHeight = h + 'px';
-      const onEnd = () => {
-        body.style.maxHeight = 'none';
-        body.removeEventListener('transitionend', onEnd);
-      };
-      body.addEventListener('transitionend', onEnd);
+      const indepScroll = this._hasIndependentScroll(secId);
+      if (indepScroll) {
+        // ★ 独立滚动 section：不设 max-height，由 CSS flex 自动控制
+        body.style.maxHeight = '';
+      } else {
+        const h = body.scrollHeight;
+        body.style.maxHeight = h + 'px';
+        const onEnd = () => {
+          body.style.maxHeight = 'none';
+          body.removeEventListener('transitionend', onEnd);
+        };
+        body.addEventListener('transitionend', onEnd);
+      }
     }
 
     // ARIA 同步
@@ -9729,9 +9866,13 @@ const G = {
   _initSecBodyHeights() {
     document.querySelectorAll('.section .sec-body').forEach(body => {
       const sec = body.closest('.section');
-      if (sec && !sec.classList.contains('collapsed')) {
-        body.style.maxHeight = body.scrollHeight + 'px';
+      if (!sec || sec.classList.contains('collapsed')) return;
+      // ★ 独立滚动的 section 由 CSS flex 控制高度，不设 max-height
+      if (this._hasIndependentScroll(sec.id)) {
+        body.style.maxHeight = '';
+        return;
       }
+      body.style.maxHeight = body.scrollHeight + 'px';
     });
   },
 
@@ -9740,6 +9881,7 @@ const G = {
     if (!sec) return;
     const body = sec.querySelector('.sec-body');
     const isCollapsing = !sec.classList.contains('collapsed');
+    const indepScroll = this._hasIndependentScroll(secId);
 
     if (isCollapsing) {
       // 展开 → 折叠：先锁定当前高度，再触发过渡到 0
@@ -9754,14 +9896,19 @@ const G = {
       // 折叠 → 展开：先移除 collapsed，测量自然高度，设置 max-height
       sec.classList.remove('collapsed');
       if (body) {
-        const h = body.scrollHeight;
-        body.style.maxHeight = h + 'px';
-        // 过渡结束后移除固定值，允许内容动态变化
-        const onEnd = () => {
-          body.style.maxHeight = 'none';
-          body.removeEventListener('transitionend', onEnd);
-        };
-        body.addEventListener('transitionend', onEnd);
+        if (indepScroll) {
+          // ★ 独立滚动 section：清除 max-height，由 CSS flex 控制
+          body.style.maxHeight = '';
+        } else {
+          const h = body.scrollHeight;
+          body.style.maxHeight = h + 'px';
+          // 过渡结束后移除固定值，允许内容动态变化
+          const onEnd = () => {
+            body.style.maxHeight = 'none';
+            body.removeEventListener('transitionend', onEnd);
+          };
+          body.addEventListener('transitionend', onEnd);
+        }
       }
     }
 
@@ -9909,9 +10056,9 @@ const G = {
     // 清除旧高亮
     document.querySelectorAll('.action-btn.guide-highlight').forEach(btn => {
       btn.classList.remove('guide-highlight');
-      const tip = btn.querySelector('.guide-tooltip');
-      if (tip) tip.remove();
     });
+    // ★ 清除全局浮层 tooltip 和箭头
+    document.querySelectorAll('.guide-tooltip-float,.guide-arrow-float').forEach(e => e.remove());
 
     if (!targetKey) { this._prevGuideKey = null; return; }
 
@@ -9929,15 +10076,34 @@ const G = {
     const btn = document.querySelector(`.action-btn[data-b="${targetKey}"]`);
     if (btn && !btn.classList.contains('locked')) {
       btn.classList.add('guide-highlight');
-      // 添加 tooltip
-      if (!btn.querySelector('.guide-tooltip')) {
-        const tip = document.createElement('div');
-        tip.className = 'guide-tooltip';
-        tip.textContent = BLDS[targetKey].ratio || '点击选择 → 放入培养皿';
-        btn.style.position = 'relative';
-        btn.appendChild(tip);
-      }
+      // ★ 使用全局 fixed 浮层（不会被 overflow:hidden 裁剪）
+      this._updateGuideFloats(btn, targetKey);
     }
+  },
+
+  /** ★ 更新引导全局浮层（tooltip + 箭头），用 fixed 定位避免 overflow 裁剪 */
+  _updateGuideFloats(btn, targetKey) {
+    // 移除旧浮层
+    document.querySelectorAll('.guide-tooltip-float,.guide-arrow-float').forEach(e => e.remove());
+    if (!btn) return;
+
+    const rect = btn.getBoundingClientRect();
+
+    // tooltip 浮层（在按钮上方）
+    const tip = document.createElement('div');
+    tip.className = 'guide-tooltip-float';
+    tip.textContent = BLDS[targetKey].ratio || '点击选择 → 放入培养皿';
+    tip.style.left = rect.left + 'px';
+    tip.style.top = (rect.top - 28) + 'px';
+    document.body.appendChild(tip);
+
+    // 箭头浮层（在按钮右侧）
+    const arrow = document.createElement('div');
+    arrow.className = 'guide-arrow-float';
+    arrow.textContent = '◀ 点这里';
+    arrow.style.left = (rect.right + 6) + 'px';
+    arrow.style.top = (rect.top + rect.height / 2 - 8) + 'px';
+    document.body.appendChild(arrow);
   },
 
   // ===== NEWBIE HAND GUIDE (一阶段虚幻小手引导) =====
@@ -10106,6 +10272,12 @@ const G = {
       hand.style.display = 'none';
       ring.style.display = 'none';
       return;
+    }
+
+    // ★ 确保目标在独立滚动容器的可视区内（修复建造面板独立滚动后小手飞出问题）
+    const scrollParent = targetEl.closest('.sec-body');
+    if (scrollParent && scrollParent.scrollHeight > scrollParent.clientHeight) {
+      targetEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
     }
 
     // 计算位置
@@ -10309,7 +10481,7 @@ const G = {
           background:var(--color-panel-bg);border:1px solid ${minLv >= 5 ? 'rgba(74,26,106,0.25)' : minLv >= 3 ? 'rgba(26,58,58,0.25)' : 'rgba(58,42,26,0.25)'};
           cursor:pointer;transition:all 0.15s`;
         const avgCap = count > 0 ? grp.keys.reduce((s, k) => s + this.getBeltCapacity(k), 0) / count : 0;
-        const capStr = avgCap.toFixed(1);
+        const capStr = formatNum(avgCap, 1);
         row.innerHTML = `
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px">
             <span style="font-size:0.95em;color:var(--color-info)">${resIcons} ${grp.fromName} → ${grp.toName}${countTag}</span>
@@ -10891,14 +11063,14 @@ const G = {
     if (!cost) return;
 
     this.upgradeIdx = idx;
-    const costStr = Object.entries(cost).map(([k,v]) => `${v}${RES[k]?.icon||k}`).join(' + ');
+    const costStr = Object.entries(cost).map(([k,v]) => `${formatNum(v)}${RES[k]?.icon||k}`).join(' + ');
     const nextMult = (1 + lv * 0.4).toFixed(1);
 
     const pop = document.getElementById('upgradePopup');
     if (!pop) return;
     document.getElementById('upgradeName').textContent = `${bd.emoji} ${bd.n}`;
     document.getElementById('upgradeLevel').textContent = `Lv.${lv} → Lv.${lv+1}`;
-    document.getElementById('upgradeEffect').textContent = `产出倍率: ${this.getUpgradeMultiplier(idx).toFixed(1)}x → ${nextMult}x`;
+    document.getElementById('upgradeEffect').textContent = `产出倍率: ${formatNum(this.getUpgradeMultiplier(idx), 1)}x → ${nextMult}x`;
     document.getElementById('upgradeCost').textContent = `造价: ${costStr}`;
 
     const canAfford = this.checkRes(cost);
@@ -10927,7 +11099,7 @@ const G = {
     const bd = BLDS[this.grid[idx].type];
     this.stats.totalUpgrades = (this.stats.totalUpgrades || 0) + 1;
 
-    this.log(`⬆ ${bd.n} 升级到 Lv.${lv} — 产出×${this.getUpgradeMultiplier(idx).toFixed(1)}`, 's');
+    this.log(`⬆ ${bd.n} 升级到 Lv.${lv} — 产出×${formatNum(this.getUpgradeMultiplier(idx), 1)}`, 's');
     SFX.coreUpgrade();
     this.buildBurst(idx);
     this.screenShake(4);
@@ -11149,7 +11321,7 @@ const G = {
     if (!cost) return;
 
     this._beltUpgradeKey = beltKey;
-    const costStr = Object.entries(cost).map(([k,v]) => `${v}${RES[k]?.icon||k}`).join(' + ');
+    const costStr = Object.entries(cost).map(([k,v]) => `${formatNum(v)}${RES[k]?.icon||k}`).join(' + ');
     const curEff = this.getBeltEfficiency(beltKey);
     const curCap = this.getBeltCapacity(beltKey);
     const nextLv = lv + 1;
@@ -11266,7 +11438,7 @@ const G = {
       upgradeBtn.style.opacity = '0.3';
     } else {
       const cost = this.getBeltUpgradeCost(beltKey);
-      const costStr = cost ? Object.entries(cost).map(([k,v]) => `${v}${RES[k]?.icon||k}`).join('+') : '';
+      const costStr = cost ? Object.entries(cost).map(([k,v]) => `${formatNum(v)}${RES[k]?.icon||k}`).join('+') : '';
       upgradeBtn.textContent = `⬆ 升级 Lv.${lv+1} (${costStr})`;
       const canAfford = cost && this.checkRes(cost);
       upgradeBtn.disabled = !canAfford;
@@ -11622,7 +11794,7 @@ const G = {
     this._beltUpgradeKeys = toUpgrade;
     this._beltUpgradeKey = null;
 
-    const costStr = Object.entries(totalCost).map(([k,v]) => `${v}${RES[k]?.icon||k}`).join(' + ');
+    const costStr = Object.entries(totalCost).map(([k,v]) => `${formatNum(v)}${RES[k]?.icon||k}`).join(' + ');
     const curEff = this.getBeltEfficiency(toUpgrade[0]);
     const curCap = this.getBeltCapacity(toUpgrade[0]);
     const nextLv = minLv + 1;
@@ -11990,8 +12162,8 @@ const G = {
     const pop = document.getElementById('prestigePopup');
     if (!pop) return;
     const gain = this.getPrestigeGain();
-    document.getElementById('prestigeGain').textContent = `+${gain} ${PRESTIGE.currencyIcon}${PRESTIGE.currencyName}`;
-    document.getElementById('prestigeCurrent').textContent = `当前: ${this.prestigeCurrency} ${PRESTIGE.currencyIcon}`;
+    document.getElementById('prestigeGain').textContent = `+${formatNum(gain)} ${PRESTIGE.currencyIcon}${PRESTIGE.currencyName}`;
+    document.getElementById('prestigeCurrent').textContent = `当前: ${formatNum(this.prestigeCurrency)} ${PRESTIGE.currencyIcon}`;
     document.getElementById('prestigeTotal').textContent = `转生次数: ${this.prestigeCount}`;
 
     // === 被动奖励预览 ===
@@ -12001,7 +12173,7 @@ const G = {
       const pcBonus = PRESTIGE.prestigeCountBonus(this.prestigeCount);
       if (this.prestigeCount > 0) {
         passiveHTML += `<div style="padding:4px 8px;margin:2px 0;border-radius:4px;background:rgba(168,85,247,0.08);border:1px solid rgba(168,85,247,0.2);font-size:0.75em;color:var(--purple)">
-          🌀 轮回之力: 全局效率 +${(pcBonus * 100).toFixed(1)}% (${this.prestigeCount}次转生累计)</div>`;
+          🌀 轮回之力: 全局效率 +${formatNum(pcBonus * 100, 1)}% (${this.prestigeCount}次转生累计)</div>`;
       }
       for (const pb of PRESTIGE.passiveBonuses) {
         const met = this.prestigeCount >= pb.count;
@@ -12030,7 +12202,7 @@ const G = {
           <div style="font-size:0.85em;font-weight:700;color:${owned ? 'var(--green)' : 'var(--bright)'}">${owned ? '✓ ' : ''}${b.n}</div>
           <div style="font-size:0.7em;color:var(--dim)">${b.d}</div>
         </div>
-        <div style="font-size:0.75em;font-weight:700;color:${canBuy ? 'var(--yellow)' : 'var(--color-muted-dark)'}">${owned ? '已拥有' : `${b.cost}${PRESTIGE.currencyIcon}`}</div>
+        <div style="font-size:0.75em;font-weight:700;color:${canBuy ? 'var(--yellow)' : 'var(--color-muted-dark)'}">${owned ? '已拥有' : `${formatNum(b.cost)}${PRESTIGE.currencyIcon}`}</div>
       `;
       if (canBuy && !owned) {
         div.onclick = () => this.buyPrestigeBonus(i);
@@ -12058,7 +12230,7 @@ const G = {
               <div style="font-size:0.85em;font-weight:700;color:var(--bright)">${inf.icon} ${inf.n} <span style="color:var(--yellow);font-size:0.8em">Lv.${lv}</span></div>
               <div style="font-size:0.7em;color:var(--dim)">${inf.d(lv + 1)}</div>
             </div>
-            <div style="font-size:0.75em;font-weight:700;color:${canBuy ? 'var(--yellow)' : 'var(--color-muted-dark)'}">${cost}${PRESTIGE.currencyIcon}</div>
+            <div style="font-size:0.75em;font-weight:700;color:${canBuy ? 'var(--yellow)' : 'var(--color-muted-dark)'}">${formatNum(cost)}${PRESTIGE.currencyIcon}</div>
           </div>`;
         }
         infEl.innerHTML = infHTML;
@@ -12106,8 +12278,8 @@ const G = {
     const nextPassive = PRESTIGE.passiveBonuses.find(pb => pb.count === nextCount);
     if (nextPassive) extraInfo = `\n🌟 新被动解锁: ${nextPassive.n} — ${nextPassive.d}`;
     const pcBonus = PRESTIGE.prestigeCountBonus(nextCount);
-    extraInfo += `\n🌀 轮回之力: 全局效率 +${(pcBonus * 100).toFixed(1)}%`;
-    if (!confirm(`确定要转生？\n\n获得 +${gain} ${PRESTIGE.currencyIcon}${PRESTIGE.currencyName}${extraInfo}\n\n所有进度将重置（转生加成和货币保留）`)) return;
+    extraInfo += `\n🌀 轮回之力: 全局效率 +${formatNum(pcBonus * 100, 1)}%`;
+    if (!confirm(`确定要转生？\n\n获得 +${formatNum(gain)} ${PRESTIGE.currencyIcon}${PRESTIGE.currencyName}${extraInfo}\n\n所有进度将重置（转生加成和货币保留）`)) return;
 
     this.prestigeCurrency += gain;
     this.prestigeCount++;
@@ -12164,7 +12336,7 @@ const G = {
 
       if (this.prestigeCount > 0) {
         this.log(`🌀 转生加成已应用 (第${this.prestigeCount}世)`, 'ev');
-        const pcPct = (pcBonus * 100).toFixed(1);
+        const pcPct = formatNum(pcBonus * 100, 1);
         if (pcBonus > 0) this.log(`🌀 轮回之力: 全局效率 +${pcPct}%`, 'ev');
         document.querySelector('.topbar')?.classList.add('has-prestige');
       }
@@ -12228,7 +12400,7 @@ const GameTooltip = (() => {
 
     // 科技
     for (const [k, t] of Object.entries(TECHS)) {
-      const costStr = Object.entries(t.cost).map(([r,v]) => `${v}${RES[r]?.icon||r}`).join(' + ');
+      const costStr = Object.entries(t.cost).map(([r,v]) => `${formatNum(v)}${RES[r]?.icon||r}`).join(' + ');
       dict[t.n] = { title: `📖 ${t.n}`, tag: '科技', desc: `${t.d} — ${t.ef}`, detail: `费用: ${costStr} | 研究时间: ${t.time}秒`, color: '#60a5fa' };
     }
 
