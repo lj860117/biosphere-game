@@ -37,7 +37,7 @@ body{background:#0a0f1a;color:#c8d6e5;font-family:'Segoe UI','Microsoft YaHei',s
   <button data-phase="1">🌱 P1 采集</button>
   <button data-phase="2">⚗️ P2 代谢</button>
   <button data-phase="3">🔗 P3 物流</button>
-  <button data-phase="4">🤖 P4 自动化</button>
+  <button data-phase="4">🧠 P4 自动化</button>
   <button data-phase="5">🏛️ P5 奇观</button>
 </div>
 <div class="tooltip" id="tooltip"></div>
@@ -61,7 +61,7 @@ const BLDS = {
   sporeSower:{n:'孢子播种器',phase:3,emoji:'🍄',color:'#34d399',ratio:'0.4🧱+0.5⚡ → 0.3🧬+0.5🔵/s',prod:{dna:0.3,nitrogen:0.5},cons:{biomass:0.4,energy:0.5},tier:3},
   metabolicLoop:{n:'代谢回路',phase:3,emoji:'♻️',color:'#06b6d4',ratio:'全局+8%,消耗-5%',prod:{},cons:{},tier:3,isBoost:true},
   biomassConverter:{n:'生物质转化炉',phase:3,emoji:'🔥',color:'#2dd4bf',ratio:'0.6🧪+0.8⚡ → 0.5🧱+0.1🧬/s',prod:{biomass:0.5,dna:0.1},cons:{protein:0.6,energy:0.8},tier:3,isNew:true},
-  quantumExtractor:{n:'量子提取器',phase:3,emoji:'💎',color:'#818cf8',ratio:'0.6🔵+1.2⚡ → 0.7🧬/s',prod:{dna:0.7},cons:{nitrogen:0.6,energy:1.2},tier:3,isNew:true},
+  quantumExtractor:{n:'噬菌体裂解器',phase:3,emoji:'💎',color:'#818cf8',ratio:'0.6🔵+1.2⚡ → 0.7🧬/s',prod:{dna:0.7},cons:{nitrogen:0.6,energy:1.2},tier:3,isNew:true},
   qsController:{n:'群体感应塔',phase:4,emoji:'🗼',color:'#eab308',ratio:'2⚡ → 0.8📡/s',prod:{qs:0.8},cons:{energy:2},tier:4},
   nanoAssembler:{n:'纳米组装线',phase:4,emoji:'🔩',color:'#a3e635',ratio:'0.3📡+1.5⚡ → 1.2🧱+0.4🧪/s',prod:{biomass:1.2,protein:0.4},cons:{qs:0.3,energy:1.5},tier:4},
   pheromoneStation:{n:'信息素广播站',phase:4,emoji:'📢',color:'#facc15',ratio:'0.6🧪+0.5⚡ → 0.5📡/s',prod:{qs:0.5},cons:{protein:0.6,energy:0.5},tier:4},

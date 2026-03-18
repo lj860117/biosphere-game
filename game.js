@@ -554,7 +554,7 @@ const PHASES = [
   { id:1, name:'采集', color:'var(--green)', desc:'建造采集器收集基础资源', icon:'🌱' },
   { id:2, name:'代谢', color:'var(--orange)', desc:'转化资源产生高级材料', icon:'⚗️' },
   { id:3, name:'物流', color:'var(--blue)', desc:'建立运输网络提升效率', icon:'🔗' },
-  { id:4, name:'自动化', color:'var(--yellow)', desc:'QS信号自动化控制', icon:'🤖' },
+  { id:4, name:'自动化', color:'var(--yellow)', desc:'QS信号自动化控制', icon:'🧠' },
   { id:5, name:'奇观', color:'var(--purple)', desc:'建造终极生物奇观！', icon:'🏛️' },
 ];
 
@@ -714,8 +714,8 @@ const BLDS = {
     color:'#2dd4bf', bg:'bg-teal', emoji:'🔥', tier:3, techReq:'biofilmTech',
   },
   quantumExtractor: {
-    n:'量子提取器', phase:3,
-    d:'氮源+能量→高纯DNA（旁路）',
+    n:'噬菌体裂解器', phase:3,
+    d:'氮源+能量→裂解释放高纯DNA（旁路）',
     ratio:'0.6🔵 + 1.2⚡ → 0.7🧬/s',
     cost:{ nitrogen:20, energy:40, dna:10 }, prod:{ dna:0.7 }, cons:{ nitrogen:0.6, energy:1.2 },
     color:'#818cf8', bg:'bg-purple', emoji:'💎', tier:3, techReq:'biofilmTech',
@@ -824,7 +824,7 @@ const ADJACENCY_RULES = [
   { self:'biomassConverter',  neighbor:'energyStation',   bonus:0.08, name:'转化加速', icon:'⚡', stackable:true, maxStack:1, phase:3 },
   { self:'quantumExtractor',  neighbor:'nitrogenFixer',   bonus:0.15, name:'氮源直通', icon:'🔵', stackable:true, maxStack:2, phase:3 },
   { self:'quantumExtractor',  neighbor:'geneExtractor',   bonus:0.10, name:'DNA协同', icon:'🧬', stackable:true, maxStack:1, phase:3 },
-  { self:'quantumExtractor',  neighbor:'energyStation',   bonus:0.08, name:'量子加速', icon:'⚡', stackable:true, maxStack:1, phase:3 },
+  { self:'quantumExtractor',  neighbor:'energyStation',   bonus:0.08, name:'裂解加速', icon:'⚡', stackable:true, maxStack:1, phase:3 },
   { self:'resonanceChamber',  neighbor:'qsController',    bonus:0.18, name:'QS共振', icon:'📡', stackable:true, maxStack:2, phase:4 },
   { self:'resonanceChamber',  neighbor:'pheromoneStation', bonus:0.12, name:'信号反馈', icon:'📡', stackable:true, maxStack:1, phase:4 },
   { self:'resonanceChamber',  neighbor:'resonanceChamber', bonus:0.10, name:'共振叠加', icon:'🌀', stackable:true, maxStack:2, phase:4 },
@@ -882,7 +882,7 @@ const TECHS = {
   },
   symbioticNetwork: {
     n:'共生网络', phase:3, cost:{ protein:18, biomass:10 }, time:35,
-    d:'建立跨种群共生体系', ef:'人口上限+200，人口加成效率翻倍',
+    d:'建立跨种群共生体系', ef:'种群上限+200，种群加成效率翻倍',
     req:['biofilmTech'], exclusive:['adaptiveLogistics'],
     fn: s => { s._popCapBonus = (s._popCapBonus || 0) + 200; s._popEffMult = (s._popEffMult || 1) * 2 },
   },
@@ -962,7 +962,7 @@ const MUTATIONS = {
   },
   rapidDivision: {
     n:'加速分裂', rarity:'common', icon:'🔄',
-    d:'人口增长速度 +15%',
+    d:'种群增长速度 +15%',
     flavor:'有丝分裂？不，是极速分裂。',
     ef: { popGrowthMult: 0.15 },
     category:'growth',
@@ -1166,7 +1166,7 @@ const ACHIEVE = [
   // 效率里程碑
   { id:'eff150', n:'📈 效率突破', d:'全局效率达到150%', tier:'silver', check: s => s.gEff >= 1.5, reward:{ dna:15, energy:40 } },
   { id:'eff200', n:'🚀 效率翻倍', d:'全局效率达到200%', tier:'gold', check: s => s.gEff >= 2.0, reward:{ dna:30, energy:80 } },
-  // 人口里程碑
+  // 种群里程碑
   { id:'pop100', n:'🦠 百菌汇聚', d:'种群达到100', tier:'bronze', check: s => s.pop >= 100, reward:{ glucose:40, energy:30 } },
   { id:'pop500', n:'🦠 千菌浩荡', d:'种群达到500', tier:'silver', check: s => s.pop >= 500, reward:{ energy:60, dna:20 } },
 
@@ -1199,7 +1199,7 @@ const ACHIEVE = [
   // 速度挑战
   { id:'speedPhase2', n:'⏱️ 闪电进化', d:'5分钟内到达阶段2', tier:'gold', check: s => s.phase >= 2 && s.stats.onlineTime <= 300, reward:{ energy:80, dna:20 } },
   { id:'speedBuild8', n:'⏱️ 疾风建造', d:'3分钟内建造8个建筑', tier:'silver', check: s => s.totalBuildings() >= 8 && s.stats.onlineTime <= 180, reward:{ energy:60, glucose:40 } },
-  // 人口进阶
+  // 种群进阶
   { id:'pop1000', n:'🌍 千菌一心', d:'种群达到1000', tier:'gold', check: s => s.pop >= 1000, reward:{ energy:100, dna:30, protein:20 } },
   { id:'pop2000', n:'🌌 万菌归一', d:'种群达到2000', tier:'diamond', check: s => s.pop >= 2000, reward:{ energy:200, dna:60, protein:40 } },
   // 资源进阶
@@ -1230,7 +1230,7 @@ const ACHV_CATEGORIES = {
   'tech':     { name:'科技', icon:'📖', ids:['firstTech','allTech'] },
   'phase':    { name:'阶段', icon:'🌍', ids:['phase2','phase3','phase4','phase5'] },
   'efficiency':{ name:'效率', icon:'📈', ids:['eff150','eff200'] },
-  'population':{ name:'人口', icon:'🦠', ids:['pop100','pop500','pop1000','pop2000'] },
+  'population':{ name:'种群', icon:'🦠', ids:['pop100','pop500','pop1000','pop2000'] },
   'upgrade':  { name:'升级', icon:'🔧', ids:['firstUpgrade','upgrade10','upgrade25'] },
   'belt':     { name:'传送带', icon:'🔗', ids:['belt5','belt15','belt25','manualBelt3','manualBelt8','beltCombo3','beltCombo5','beltLv5','firstSync','perfectSync'] },
   'survival': { name:'生存', icon:'🛡️', ids:['powerCrisis','neverLowPower'] },
@@ -1250,7 +1250,7 @@ const ACHIEVE_MILESTONES = [
   { count: 10, n:'⭐ 声名鹊起', d:'解锁10个成就', buff:'建造费用-8%', fn: s => { s._costDiscount = (s._costDiscount || 0) + 0.08; } },
   { count: 15, n:'🌟 威震四方', d:'解锁15个成就', buff:'传送带初始效率+10%', fn: s => { s._beltBonus = (s._beltBonus || 0) + 0.1; } },
   { count: 20, n:'💫 名满天下', d:'解锁20个成就', buff:'全局效率+8%', fn: s => { s.gEff += 0.08; } },
-  { count: 25, n:'✨ 传奇霸主', d:'解锁25个成就', buff:'人口上限+100', fn: s => { s._popCapBonus = (s._popCapBonus || 0) + 100; } },
+  { count: 25, n:'✨ 传奇霸主', d:'解锁25个成就', buff:'种群上限+100', fn: s => { s._popCapBonus = (s._popCapBonus || 0) + 100; } },
   { count: 30, n:'🏆 微生物之神', d:'解锁30个成就', buff:'全局效率+12% + 费用-10%', fn: s => { s.gEff += 0.12; s._costDiscount = (s._costDiscount || 0) + 0.1; } },
 ];
 
@@ -1390,7 +1390,7 @@ const FLOW_MAP = [
   { from:'aminoSynth',       to:'biomassConverter',   res:'protein',  icon:'🧪', color:'#f472b6', label:'蛋白质' },
   { from:'energyStation',    to:'biomassConverter',   res:'energy',   icon:'⚡', color:'#f97316', label:'ATP' },
   { from:'energyBuffer',     to:'biomassConverter',   res:'energy',   icon:'⚡', color:'#fb923c', label:'ATP' },
-  // Phase 3 — 量子提取器（需要氮源+能量）
+  // Phase 3 — 噬菌体裂解器（需要氮源+能量）
   { from:'nitrogenFixer',    to:'quantumExtractor',   res:'nitrogen', icon:'🔵', color:'#3b82f6', label:'氮源' },
   { from:'energyStation',    to:'quantumExtractor',   res:'energy',   icon:'⚡', color:'#f97316', label:'ATP' },
   { from:'energyBuffer',     to:'quantumExtractor',   res:'energy',   icon:'⚡', color:'#fb923c', label:'ATP' },
@@ -1527,10 +1527,10 @@ const CHOICE_EVENTS = [
     b:{ label:'安全储存', desc:'获得15🧪蛋白质 + 6🧬', fn:s=>{s.res.protein+=15;s.res.dna+=6} },
   },
   {
-    n:'🌀 时空裂缝', phase:3,
-    d:'培养皿中出现微小的时空裂缝！',
-    a:{ label:'跳入探索', desc:'获得20🧱生物质 + 效率+3%', fn:s=>{s.res.biomass+=20;s.gEff+=0.03} },
-    b:{ label:'关闭裂缝', desc:'获得40⚡ + 12🧬（更安全）', fn:s=>{s.res.energy+=40;s.res.dna+=12} },
+    n:'🌀 异常代谢场', phase:3,
+    d:'培养皿边缘出现一片异常活跃的代谢区域，酶促反应速率远超正常水平...',
+    a:{ label:'引导菌落扩散', desc:'获得20🧱生物质 + 效率+3%', fn:s=>{s.res.biomass+=20;s.gEff+=0.03} },
+    b:{ label:'采样分析', desc:'获得40⚡ + 12🧬（更安全）', fn:s=>{s.res.energy+=40;s.res.dna+=12} },
   },
   {
     n:'🦠 变异菌株', phase:2,
@@ -1667,7 +1667,7 @@ const PRESTIGE = {
       icon: '🦠',
       baseCost: 70,
       costScale: 1.3,
-      d: lv => `人口上限 +${lv * 80} (当前Lv.${lv})`,
+      d: lv => `种群上限 +${lv * 80} (当前Lv.${lv})`,
       fn: (s, lv) => { s._popCapBonus = (s._popCapBonus || 0) + lv * 80; },
     },
     {
@@ -1695,7 +1695,7 @@ const PRESTIGE = {
     { count: 5,  n: '五行轮转', d: '建造费用 -10%', fn: s => { s._costDiscount = (s._costDiscount || 0) + 0.1; } },
     { count: 7,  n: '七星连珠', d: '进化速度 +30%', fn: s => { s._evoSpeedMult = (s._evoSpeedMult || 1) + 0.3; } },
     { count: 10, n: '十世宿慧', d: '初始效率 +15% + 产出 +15%', fn: s => { s.gEff += 0.15; s._prodMult = (s._prodMult || 1) * 1.15; } },
-    { count: 15, n: '超越轮回', d: '科研时间 -20% + 人口上限 +200', fn: s => { s._techTimeMult = (s._techTimeMult || 1) * 0.8; s._popCapBonus = (s._popCapBonus || 0) + 200; } },
+    { count: 15, n: '超越轮回', d: '科研时间 -20% + 种群上限 +200', fn: s => { s._techTimeMult = (s._techTimeMult || 1) * 0.8; s._popCapBonus = (s._popCapBonus || 0) + 200; } },
     { count: 20, n: '永恒之灵', d: '全局效率 +25% + 产出 +25%', fn: s => { s.gEff += 0.25; s._prodMult = (s._prodMult || 1) * 1.25; } },
   ],
   // 每次转生的通用加成（叠乘）
@@ -2433,9 +2433,9 @@ const G = {
     if (bd.maint > 0.01) {
       lines.push(`<div class="rb-row rb-neg"><span class="rb-label">🔧 维护费</span><span class="rb-val">-${bd.maint.toFixed(2)}/s</span></div>`);
     }
-    // 人口食物消耗
+    // 种群食物消耗
     if (bd.popFood > 0.001) {
-      lines.push(`<div class="rb-row rb-neg"><span class="rb-label">🦠 人口消耗</span><span class="rb-val">-${bd.popFood.toFixed(2)}/s</span></div>`);
+      lines.push(`<div class="rb-row rb-neg"><span class="rb-label">🦠 种群消耗</span><span class="rb-val">-${bd.popFood.toFixed(2)}/s</span></div>`);
     }
     // 竞争惩罚
     if (bd.competition > 0.01) {
@@ -5255,7 +5255,7 @@ const G = {
     this.stats.peakGlucose = Math.max(this.stats.peakGlucose, Math.floor(this.res.glucose || 0));
     this.stats.peakEnergy = Math.max(this.stats.peakEnergy, Math.floor(this.res.energy || 0));
     this.stats.peakDna = Math.max(this.stats.peakDna, Math.floor(this.res.dna || 0));
-    // 峰值人口追踪
+    // 峰值种群追踪
     this.stats.peakPop = Math.max(this.stats.peakPop || 0, Math.floor(this.pop));
   },
 
@@ -5291,7 +5291,7 @@ const G = {
     score += Math.floor(Math.log10(Math.max(1, s.peakEnergy)) * 20);
     score += Math.floor(Math.log10(Math.max(1, s.peakDna)) * 25);
 
-    // 8. 人口 — 对数评分
+    // 8. 种群 — 对数评分
     score += Math.floor(Math.log10(Math.max(1, s.peakPop || 0)) * 30);
 
     // 9. 全局效率 — 每100%=40分
@@ -5425,7 +5425,7 @@ const G = {
       <div class="stat-row"><span class="stat-label">🟢 峰值葡萄糖</span><span class="stat-value">${this.stats.peakGlucose}</span></div>
       <div class="stat-row"><span class="stat-label">⚡ 峰值能量</span><span class="stat-value">${this.stats.peakEnergy}</span></div>
       <div class="stat-row"><span class="stat-label">🧬 峰值DNA</span><span class="stat-value">${this.stats.peakDna}</span></div>
-      <div class="stat-row"><span class="stat-label">🦠 峰值人口</span><span class="stat-value">${this.stats.peakPop || 0}</span></div>
+      <div class="stat-row"><span class="stat-label">🦠 峰值种群</span><span class="stat-value">${this.stats.peakPop || 0}</span></div>
       <div class="stat-row"><span class="stat-label">🏆 成就</span><span class="stat-value">${Object.keys(this.achievements).length}/${ACHIEVE.length}</span></div>
       <div class="stat-row"><span class="stat-label">🎯 挑战完成</span><span class="stat-value">${Object.keys(this.completedChallenges).length}/${CHALLENGES.length}</span></div>${historyRows}
       <div style="text-align:center;padding:6px 0 2px;border-top:1px solid rgba(255,255,255,0.06);margin-top:4px">
@@ -5457,7 +5457,7 @@ const G = {
       `🏆 总分: ${score.toLocaleString()}  [${rank}]`,
       `⏱ 在线: ${timeStr}  |  📡 阶段: P${this.phase}`,
       `🧬 进化: Lv.${this.eL}  |  📈 效率: ${(this.gEff*100).toFixed(0)}%`,
-      `🏗️ 建筑: ${this.totalBuildings()}  |  🦠 峰值人口: ${this.stats.peakPop || 0}`,
+      `🏗️ 建筑: ${this.totalBuildings()}  |  🦠 峰值种群: ${this.stats.peakPop || 0}`,
       `📖 科技: ${techDone}/${Object.keys(TECHS).length}  |  🏆 成就: ${achieves}/${ACHIEVE.length}`,
       `🎯 挑战: ${challenges}/${CHALLENGES.length}${this.wonderComplete ? '  |  ☀️ 戴森球已完成!' : ''}${highLine}`,
       ``,
@@ -6214,7 +6214,7 @@ const G = {
     return this.grid.filter(g => g !== null).length;
   },
 
-  // 人口上限：基于建筑数量和阶段（+科技加成）
+  // 种群上限：基于建筑数量和阶段（+科技加成）
   _popCap() {
     return 50 + this.totalBuildings() * 40 + (this.phase - 1) * 100 + (this._popCapBonus || 0);
   },
@@ -6222,7 +6222,7 @@ const G = {
   // ===== 菌群分工系统 =====
   // 调整菌群分工比例（type = 'harvest'|'research'|'logistics', delta = ±5）
   adjustPopAlloc(type, delta) {
-    // 人口不足3时禁止调整分工
+    // 种群不足3时禁止调整分工
     if (this.pop < 3) return;
     const keys = ['harvest', 'research', 'logistics'];
     const others = keys.filter(k => k !== type);
@@ -6356,10 +6356,10 @@ const G = {
 
       const bldMult = this.getUpgradeMultiplier(idx); // building level multiplier
       const beltMult = this.getBeltMultiplierForBuilding(idx); // conveyor belt efficiency
-      // 菌群分工系统：采集菌分配到的人口提升产出
+      // 菌群分工系统：采集菌分配到的个体提升产出
       const popEffMult = this._popEffMult || 1;
       const harvestPop = Math.min(this.pop, this._popCap()) * (this.popAlloc.harvest / 100);
-      const popMult = 1 + harvestPop * 0.003 * popEffMult; // 采集人口加成（比旧版0.002更高，但需要主动分配）
+      const popMult = 1 + harvestPop * 0.003 * popEffMult; // 采集个体加成（比旧版0.002更高，但需要主动分配）
       // 科技树分支加成 — 特定建筑类型的额外乘数
       let techBonus = 1;
       let techConsPenalty = 1;
@@ -6432,9 +6432,9 @@ const G = {
 
     // 【修复】物流效率(lEff)只加成正值(产出)，不增加消耗
     const transportRate = 0.10 + (this._transportBonus || 0); // 自适应物流科技加成
-    // 物流人口加成：分配到物流的人口提升传送带整体效率
+    // 物流个体加成：分配到物流的个体提升传送带整体效率
     const logisticsPop = Math.min(this.pop, this._popCap()) * (this.popAlloc.logistics / 100);
-    const logisticsPopBonus = logisticsPop * 0.0005; // 每个物流人口 +0.05% 物流效率
+    const logisticsPopBonus = logisticsPop * 0.0005; // 每个物流个体 +0.05% 物流效率
     this.lEff = 1 + totalTransport * transportRate + logisticsPopBonus;
     for (let k in r) {
       if (r[k] > 0) {
@@ -6500,7 +6500,7 @@ const G = {
         });
         // 加上维护费消耗
         totalCons += (this._maintenanceCost[k] || 0);
-        // 加上人口食物消耗（葡萄糖）
+        // 加上种群食物消耗（葡萄糖）
         if (k === 'glucose') totalCons += this.pop * 0.005;
 
         if (totalProd > 0.01) {
@@ -6532,7 +6532,7 @@ const G = {
     this._resourceTension = tension;
     this._competitionPenalty = penalty;
 
-    // ★ Q1：追踪人口食物消耗到明细（虽然实际扣减在startLoop，但此处用于UI显示）
+    // ★ Q1：追踪种群食物消耗到明细（虽然实际扣减在startLoop，但此处用于UI显示）
     if (this.pop > 0) {
       breakdown.glucose.popFood = this.pop * 0.005;
     }
@@ -6570,10 +6570,10 @@ const G = {
   tickResearch() {
     if (!this.rTech) return;
     const t = TECHS[this.rTech];
-    // 研究人口加速：分配到研究的人口越多，研究越快
+    // 研究个体加速：分配到研究的个体越多，研究越快
     const researchPop = Math.min(this.pop, this._popCap()) * (this.popAlloc.research / 100);
-    const researchPopBonus = 1 + researchPop * 0.002; // 每个研究人口 +0.2% 研究速度
-    this.rProg += 1 * (this._techTimeMult ? (1 / this._techTimeMult) : 1) * researchPopBonus;  // 转生加成 + 人口加速
+    const researchPopBonus = 1 + researchPop * 0.002; // 每个研究个体 +0.2% 研究速度
+    this.rProg += 1 * (this._techTimeMult ? (1 / this._techTimeMult) : 1) * researchPopBonus;  // 转生加成 + 个体加速
     const pct = Math.min(this.rProg / t.time * 100, 100);
     const fill = document.getElementById('techFill-' + this.rTech);
     if (fill) fill.style.width = pct + '%';
@@ -6680,9 +6680,9 @@ const G = {
     bonus *= (this._evoBoostMult || 1);
     // ★ Q4：突变进化效率倍率
     bonus *= (this._mutActiveEffects.evoEffMult || 1);
-    // 研究人口加成进化效率奖励
+    // 研究个体加成进化效率奖励
     const researchPop = Math.min(this.pop, this._popCap()) * (this.popAlloc.research / 100);
-    const researchBoost = 1 + researchPop * 0.001; // 每个研究人口 +0.1% 进化奖励
+    const researchBoost = 1 + researchPop * 0.001; // 每个研究个体 +0.1% 进化奖励
     bonus *= researchBoost;
     this.eL++;
     // 【修复】效率改为加法叠加（不再是乘法爆炸）
@@ -7524,6 +7524,9 @@ const G = {
     });
     stepsEl.appendChild(phaseBar);
 
+    // 引导目标面板自动展开（避免引导指向折叠的面板）
+    this._ensureGuideSectionVisible();
+
     // 更新建造按钮高亮
     this.updateGuideHighlight();
 
@@ -7554,7 +7557,7 @@ const G = {
           const growth = bCount * 0.03 * this.gEff;
           this.pop = Math.min(this.pop + growth, popCap);
         }
-        // 人口消耗葡萄糖 (每100人口消耗0.5葡萄糖/s) + 功率水平系统
+        // 种群消耗葡萄糖 (每100个体消耗0.5葡萄糖/s) + 功率水平系统
         const popFoodCost = this.pop * 0.005;
         if (popFoodCost > 0) {
           // 计算葡萄糖储备比（以30秒消耗量为基准）
@@ -7577,7 +7580,7 @@ const G = {
           if (this.res.glucose >= popFoodCost) {
             this.res.glucose -= popFoodCost;
           } else {
-            // 食物不足：人口加速下降（功率越低降得越快）
+            // 食物不足：种群加速衰减（功率越低降得越快）
             const popLoss = this._foodPowerLevel <= 0.4 ? 2.0 : this._foodPowerLevel <= 0.7 ? 1.0 : 0.5;
             this.pop = Math.max(0, this.pop - popLoss);
           }
@@ -9382,7 +9385,7 @@ const G = {
     }
 
     document.getElementById('statPop').textContent = Math.floor(this.pop) + '/' + this._popCap();
-    // 显示人口食物消耗 — 始终显示
+    // 显示种群食物消耗 — 始终显示
     const popFoodRow = document.getElementById('rowPopFood');
     if (popFoodRow) {
       if (this.pop > 0) {
@@ -9636,6 +9639,81 @@ const G = {
   },
 
   // ===== SECTION TOGGLE (折叠/展开) =====
+
+  // === 引导目标元素 → 所属 section ID 映射 ===
+  // 当引导指向某个 UI 元素时，自动展开它所在的折叠面板
+  _GUIDE_SECTION_MAP: {
+    'build':    'secBuild',      // 建造类引导 → 建造面板
+    'research': 'techSection',   // 研究类引导 → 科技树面板
+    'evolve':   'evoSection',    // 进化类引导 → 进化面板
+    'mutLab':   'mutLabSection', // 变异实验室引导 → 变异面板
+  },
+
+  /** 确保目标 section 处于展开状态（引导系统调用） */
+  _ensureSectionExpanded(secId) {
+    if (!secId) return;
+    const sec = document.getElementById(secId);
+    if (!sec || !sec.classList.contains('collapsed')) return;
+
+    // 静默展开（不触发音效、不更新 localStorage）
+    const body = sec.querySelector('.sec-body');
+    sec.classList.remove('collapsed');
+    if (body) {
+      const h = body.scrollHeight;
+      body.style.maxHeight = h + 'px';
+      const onEnd = () => {
+        body.style.maxHeight = 'none';
+        body.removeEventListener('transitionend', onEnd);
+      };
+      body.addEventListener('transitionend', onEnd);
+    }
+
+    // ARIA 同步
+    const toggleBtn = sec.querySelector('.sec-toggle, .colony-status-toggle');
+    if (toggleBtn) toggleBtn.setAttribute('aria-expanded', 'true');
+
+    // 视觉反馈：短暂脉冲动画
+    sec.classList.add('guide-expanded');
+    setTimeout(() => sec.classList.remove('guide-expanded'), 700);
+
+    // 更新 localStorage（标记为展开）
+    try {
+      const state = JSON.parse(localStorage.getItem('bioSphereSecState') || '{}');
+      state[secId] = false;
+      localStorage.setItem('bioSphereSecState', JSON.stringify(state));
+    } catch(e) {}
+  },
+
+  /** 根据引导步骤文本判断目标 section 并自动展开 */
+  _ensureGuideSectionVisible() {
+    const steps = GUIDE[this.phase] || [];
+    for (const step of steps) {
+      if (!step.check(this)) continue;
+      const text = step.text;
+
+      // 建造类引导
+      if (text.match(/建造「/)) {
+        this._ensureSectionExpanded('secBuild');
+        return;
+      }
+      // 研究类引导
+      if (text.includes('研究') && text.includes('「')) {
+        this._ensureSectionExpanded('techSection');
+        return;
+      }
+      // 进化类引导
+      if (text.includes('进化') && (text.includes('按钮') || text.includes('Lv'))) {
+        this._ensureSectionExpanded('evoSection');
+        return;
+      }
+      // 变异实验室引导
+      if (text.includes('变异实验室')) {
+        this._ensureSectionExpanded('mutLabSection');
+        return;
+      }
+      return; // 其他步骤不需要展开
+    }
+  },
   /** 测量 sec-body 自然高度并设置 max-height（用于过渡动画） */
   _measureSecBody(secBody) {
     if (!secBody) return;
@@ -9837,6 +9915,9 @@ const G = {
 
     if (!targetKey) { this._prevGuideKey = null; return; }
 
+    // 确保建造面板展开
+    this._ensureSectionExpanded('secBuild');
+
     // 新目标出现时的完成反馈
     if (this._prevGuideKey && this._prevGuideKey !== targetKey && this._gameReady) {
       this.showUnlockFloat('✓ 完成！继续下一步');
@@ -9985,7 +10066,9 @@ const G = {
     let targetEl = null;
     let bubbleText = target.text;
 
+    // 根据目标类型自动展开折叠面板
     if (target.type === 'build') {
+      this._ensureSectionExpanded('secBuild');
       targetEl = document.querySelector(`.action-btn[data-b="${target.key}"]`);
       if (!targetEl || targetEl.classList.contains('locked')) {
         hand.style.display = 'none';
@@ -10004,6 +10087,7 @@ const G = {
         }
       }
     } else if (target.type === 'research') {
+      this._ensureSectionExpanded('techSection');
       targetEl = document.querySelector(`.tech-btn[data-t="${target.key}"]`);
       if (!targetEl) {
         // 尝试查找包含科技名的按钮
@@ -10014,6 +10098,7 @@ const G = {
         });
       }
     } else if (target.type === 'evolve') {
+      this._ensureSectionExpanded('evoSection');
       targetEl = document.getElementById('evoBtn');
     }
 
@@ -12095,6 +12180,24 @@ const GameTooltip = (() => {
   let _showing = false;
   let _hideTimer = null;
 
+  // ===== 已见术语追踪（降低受众门槛：首次遇到的术语会高亮提示） =====
+  const SEEN_KEY = 'bioSeenTerms';
+  let _seenTerms = new Set();
+  try {
+    const saved = localStorage.getItem(SEEN_KEY);
+    if (saved) _seenTerms = new Set(JSON.parse(saved));
+  } catch(e) {}
+  function markSeen(term) {
+    if (_seenTerms.has(term)) return;
+    _seenTerms.add(term);
+    try { localStorage.setItem(SEEN_KEY, JSON.stringify([..._seenTerms])); } catch(e) {}
+    // 移除该术语所有 DOM 实例的 term-new 标记
+    document.querySelectorAll(`.game-term.term-new[data-term="${term}"]`).forEach(el => {
+      el.classList.remove('term-new');
+    });
+  }
+  function isNewTerm(term) { return !_seenTerms.has(term); }
+
   // ===== 游戏词典 =====
   function buildGlossary() {
     const dict = {};
@@ -12147,7 +12250,7 @@ const GameTooltip = (() => {
     dict['进化等级'] = dict['进化'];
     dict['传送带'] = { title: '⛓ 传送带', tag: '系统', desc: '连接相邻建筑，自动传输资源。传送带有等级（Lv.1~5），影响传输效率。', detail: 'Lv.1=75% → Lv.3=100% → Lv.5=150%', color: '#f97316' };
     dict['效率'] = { title: '📈 全局效率', tag: '机制', desc: '影响所有建筑的产出倍率。通过进化、科技、QS信号等途径提升。', detail: '基础100%，理论上限无封顶', color: '#22c55e' };
-    dict['种群'] = { title: '🦠 种群', tag: '机制', desc: '你的微生物帝国人口。随建筑增多而增长，每100人口提供额外效率加成。', detail: '人口加成 = 每100人口 +2%效率', color: '#3b82f6' };
+    dict['种群'] = { title: '🦠 种群', tag: '机制', desc: '你的微生物菌落规模。随建筑增多而增长，每100个体提供额外效率加成。', detail: '种群加成 = 每100个体 +2%效率', color: '#3b82f6' };
     dict['转生'] = { title: '🌀 转生', tag: '系统', desc: '重置进度换取永久加成。保留进化因子可购买转生加成，下一世更快发展。', detail: '评分越高获得的进化因子越多', color: '#eab308' };
     dict['进化因子'] = { title: '🌀 进化因子', tag: '货币', desc: '转生获得的永久货币，用于购买各种跨世代加成。', detail: '评分决定获得数量', color: '#eab308' };
     dict['奇观'] = { title: '🏛️ 奇观', tag: '建筑', desc: '终极建筑，全图仅限建造一座。拥有极其强大的效果。', detail: '微型戴森球: 0消耗 → 12⚡+8🟢+2🧱/s', color: '#a855f7' };
@@ -12157,10 +12260,10 @@ const GameTooltip = (() => {
     dict['成就'] = { title: '🏅 成就系统', tag: '系统', desc: '达成特定里程碑解锁成就，记录你的帝国发展历程。', detail: '共21项成就可解锁', color: '#eab308' };
 
     // ===== 右侧面板 — 菌落状态 =====
-    dict['细菌种群'] = { title: '🦠 细菌种群', tag: '状态', desc: '你的微生物帝国总人口数量。种群越多，生产效率越高。', detail: '每100人口提供+2%效率加成\n种群上限 = 50 + 建筑数×40 + (阶段-1)×100\n种群需要消耗葡萄糖作为食物', color: '#3b82f6' };
-    dict['食物消耗'] = { title: '🍽️ 食物消耗', tag: '机制', desc: '种群需要消耗葡萄糖维持生存。每100人口每秒消耗0.5葡萄糖。', detail: '食物不足时会触发功率下降:\n🟢 储备>80%: 满功率100%\n🟡 储备50-80%: 正常但预警\n🟠 储备20-50%: 低功率70%\n🔴 储备<20%: 危机模式40%\n⛔ 储备耗尽: 极限模式20%\n功率下降会降低所有建筑产出！', color: '#f97316' };
+    dict['细菌种群'] = { title: '🦠 细菌种群', tag: '状态', desc: '你的微生物菌落总个体数量。种群越多，生产效率越高。', detail: '每100个体提供+2%效率加成\n种群上限 = 50 + 建筑数×40 + (阶段-1)×100\n种群需要消耗葡萄糖作为食物', color: '#3b82f6' };
+    dict['食物消耗'] = { title: '🍽️ 食物消耗', tag: '机制', desc: '种群需要消耗葡萄糖维持生存。每100个体每秒消耗0.5葡萄糖。', detail: '食物不足时会触发功率下降:\n🟢 储备>80%: 满功率100%\n🟡 储备50-80%: 正常但预警\n🟠 储备20-50%: 低功率70%\n🔴 储备<20%: 危机模式40%\n⛔ 储备耗尽: 极限模式20%\n功率下降会降低所有建筑产出！', color: '#f97316' };
     dict['功率水平'] = { title: '🔋 功率水平', tag: '机制', desc: '反映葡萄糖储备状况，直接影响全局产能。', detail: '功率水平 = 葡萄糖储备 ÷ (30秒消耗量)\n功率低于100%时所有建筑产出按比例降低\n保持充足的葡萄糖储备是帝国运转的基础！', color: '#22c55e' };
-    dict['成就里程碑'] = { title: '🏅 成就里程碑', tag: '系统', desc: '每解锁5个成就触发一个里程碑，获得永久buff加成。', detail: '5个成就: 全局效率+5%\n10个成就: 建造费用-8%\n15个成就: 传送带效率+10%\n20个成就: 全局效率+8%\n25个成就: 人口上限+100\n30个成就: 效率+12% + 费用-10%', color: '#fbbf24' };
+    dict['成就里程碑'] = { title: '🏅 成就里程碑', tag: '系统', desc: '每解锁5个成就触发一个里程碑，获得永久buff加成。', detail: '5个成就: 全局效率+5%\n10个成就: 建造费用-8%\n15个成就: 传送带效率+10%\n20个成就: 全局效率+8%\n25个成就: 种群上限+100\n30个成就: 效率+12% + 费用-10%', color: '#fbbf24' };
     dict['工作效率'] = { title: '⚡ 工作效率', tag: '状态', desc: '所有建筑的全局产出倍率。初始100%，通过多种途径提升。', detail: '提升途径：进化(+10~20%) / 科技 / QS信号(最高+80%) / 挑战奖励 / 转生加成\n效率越高，所有资源产出越快', color: '#22c55e' };
     dict['物流效率'] = { title: '🚚 物流效率', tag: '状态', desc: '资源运输的综合效率。由仓储加成和传送带平均效率共同决定。', detail: '物流效率 = 仓储加成 × 传送带平均效率\n升级传送带可提升物流效率\n「自适应物流」科技提供额外+20%', color: '#60a5fa' };
     dict['总分数'] = { title: '🏆 总分数', tag: '评分', desc: '衡量你的帝国发展综合实力的评分。决定转生时获得的进化因子数量。', detail: '分数来源：阶段 + 进化 + 建筑 + 科技 + 成就 + 挑战 + 资源峰值 + 效率\n时间惩罚：30分钟后每小时-50分', color: '#fbbf24' };
@@ -12179,14 +12282,14 @@ const GameTooltip = (() => {
     dict['采集'] = { title: '🌱 采集（P1）', tag: '阶段', desc: '游戏第一阶段。建造碳源采集器收集葡萄糖，开始最基础的资源积累。', detail: '核心建筑：碳源采集器、ATP合成酶\n目标：积累资源，准备进化', color: '#22c55e' };
     dict['代谢'] = { title: '⚗️ 代谢（P2）', tag: '阶段', desc: '第二阶段。解锁氮源固定和蛋白质合成，建立更复杂的资源转化链。', detail: '新建筑：固氮装置、蛋白质工厂、DNA提取器\n核心升级为「原核聚落」', color: 'var(--orange)' };
     dict['物流'] = { title: '🔗 物流（P3）', tag: '阶段', desc: '第三阶段。建立生物膜资源链，传送带网络变得更加重要。', detail: '新建筑：生物膜反应器、仓储中心\n物流效率成为关键发展指标', color: 'var(--blue)' };
-    dict['自动化'] = { title: '🤖 自动化（P4）', tag: '阶段', desc: '第四阶段。解锁QS群体感应系统，自动化调控全局效率。', detail: '新建筑：群体感应塔、信号增幅器\nQS信号提供全局效率加成', color: 'var(--yellow)' };
+    dict['自动化'] = { title: '🧠 自动化（P4）', tag: '阶段', desc: '第四阶段。解锁QS群体感应系统，自动化调控全局效率。', detail: '新建筑：群体感应塔、信号增幅器\nQS信号提供全局效率加成', color: 'var(--yellow)' };
 
     // ===== 培养皿 & 环境 =====
     dict['培养皿'] = { title: '🔬 培养皿', tag: '系统', desc: '你的微生物帝国主战场。在这个网格中放置建筑、连接传送带。', detail: '拖拽移动 / 双击升级 / 右键回收 / 框选批量\n快捷键：空格暂停 / 1-3加速', color: '#22d3ee' };
     dict['能量供给'] = { title: '⚡ 能量供给', tag: '机制', desc: '帝国核心为碳源采集器提供免费能量驱动，无需消耗ATP。', detail: '供能数量随核心等级提升\nP1:2台 → P2:4台 → P3:6台 → P4:8台 → P5:10台', color: '#22c55e' };
     dict['碳源'] = { title: '🟢 碳源', tag: '资源', desc: '碳元素的来源，即葡萄糖。是整个帝国最基础的资源。', detail: '由碳源采集器通过核心供能采集\n是食物链和产出链的起点', color: '#22c55e' };
     dict['人口'] = dict['细菌种群'];
-    dict['人口上限'] = { title: '🦠 人口上限', tag: '机制', desc: '种群数量的最大值。建造更多建筑和升级阶段可提高上限。', detail: '上限 = 50 + 建筑数×40 + (阶段-1)×100 + 科技加成\n「高级种群学」科技额外+200上限', color: '#3b82f6' };
+    dict['人口上限'] = { title: '🦠 种群上限', tag: '机制', desc: '种群数量的最大值。建造更多建筑和升级阶段可提高上限。', detail: '上限 = 50 + 建筑数×40 + (阶段-1)×100 + 科技加成\n「高级种群学」科技额外+200上限', color: '#3b82f6' };
 
     // ===== 流水线 & 产能链 =====
     dict['流水线'] = { title: '🏭 流水线', tag: '系统', desc: '展示当前激活的资源生产链条。每条流水线由对应建筑激活。', detail: '基础产能 → 能量转化 → DNA合成 → 蛋白质合成 → 生物膜培养 → 群体感应', color: '#60a5fa' };
@@ -12199,6 +12302,19 @@ const GameTooltip = (() => {
 
     // ===== 环境参数 =====
     dict['pH'] = { title: '🧪 pH', tag: '环境', desc: '培养皿的酸碱度。当前固定为7.0（中性环境），是微生物最适生长条件。', detail: '后续版本可能加入pH变化机制', color: '#22d3ee' };
+
+    // ===== 生物学科普术语（降低受众门槛） =====
+    dict['ATP'] = { title: '⚡ ATP（三磷酸腺苷）', tag: '科普', desc: '细胞的"能量货币"。全称 Adenosine Triphosphate，几乎所有生命活动都依赖它提供能量。', detail: '在游戏中：碳源采集器产出的葡萄糖经ATP合成酶转化为ATP能量\n现实中：人体每天消耗约40kg ATP（不断循环再生）', color: '#f97316' };
+    dict['核糖体'] = { title: '🫧 核糖体（Ribosome）', tag: '科普', desc: '细胞中的"蛋白质生产车间"。负责将mRNA上的遗传信息翻译成蛋白质。', detail: '在游戏中：核糖体集群可同时产出DNA和葡萄糖\n现实中：一个细菌细胞内约有2万个核糖体在同时工作', color: '#c084fc' };
+    dict['噬菌体'] = { title: '🦠 噬菌体（Bacteriophage）', tag: '科普', desc: '专门感染细菌的病毒。它将自己的DNA注入细菌体内，利用细菌的分子机器复制自身。', detail: '在游戏中：噬菌体裂解器利用裂解机制释放高纯DNA\n噬菌体入侵是负面事件——当心病毒感染！\n现实中：噬菌体是地球上数量最多的生物实体', color: '#ef4444' };
+    dict['CRISPR'] = { title: '✂️ CRISPR（基因剪刀）', tag: '科普', desc: '一种革命性的基因编辑技术。原本是细菌用来抵御噬菌体的免疫系统。2020年诺贝尔化学奖。', detail: '在游戏中：CRISPR编辑器突变可锁定培育类别\n现实中：CRISPR-Cas9可精准剪切DNA的特定位点', color: '#22c55e' };
+    dict['生物膜'] = { ...dict['生物膜'], desc: '微生物聚集形成的保护性结构（Biofilm）。细菌附着在表面并分泌胞外基质，形成有组织的群落。', detail: '在游戏中：生物膜反应器可合成生物质资源\n现实中：牙菌斑就是一种常见的生物膜\n生物膜内的细菌耐药性可比游离细菌高1000倍' };
+    dict['质粒'] = { title: '🔄 质粒（Plasmid）', tag: '科普', desc: '细菌体内可独立复制的小型环状DNA。能在细菌之间水平转移，传递抗性基因等有用信息。', detail: '在游戏中：质粒工厂突变可批量生产突变候选\n现实中：质粒是基因工程最常用的载体工具', color: '#a855f7' };
+    dict['内共生'] = { title: '🔬 内共生（Endosymbiosis）', tag: '科普', desc: '约20亿年前，一个古细菌吞噬了一个好氧细菌，后者没有被消化，反而成为了线粒体——这就是内共生理论。', detail: '在游戏中：内共生事件突变让历史在你的菌落中重演\n这是生命史上最重要的事件之一——没有它就没有真核生物', color: '#10b981' };
+    dict['朊病毒'] = { title: '🧠 朊病毒（Prion）', tag: '科普', desc: '一种仅由蛋白质组成的感染性因子，不含DNA或RNA。它能使正常蛋白质改变折叠方式，像"传染"一样扩散。', detail: '在游戏中：朊病毒记忆突变让蛋白质也能传递信息\n现实中：疯牛病就是由朊病毒引起的', color: '#eab308' };
+    dict['信息素'] = { title: '📢 信息素（Pheromone）', tag: '科普', desc: '微生物分泌到环境中的化学信号分子。用于协调群体行为，如生物发光、毒力因子表达等。', detail: '在游戏中：信息素广播站是P4阶段的QS信号发射器\n现实中：费氏弧菌通过信息素实现群体发光——海洋中的"星空"', color: '#eab308' };
+    dict['固氮'] = { title: '🌿 固氮（Nitrogen Fixation）', tag: '科普', desc: '将大气中的惰性氮气（N₂）转化为生物可利用的氨（NH₃）的过程。只有少数微生物拥有这种超能力。', detail: '在游戏中：固氮装置将环境氮源转化为可用氮资源\n现实中：根瘤菌与豆科植物的固氮共生是农业的基石', color: '#3b82f6' };
+    dict['戴森球'] = { title: '☀️ 戴森球（Dyson Sphere）', tag: '科普', desc: '一种假想的巨型结构，完全包裹恒星以捕获其全部能量输出。由物理学家弗里曼·戴森于1960年提出。', detail: '在游戏中：微型戴森球是终极奇观——用生物膜在恒星轨道上建造\n代表了微生物文明的极限想象', color: '#fbbf24' };
 
     return dict;
   }
@@ -12214,6 +12330,9 @@ const GameTooltip = (() => {
     const g = glossary();
     const info = g[termKey];
     if (!info) return;
+
+    // 用户查看了这个术语，标记为已见（移除高亮）
+    markSeen(termKey);
 
     const tip = el();
     if (!tip) return;
@@ -12319,7 +12438,7 @@ const GameTooltip = (() => {
           frag.appendChild(document.createTextNode(text.slice(lastIdx, match.index)));
         }
         const span = document.createElement('span');
-        span.className = 'game-term';
+        span.className = 'game-term' + (isNewTerm(match[1]) ? ' term-new' : '');
         span.dataset.term = match[1];
         span.textContent = match[1];
         frag.appendChild(span);
@@ -12418,7 +12537,7 @@ const GameTooltip = (() => {
     obs.observe(document.body, { childList: true, subtree: true });
   }
 
-  return { init, glossary, scheduleScan, show, showRaw, hide };
+  return { init, glossary, scheduleScan, show, showRaw, hide, markSeen, isNewTerm };
 })();
 
 // ===== BOOT =====

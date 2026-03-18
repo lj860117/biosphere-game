@@ -4,6 +4,25 @@
 
 ---
 
+## v0.8.2 — 2026-03-18 · 折叠增强 + 引导自动展开
+
+### ✨ 新功能 — 引导系统自动展开折叠面板
+- [office] 新增 `_ensureSectionExpanded(secId)` 方法：当引导目标在折叠面板内时，自动静默展开（不触发音效）
+- [office] 新增 `_ensureGuideSectionVisible()` 方法：根据引导步骤文本智能匹配目标面板
+- [office] 三入口点覆盖：`updateGuide()` / `updateGuideHighlight()` / `_updateGuideHand()` 均在执行前自动展开目标面板
+- [office] 展开时带绿色脉冲动画（`guideExpandPulse`），提示玩家面板刚打开
+- [office] 引导类型映射：建造→`secBuild`、研究→`techSection`、进化→`evoSection`、变异→`mutLabSection`
+
+### 🎨 视觉 / UI — 折叠图标增强
+- [office] 折叠按钮放大：1.1em → 1.4em，padding 增加，hover 时有背景色高亮（`rgba(6,214,160,0.08)`）
+- [office] 所有 9 个可折叠面板新增折叠状态提示 `▸ 点击展开`（`.sec-collapsed-hint`）
+- [office] 折叠状态下 section-title 带微弱绿色背景，视觉暗示内容被收起
+
+### 🔧 其他
+- [office] production-map：P4 阶段图标 🤖→🧠、量子提取器更名为噬菌体裂解器
+
+---
+
 ## v0.8.1 — 2026-03-18 · 右侧栏面板布局优化
 
 ### 🎨 布局调整
