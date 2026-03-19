@@ -1036,26 +1036,57 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
   width:21px;height:21px;
 }
 
-/* ===== v2.0 邻接放置预览高亮 ===== */
-.cell.adj-preview-1{
-  box-shadow:inset 0 0 0 2px rgba(34,197,94,0.3);
+/* ===== v2.0 邻接放置预览热力图 ===== */
+/* 热力梯度：暗绿 → 亮绿 → 金色 → 闪金 */
+.cell.adj-heat-1{
+  box-shadow:inset 0 0 0 2px rgba(34,197,94,0.25), inset 0 0 8px rgba(34,197,94,0.08);
 }
-.cell.adj-preview-2{
-  box-shadow:inset 0 0 0 2px rgba(34,197,94,0.5);
+.cell.adj-heat-2{
+  box-shadow:inset 0 0 0 2px rgba(34,197,94,0.55), inset 0 0 12px rgba(34,197,94,0.15);
 }
-.cell.adj-preview-3{
-  box-shadow:inset 0 0 0 2px rgba(34,197,94,0.8);
-  animation:adjPulse 1.5s ease-in-out infinite;
+.cell.adj-heat-3{
+  box-shadow:inset 0 0 0 2px rgba(251,191,36,0.6), inset 0 0 14px rgba(251,191,36,0.12);
 }
-@keyframes adjPulse{
-  0%,100%{box-shadow:inset 0 0 0 2px rgba(34,197,94,0.6)}
-  50%{box-shadow:inset 0 0 0 3px rgba(34,197,94,1.0)}
+.cell.adj-heat-4{
+  box-shadow:inset 0 0 0 2px rgba(251,191,36,0.85), inset 0 0 18px rgba(251,191,36,0.2);
+  animation:adjHeatPulse 1.5s ease-in-out infinite;
 }
+@keyframes adjHeatPulse{
+  0%,100%{box-shadow:inset 0 0 0 2px rgba(251,191,36,0.7), inset 0 0 14px rgba(251,191,36,0.15)}
+  50%{box-shadow:inset 0 0 0 3px rgba(251,191,36,1.0), inset 0 0 22px rgba(251,191,36,0.3)}
+}
+/* 分数 badge — 梯度着色 */
 .adj-preview-badge{
-  position:absolute;top:2px;right:2px;
-  background:rgba(34,197,94,0.8);color:#fff;
-  font-size:9px;padding:1px 3px;border-radius:3px;
+  position:absolute;top:1px;right:1px;
+  color:#fff;font-size:9px;font-weight:700;
+  padding:1px 4px;border-radius:3px;
   z-index:10;pointer-events:none;
+  letter-spacing:0.3px;
+  text-shadow:0 1px 2px rgba(0,0,0,0.5);
+}
+.adj-badge-t1{background:rgba(34,197,94,0.65)}
+.adj-badge-t2{background:rgba(34,197,94,0.85)}
+.adj-badge-t3{background:rgba(251,191,36,0.75);color:#1a1a2e}
+.adj-badge-t4{
+  background:linear-gradient(135deg,rgba(251,191,36,0.9),rgba(245,158,11,0.9));
+  color:#1a1a2e;
+  animation:adjBadgeGlow 1.5s ease-in-out infinite;
+}
+@keyframes adjBadgeGlow{
+  0%,100%{box-shadow:0 0 3px rgba(251,191,36,0.4)}
+  50%{box-shadow:0 0 8px rgba(251,191,36,0.8)}
+}
+/* 反向加成提示 — 在已有建筑上闪烁 */
+.adj-reverse-hint{
+  position:absolute;bottom:1px;left:50%;transform:translateX(-50%);
+  background:rgba(251,191,36,0.85);color:#1a1a2e;
+  font-size:8px;font-weight:700;padding:1px 3px;border-radius:2px;
+  z-index:11;pointer-events:none;white-space:nowrap;
+  animation:reverseHintPulse 1.2s ease-in-out infinite;
+}
+@keyframes reverseHintPulse{
+  0%,100%{opacity:0.7;transform:translateX(-50%) scale(1)}
+  50%{opacity:1;transform:translateX(-50%) scale(1.08)}
 }
 
 /* ===== v2.0 已触发邻接指示器 ===== */

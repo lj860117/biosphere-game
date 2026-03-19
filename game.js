@@ -1557,7 +1557,7 @@ const GUIDE = {
     { check: s => s.bldCount('nitrogenFixer') === 0, text:'▸ P2a · 代谢基础｜建造「固氮装置」获取氮源 (0.3⚡→1🔵/s) — 蛋白质工厂的原料来源！', icon:'💨' },
     { check: s => s.bldCount('nitrogenFixer') > 0 && s.bldCount('proteinFactory') === 0, text:'▸ P2a · 代谢基础｜建造「蛋白质工厂」(0.8🔵+0.5⚡→0.6🧪/s) — 用氮源合成蛋白质', icon:'⚗️' },
     // v2.0 §11.2: 首次放置建筑邻接推荐
-    { check: s => s.phase === 2 && !s._adjPreviewShown && s.totalBuildings() >= 6, text:'💡 绿色高亮的格子表示放在那里可以获得邻接加成！选中建筑后查看推荐位', icon:'📐', once:'adjPreviewHint' },
+    { check: s => !s._adjPreviewShown && s.totalBuildings() >= 3, text:'💡 选中建筑后，空格子会显示邻接加成分数（如 +15%）！颜色越亮加成越高，选位置放置试试', icon:'📐', once:'adjPreviewHint' },
     { check: s => s.bldCount('proteinFactory') > 0 && !s.techs.basicMetab.done, text:'▸ P2a → P2b｜研究「基础代谢学」— 解锁代谢进阶：高效DNA提取器 + 旁路建筑 + 互斥科技路线！', icon:'📖' },
     // ── P2b · 代谢进阶：旁路 + 互斥 ──
     { check: s => s.techs.basicMetab.done && s.bldCount('geneExtractor') === 0, text:'▸ P2b · 代谢进阶｜建造「DNA提取器」(0.5🧪+1⚡→0.8🧬/s) — 比简易提取器快2倍！', icon:'🏭' },
@@ -4168,7 +4168,46 @@ const G = {
       if (self._isMultiDragging && !self._selectedCells.has(idx)) {
         self._dragOverIdx = idx;
       }
-      if (!self.grid[idx]) return;
+      if (!self.grid[idx]) {
+        // 邻接预览 tooltip：空格子且有预览数据时显示加成明细
+        if (self._adjPreviewData && self._adjPreviewData[idx]) {
+          const p = self._adjPreviewData[idx];
+          const tt = document.getElementById('tooltip');
+          const bld = BLDS[self.sel];
+          const bldName = bld ? `${bld.emoji||''} ${bld.n}` : self.sel;
+          let html = `<span style="color:#06d6a0;font-weight:700">🔗 邻接加成预览</span> — 放置 ${bldName}`;
+          // 正向加成明细
+          const forward = p.result.bonuses.filter(b => !b.isReverse);
+          if (forward.length > 0) {
+            html += `<br><span style="color:#22d3ee;font-size:0.85em;margin-top:2px;display:inline-block">▼ 自身获得：+${Math.round(p.forwardPct * 100)}%</span>`;
+            for (const b of forward) {
+              const nType = self.grid[b.neighborIdx]?.type;
+              const nBld = nType ? BLDS[nType] : null;
+              const nName = nBld ? `${nBld.emoji||''} ${nBld.n}` : '?';
+              html += `<br><span style="color:#06d6a080;font-size:0.85em">  ${b.rule.icon} ${b.rule.name} +${Math.round(b.bonus * 100)}% ← ${nName}</span>`;
+            }
+          }
+          // 反向加成明细
+          const reverse = p.result.bonuses.filter(b => b.isReverse);
+          if (reverse.length > 0) {
+            html += `<br><span style="color:#fbbf24;font-size:0.85em;margin-top:2px;display:inline-block">▼ 邻居受益：+${Math.round(p.reversePct * 100)}%</span>`;
+            for (const b of reverse) {
+              const nType = self.grid[b.neighborIdx]?.type;
+              const nBld = nType ? BLDS[nType] : null;
+              const nName = nBld ? `${nBld.emoji||''} ${nBld.n}` : '?';
+              html += `<br><span style="color:#fbbf2480;font-size:0.85em">  ${b.rule.icon} ${b.rule.name} +${Math.round(b.bonus * 100)}% → ${nName}</span>`;
+            }
+          }
+          // 总计
+          html += `<br><span style="color:#fff;font-weight:700;font-size:0.9em;margin-top:3px;display:inline-block">∑ 综合加成：+${Math.round(p.totalPct * 100)}%</span>`;
+          document.getElementById('ttName').innerHTML = `🔗 邻接分数：<span style="color:#06d6a0;font-weight:700">+${Math.round(p.totalPct * 100)}%</span>`;
+          document.getElementById('ttDesc').innerHTML = html;
+          tt.classList.add('show');
+          tt.style.left = Math.min(e.clientX + 12, window.innerWidth - 280) + 'px';
+          tt.style.top = Math.min(e.clientY + 12, window.innerHeight - 100) + 'px';
+        }
+        return;
+      }
       if (self._isDragging || self._isMultiDragging) return;
       const bd = BLDS[self.grid[idx].type];
       if (!bd) return;
@@ -4518,9 +4557,9 @@ const G = {
       b.classList.toggle('active', b.dataset.b === this.sel);
     });
 
-    // v2.0 §10.2: 邻接放置预览高亮
+    // v2.0 §10.2: 邻接放置预览热力图（所有阶段均可用）
     this._clearAdjPreview();
-    if (this.sel && this.phase >= 2) {
+    if (this.sel) {
       this._showAdjPreview(this.sel);
     }
 
@@ -4535,30 +4574,72 @@ const G = {
     if (this.phase === 1) this._updateGuideHand();
   },
 
-  // v2.0 §10.2: 显示邻接放置预览高亮
+  // v2.0 §10.2: 显示邻接放置预览高亮（热力图版）
   _showAdjPreview(bldType) {
     const cells = document.querySelectorAll('.cell');
+    this._adjPreviewData = {}; // 存储每个格子的预览数据，供 hover tooltip 使用
+    // 第一遍：计算所有格子的加成百分比，找出最大值用于相对着色
+    let maxPct = 0;
+    const previews = [];
     for (let i = 0; i < this.grid.length; i++) {
-      if (this.grid[i]) continue; // 已占用格子跳过
+      if (this.grid[i]) continue;
       const result = previewAdjacencyBonuses(i, bldType);
       if (result.count === 0) continue;
-      const cell = cells[i];
+      // 计算正向加成总百分比（对新建筑本身的加成）
+      const forwardPct = result.bonuses.filter(b => !b.isReverse).reduce((s, b) => s + b.bonus, 0);
+      // 计算反向加成总百分比（对周围已有建筑的加成）
+      const reversePct = result.bonuses.filter(b => b.isReverse).reduce((s, b) => s + b.bonus, 0);
+      const totalPct = forwardPct + reversePct;
+      if (totalPct > maxPct) maxPct = totalPct;
+      previews.push({ idx: i, result, forwardPct, reversePct, totalPct });
+    }
+    // 第二遍：渲染热力图
+    for (const p of previews) {
+      const cell = cells[p.idx];
       if (!cell) continue;
-      const level = Math.min(result.count, 3);
-      cell.classList.add('adj-preview-' + level);
+      // 颜色梯度：暗绿 → 亮绿 → 金色 → 闪金
+      let tier;
+      if (p.totalPct >= 0.30) tier = 4;      // 30%+ 最佳位置
+      else if (p.totalPct >= 0.15) tier = 3;  // 15~30% 优秀
+      else if (p.totalPct >= 0.05) tier = 2;  // 5~15% 不错
+      else tier = 1;                           // 0~5% 微弱
+      cell.classList.add('adj-heat-' + tier);
+      // 分数 badge：显示 +XX%
       const badge = document.createElement('div');
-      badge.className = 'adj-preview-badge';
-      badge.textContent = result.count >= 3 ? '×' + result.count + '+' : '×' + result.count;
+      badge.className = 'adj-preview-badge adj-badge-t' + tier;
+      const pctText = '+' + Math.round(p.totalPct * 100) + '%';
+      badge.textContent = pctText;
       cell.appendChild(badge);
+      // 反向加成标记：在受益的邻居建筑上显示闪烁提示
+      if (p.reversePct > 0) {
+        const reverseByNeighbor = {};
+        for (const b of p.result.bonuses) {
+          if (!b.isReverse) continue;
+          if (!reverseByNeighbor[b.neighborIdx]) reverseByNeighbor[b.neighborIdx] = 0;
+          reverseByNeighbor[b.neighborIdx] += b.bonus;
+        }
+        for (const [nIdx, bonus] of Object.entries(reverseByNeighbor)) {
+          const nCell = cells[+nIdx];
+          if (!nCell || nCell.querySelector('.adj-reverse-hint')) continue;
+          const hint = document.createElement('div');
+          hint.className = 'adj-reverse-hint';
+          hint.textContent = '↑+' + Math.round(bonus * 100) + '%';
+          nCell.appendChild(hint);
+        }
+      }
+      // 存储数据供 hover 使用
+      this._adjPreviewData[p.idx] = p;
     }
   },
 
   // v2.0: 清除邻接预览高亮
   _clearAdjPreview() {
-    document.querySelectorAll('.adj-preview-1,.adj-preview-2,.adj-preview-3').forEach(el => {
-      el.classList.remove('adj-preview-1', 'adj-preview-2', 'adj-preview-3');
+    document.querySelectorAll('.adj-heat-1,.adj-heat-2,.adj-heat-3,.adj-heat-4').forEach(el => {
+      el.classList.remove('adj-heat-1', 'adj-heat-2', 'adj-heat-3', 'adj-heat-4');
     });
     document.querySelectorAll('.adj-preview-badge').forEach(el => el.remove());
+    document.querySelectorAll('.adj-reverse-hint').forEach(el => el.remove());
+    this._adjPreviewData = {};
   },
 
   // ===== BELT GUIDANCE TOOLTIP =====
