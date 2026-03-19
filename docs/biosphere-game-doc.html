@@ -1,0 +1,1268 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>🧬 微生物帝国 — 游戏设计文档</title>
+<style>
+  @page { size: A4; margin: 15mm; }
+  @media print {
+    .no-print { display: none !important; }
+    .page-break { page-break-before: always; }
+    body { font-size: 10pt; }
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'PingFang SC', 'Microsoft YaHei', -apple-system, sans-serif;
+    background: #0a0e14; color: #c8d6e5;
+    line-height: 1.7; padding: 40px;
+    max-width: 1100px; margin: 0 auto;
+  }
+  h1 { font-size: 2.2em; text-align: center; margin: 40px 0 10px;
+       background: linear-gradient(90deg, #22c55e, #3b82f6, #a855f7);
+       -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  h2 { font-size: 1.5em; margin: 35px 0 15px; padding-bottom: 8px;
+       border-bottom: 2px solid #22c55e44; color: #22c55e; }
+  h3 { font-size: 1.15em; margin: 20px 0 10px; color: #60a5fa; }
+  p, li { margin-bottom: 6px; }
+  .subtitle { text-align: center; color: #6b7b8d; font-size: 0.95em; margin-bottom: 30px; }
+  .badge { display: inline-block; padding: 2px 10px; border-radius: 10px;
+           font-size: 0.8em; font-weight: 600; color: #fff; margin-right: 4px; }
+
+  /* 表格 */
+  table { width: 100%; border-collapse: collapse; margin: 12px 0 20px; font-size: 0.88em; }
+  th, td { padding: 8px 10px; border: 1px solid #1e2a3a; text-align: left; }
+  th { background: #141c28; color: #60a5fa; font-weight: 600; white-space: nowrap; }
+  td { background: #0d1420; }
+  tr:hover td { background: #141c28; }
+
+  /* 卡片 */
+  .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; margin: 12px 0; }
+  .card { background: #0f1923; border: 1px solid #1e2a3a; border-radius: 8px; padding: 14px;
+          transition: border-color 0.2s; }
+  .card:hover { border-color: #22c55e66; }
+  .card-title { font-weight: 700; margin-bottom: 4px; }
+  .card-desc { font-size: 0.85em; color: #8899aa; }
+
+  /* 产线流向图 */
+  .flow-section { margin: 16px 0; }
+  .flow-row { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; margin: 4px 0; font-size: 0.85em; }
+  .flow-node { background: #141c28; border: 1px solid #1e2a3a; border-radius: 6px;
+               padding: 4px 10px; white-space: nowrap; }
+  .flow-arrow { color: #4ade80; font-weight: 700; font-size: 1.1em; }
+  .flow-res { font-size: 0.78em; color: #8899aa; }
+
+  /* 公式 */
+  .formula { background: #141c28; border-left: 3px solid #a855f7; padding: 12px 16px;
+             font-family: 'Consolas', 'Fira Code', monospace; font-size: 0.88em;
+             border-radius: 0 6px 6px 0; margin: 12px 0; overflow-x: auto; white-space: pre-wrap; }
+
+  /* 打印按钮 */
+  .print-btn { position: fixed; bottom: 20px; right: 20px; padding: 12px 24px;
+               background: #22c55e; color: #000; border: none; border-radius: 8px;
+               font-size: 1em; font-weight: 700; cursor: pointer; z-index: 999; }
+  .print-btn:hover { background: #4ade80; }
+
+  /* TOC */
+  .toc { background: #0f1923; border: 1px solid #1e2a3a; border-radius: 8px;
+         padding: 20px 30px; margin: 20px 0; }
+  .toc a { color: #60a5fa; text-decoration: none; }
+  .toc a:hover { text-decoration: underline; }
+  .toc ol { padding-left: 20px; }
+  .toc li { margin: 4px 0; }
+
+  /* 邻接类型 badge */
+  .adj-same { background: #22c55e33; color: #4ade80; }
+  .adj-synergy { background: #3b82f633; color: #60a5fa; }
+  .adj-chain { background: #a855f733; color: #c084fc; }
+  .adj-penalty { background: #ef444433; color: #f87171; }
+</style>
+</head>
+<body>
+<button class="print-btn no-print" onclick="window.print()">🖨️ 导出 PDF</button>
+
+<h1>🧬 微生物帝国</h1>
+<p class="subtitle">游戏设计文档 — 核心玩法 · 产线图 · 经济系统 · 数值表<br>
+版本 v0.9.1 | 生成时间 2026/3/19 14:13:28</p>
+<div class="toc"><h3>📑 目录</h3><ol>
+  <li><a href="#ch1">游戏概述与核心循环</a></li>
+  <li><a href="#ch2">资源体系</a></li>
+  <li><a href="#ch3">游戏阶段 (P1–P5)</a></li>
+  <li><a href="#ch4">建筑总览</a></li>
+  <li><a href="#ch5">资源产线流向图</a></li>
+  <li><a href="#ch6">科技树</a></li>
+  <li><a href="#ch7">经济系统与数值公式</a></li>
+  <li><a href="#ch8">传送带与端口系统</a></li>
+  <li><a href="#ch9">邻接加成系统</a></li>
+  <li><a href="#ch10">进化与变异系统</a></li>
+  <li><a href="#ch11">转生系统</a></li>
+  <li><a href="#ch12">成就系统</a></li>
+</ol></div>
+<h2 id="ch1">1. 游戏概述与核心循环</h2>
+<p><strong>微生物帝国</strong>是一款网页端放置/增量类游戏，玩家扮演微观生命的引导者，
+从最初的原始液泡开始，通过建造采集器、转化站等建筑，逐步构建一个复杂的微生物经济体系。</p>
+<h3>核心循环</h3>
+<div class="formula">采集资源 → 建造/升级建筑 → 产出更多资源 → 解锁新阶段 → 新建筑/新资源 → 循环</div>
+<h3>核心殖民地演化</h3>
+<table><tr><th>阶段</th><th>形态</th><th>名称</th><th>描述</th><th>最大采集器</th></tr>
+<tr><td>P1</td><td>🔮</td><td>原始液泡</td><td>最初的生命痕迹...一团脆弱的原始液泡</td><td>2</td></tr>
+<tr><td>P2</td><td>🦠</td><td>原核聚落</td><td>细胞开始分化，原核生物聚集成群</td><td>4</td></tr>
+<tr><td>P3</td><td>🔬</td><td>生物膜枢纽</td><td>致密的生物膜包裹着繁忙的代谢中心</td><td>6</td></tr>
+<tr><td>P4</td><td>🏗️</td><td>菌落中枢</td><td>高度组织化的微生物城市核心</td><td>8</td></tr>
+<tr><td>P5</td><td>✨</td><td>生命圣殿</td><td>微生物帝国的终极神殿，散发着耀眼光芒</td><td>10</td></tr>
+</table>
+<h2 id="ch2" class="page-break">2. 资源体系</h2>
+<p>游戏共有 <strong>7</strong> 种资源，按阶段逐步解锁：</p>
+<table><tr><th>图标</th><th>资源名</th><th>Key</th><th>解锁阶段</th><th>颜色</th></tr>
+<tr><td>🟢</td><td>葡萄糖</td><td><code>glucose</code></td>
+         <td><span class="badge" style="background:#22c55e">P1</span></td>
+         <td><span style="color:#22c55e">■</span> #22c55e</td></tr>
+<tr><td>⚡</td><td>ATP能量</td><td><code>energy</code></td>
+         <td><span class="badge" style="background:#22c55e">P1</span></td>
+         <td><span style="color:#f97316">■</span> #f97316</td></tr>
+<tr><td>🧬</td><td>DNA</td><td><code>dna</code></td>
+         <td><span class="badge" style="background:#22c55e">P1</span></td>
+         <td><span style="color:#a855f7">■</span> #a855f7</td></tr>
+<tr><td>🔵</td><td>氮源</td><td><code>nitrogen</code></td>
+         <td><span class="badge" style="background:#f97316">P2</span></td>
+         <td><span style="color:#3b82f6">■</span> #3b82f6</td></tr>
+<tr><td>🧪</td><td>蛋白质</td><td><code>protein</code></td>
+         <td><span class="badge" style="background:#f97316">P2</span></td>
+         <td><span style="color:#ec4899">■</span> #ec4899</td></tr>
+<tr><td>🧱</td><td>生物质</td><td><code>biomass</code></td>
+         <td><span class="badge" style="background:#a855f7">P3</span></td>
+         <td><span style="color:#10b981">■</span> #10b981</td></tr>
+<tr><td>📡</td><td>QS信号</td><td><code>qs</code></td>
+         <td><span class="badge" style="background:#ef4444">P4</span></td>
+         <td><span style="color:#eab308">■</span> #eab308</td></tr>
+</table>
+<h2 id="ch3">3. 游戏阶段 (P1–P5)</h2>
+<table><tr><th>阶段</th><th>图标</th><th>名称</th><th>描述</th><th>解锁建筑</th></tr>
+<tr><td><span class="badge" style="background:#22c55e">P1</span></td>
+         <td>🌱</td><td>采集</td><td>建造采集器收集基础资源</td><td> 碳源采集器、 ATP合成酶、 简易提取器、 能量缓冲池</td></tr>
+<tr><td><span class="badge" style="background:#f97316">P2</span></td>
+         <td>⚗️</td><td>代谢</td><td>转化资源产生高级材料</td><td> 固氮装置、 蛋白质工厂、 DNA提取器、 氨基酸合成仪、 核糖体集群</td></tr>
+<tr><td><span class="badge" style="background:#a855f7">P3</span></td>
+         <td>🔗</td><td>物流</td><td>建立运输网络提升效率</td><td> 生物膜反应器、 菌丝运输网、 孢子播种器、 代谢回路、 生物质转化炉、 噬菌体裂解器、 发酵液泡</td></tr>
+<tr><td><span class="badge" style="background:#ef4444">P4</span></td>
+         <td>🧠</td><td>自动化</td><td>QS信号自动化控制</td><td> 群体感应塔、 纳米组装线、 信息素广播站、 共振培养箱</td></tr>
+<tr><td><span class="badge" style="background:#eab308">P5</span></td>
+         <td>🏛️</td><td>奇观</td><td>建造终极生物奇观！</td><td> 微型戴森球</td></tr>
+</table>
+<h2 id="ch4" class="page-break">4. 建筑总览</h2>
+<p>共 <strong>21</strong> 种建筑，按阶段分组：</p>
+<h3 style="color:#22c55e">P1 采集 — 4 种建筑</h3>
+<table><tr><th>图标</th><th>名称</th><th>建造费用</th><th>产出</th><th>消耗</th><th>转化比</th><th>描述</th></tr>
+<tr><td></td><td>碳源采集器</td><td>⚡ ATP能量 ×10</td>
+         <td>🟢 葡萄糖 ×1.5</td><td>-</td>
+         <td>🏠核心供能 → 1.5🟢/s</td><td style="font-size:0.82em;color:#8899aa">-</td></tr>
+<tr><td></td><td>ATP合成酶</td><td>🟢 葡萄糖 ×18</td>
+         <td>⚡ ATP能量 ×2.5</td><td>🟢 葡萄糖 ×1</td>
+         <td>1🟢 → 2.5⚡/s</td><td style="font-size:0.82em;color:#8899aa">-</td></tr>
+<tr><td></td><td>简易提取器</td><td>🟢 葡萄糖 ×25， ⚡ ATP能量 ×20</td>
+         <td>🧬 DNA ×0.4</td><td>🟢 葡萄糖 ×2， ⚡ ATP能量 ×1.5</td>
+         <td>2🟢 + 1.5⚡ → 0.4🧬/s</td><td style="font-size:0.82em;color:#8899aa">-</td></tr>
+<tr><td></td><td>能量缓冲池</td><td>🟢 葡萄糖 ×30， ⚡ ATP能量 ×15</td>
+         <td>⚡ ATP能量 ×1.8</td><td>🟢 葡萄糖 ×0.6</td>
+         <td>0.6🟢 → 1.8⚡/s</td><td style="font-size:0.82em;color:#8899aa">-</td></tr>
+</table>
+<h3 style="color:#f97316">P2 代谢 — 5 种建筑</h3>
+<table><tr><th>图标</th><th>名称</th><th>建造费用</th><th>产出</th><th>消耗</th><th>转化比</th><th>描述</th></tr>
+<tr><td></td><td>固氮装置</td><td>⚡ ATP能量 ×30</td>
+         <td>🔵 氮源 ×1</td><td>⚡ ATP能量 ×0.3</td>
+         <td>0.3⚡ → 1🔵/s</td><td style="font-size:0.82em;color:#8899aa">-</td></tr>
+<tr><td></td><td>蛋白质工厂</td><td>⚡ ATP能量 ×35， 🔵 氮源 ×12</td>
+         <td>🧪 蛋白质 ×0.6</td><td>🔵 氮源 ×0.8， ⚡ ATP能量 ×0.5</td>
+         <td>0.8🔵 + 0.5⚡ → 0.6🧪/s</td><td style="font-size:0.82em;color:#8899aa">-</td></tr>
+<tr><td></td><td>DNA提取器</td><td>🧪 蛋白质 ×20， ⚡ ATP能量 ×30</td>
+         <td>🧬 DNA ×0.8</td><td>🧪 蛋白质 ×0.5， ⚡ ATP能量 ×1</td>
+         <td>0.5🧪 + 1⚡ → 0.8🧬/s</td><td style="font-size:0.82em;color:#8899aa">-</td></tr>
+<tr><td></td><td>氨基酸合成仪</td><td>🔵 氮源 ×15， 🟢 葡萄糖 ×20</td>
+         <td>🧪 蛋白质 ×0.45</td><td>🔵 氮源 ×0.5， 🟢 葡萄糖 ×0.8</td>
+         <td>0.5🔵 + 0.8🟢 → 0.45🧪/s</td><td style="font-size:0.82em;color:#8899aa">-</td></tr>
+<tr><td></td><td>核糖体集群</td><td>🧪 蛋白质 ×25， 🧬 DNA ×8</td>
+         <td>🧬 DNA ×0.6， 🟢 葡萄糖 ×0.1</td><td>🧪 蛋白质 ×0.3， ⚡ ATP能量 ×0.5</td>
+         <td>0.3🧪 + 0.5⚡ → 0.6🧬 + 0.1🟢/s</td><td style="font-size:0.82em;color:#8899aa">-</td></tr>
+</table>
+<h3 style="color:#a855f7">P3 合成 — 7 种建筑</h3>
+<table><tr><th>图标</th><th>名称</th><th>建造费用</th><th>产出</th><th>消耗</th><th>转化比</th><th>描述</th></tr>
+<tr><td></td><td>生物膜反应器</td><td>🧪 蛋白质 ×25， ⚡ ATP能量 ×40</td>
+         <td>🧱 生物质 ×0.8， 🧪 蛋白质 ×0.2</td><td>🟢 葡萄糖 ×1， 🔵 氮源 ×0.3， ⚡ ATP能量 ×1</td>
+         <td>1🟢 + 0.3🔵 + 1⚡ → 0.8🧱 + 0.2🧪/s</td><td style="font-size:0.82em;color:#8899aa">-</td></tr>
+<tr><td></td><td>菌丝运输网</td><td>🧱 生物质 ×12， ⚡ ATP能量 ×25</td>
+         <td>-</td><td>-</td>
+         <td>全局产出 +10%</td><td style="font-size:0.82em;color:#8899aa">-</td></tr>
+<tr><td></td><td>孢子播种器</td><td>🧱 生物质 ×18， ⚡ ATP能量 ×30</td>
+         <td>🧬 DNA ×0.3， 🔵 氮源 ×0.5</td><td>🧱 生物质 ×0.4， ⚡ ATP能量 ×0.5</td>
+         <td>0.4🧱 + 0.5⚡ → 0.3🧬 + 0.5🔵/s</td><td style="font-size:0.82em;color:#8899aa">-</td></tr>
+<tr><td></td><td>代谢回路</td><td>🧱 生物质 ×20， 🧪 蛋白质 ×15</td>
+         <td>-</td><td>-</td>
+         <td>全局产出 +8%，消耗-5%</td><td style="font-size:0.82em;color:#8899aa">-</td></tr>
+<tr><td></td><td>生物质转化炉</td><td>🧪 蛋白质 ×30， ⚡ ATP能量 ×35</td>
+         <td>🧱 生物质 ×0.5， 🧬 DNA ×0.1</td><td>🧪 蛋白质 ×0.6， ⚡ ATP能量 ×0.8</td>
+         <td>0.6🧪 + 0.8⚡ → 0.5🧱 + 0.1🧬/s</td><td style="font-size:0.82em;color:#8899aa">-</td></tr>
+<tr><td></td><td>噬菌体裂解器</td><td>🔵 氮源 ×20， ⚡ ATP能量 ×40， 🧬 DNA ×10</td>
+         <td>🧬 DNA ×0.7</td><td>🔵 氮源 ×0.6， ⚡ ATP能量 ×1.2</td>
+         <td>0.6🔵 + 1.2⚡ → 0.7🧬/s</td><td style="font-size:0.82em;color:#8899aa">-</td></tr>
+<tr><td></td><td>发酵液泡</td><td>🧱 生物质 ×20， 🧪 蛋白质 ×15， ⚡ ATP能量 ×35</td>
+         <td>⚡ ATP能量 ×2.0</td><td>🧱 生物质 ×0.5， 🧪 蛋白质 ×0.3</td>
+         <td>0.5🧱 + 0.3🧪 → 2.0⚡/s</td><td style="font-size:0.82em;color:#8899aa">-</td></tr>
+</table>
+<h3 style="color:#ef4444">P4 生态 — 4 种建筑</h3>
+<table><tr><th>图标</th><th>名称</th><th>建造费用</th><th>产出</th><th>消耗</th><th>转化比</th><th>描述</th></tr>
+<tr><td></td><td>群体感应塔</td><td>🧪 蛋白质 ×40， 🧬 DNA ×20， ⚡ ATP能量 ×40</td>
+         <td>📡 QS信号 ×0.8</td><td>⚡ ATP能量 ×2</td>
+         <td>2⚡ → 0.8📡/s</td><td style="font-size:0.82em;color:#8899aa">-</td></tr>
+<tr><td></td><td>纳米组装线</td><td>📡 QS信号 ×8， 🧪 蛋白质 ×30， 🧬 DNA ×25</td>
+         <td>🧱 生物质 ×1.2， 🧪 蛋白质 ×0.4</td><td>📡 QS信号 ×0.3， ⚡ ATP能量 ×1.5</td>
+         <td>0.3📡 + 1.5⚡ → 1.2🧱 + 0.4🧪/s</td><td style="font-size:0.82em;color:#8899aa">-</td></tr>
+<tr><td></td><td>信息素广播站</td><td>🧪 蛋白质 ×35， 🧱 生物质 ×15</td>
+         <td>📡 QS信号 ×0.5</td><td>🧪 蛋白质 ×0.6， ⚡ ATP能量 ×0.5</td>
+         <td>0.6🧪 + 0.5⚡ → 0.5📡/s</td><td style="font-size:0.82em;color:#8899aa">-</td></tr>
+<tr><td></td><td>共振培养箱</td><td>📡 QS信号 ×10， 🧪 蛋白质 ×25， 🧱 生物质 ×15</td>
+         <td>🟢 葡萄糖 ×0.4， 🔵 氮源 ×0.3， 🧪 蛋白质 ×0.2</td><td>📡 QS信号 ×0.2， ⚡ ATP能量 ×1</td>
+         <td>0.2📡 + 1⚡ → 0.4🟢 + 0.3🔵 + 0.2🧪/s</td><td style="font-size:0.82em;color:#8899aa">-</td></tr>
+</table>
+<h3 style="color:#eab308">P5 终局 — 1 种建筑</h3>
+<table><tr><th>图标</th><th>名称</th><th>建造费用</th><th>产出</th><th>消耗</th><th>转化比</th><th>描述</th></tr>
+<tr><td></td><td>微型戴森球</td><td>🧱 生物质 ×100， 🧪 蛋白质 ×60， 🧬 DNA ×50， 📡 QS信号 ×20</td>
+         <td>⚡ ATP能量 ×12， 🟢 葡萄糖 ×8， 🧱 生物质 ×2</td><td>-</td>
+         <td>0 → 12⚡ + 8🟢 + 2🧱/s</td><td style="font-size:0.82em;color:#8899aa">-</td></tr>
+</table>
+<h2 id="ch5" class="page-break">5. 资源产线流向图</h2>
+<p>共 <strong>70</strong> 条资源流向，展示建筑间的资源传输关系：</p>
+<h3 style="color:#22c55e">P1 采集 产线</h3>
+<div class="flow-section">
+<div class="flow-row">
+  <span class="flow-node"> 碳源采集器</span>
+  <span class="flow-arrow"> →<span style="color:#22c55e">🟢</span>→ </span>
+  <span class="flow-node"> ATP合成酶</span>
+  <span class="flow-res">(葡萄糖)</span>
+</div>
+<div class="flow-row">
+  <span class="flow-node"> 碳源采集器</span>
+  <span class="flow-arrow"> →<span style="color:#22c55e">🟢</span>→ </span>
+  <span class="flow-node"> 简易提取器</span>
+  <span class="flow-res">(葡萄糖)</span>
+</div>
+<div class="flow-row">
+  <span class="flow-node"> ATP合成酶</span>
+  <span class="flow-arrow"> →<span style="color:#f97316">⚡</span>→ </span>
+  <span class="flow-node"> 简易提取器</span>
+  <span class="flow-res">(ATP)</span>
+</div>
+<div class="flow-row">
+  <span class="flow-node"> 碳源采集器</span>
+  <span class="flow-arrow"> →<span style="color:#22c55e">🟢</span>→ </span>
+  <span class="flow-node"> 能量缓冲池</span>
+  <span class="flow-res">(葡萄糖)</span>
+</div>
+<div class="flow-row">
+  <span class="flow-node"> 能量缓冲池</span>
+  <span class="flow-arrow"> →<span style="color:#fb923c">⚡</span>→ </span>
+  <span class="flow-node"> 简易提取器</span>
+  <span class="flow-res">(ATP)</span>
+</div>
+</div>
+<h3 style="color:#f97316">P2 代谢 产线</h3>
+<div class="flow-section">
+<div class="flow-row">
+  <span class="flow-node"> 能量缓冲池</span>
+  <span class="flow-arrow"> →<span style="color:#fb923c">⚡</span>→ </span>
+  <span class="flow-node"> 固氮装置</span>
+  <span class="flow-res">(ATP)</span>
+</div>
+<div class="flow-row">
+  <span class="flow-node"> 能量缓冲池</span>
+  <span class="flow-arrow"> →<span style="color:#fb923c">⚡</span>→ </span>
+  <span class="flow-node"> 蛋白质工厂</span>
+  <span class="flow-res">(ATP)</span>
+</div>
+<div class="flow-row">
+  <span class="flow-node"> 能量缓冲池</span>
+  <span class="flow-arrow"> →<span style="color:#fb923c">⚡</span>→ </span>
+  <span class="flow-node"> DNA提取器</span>
+  <span class="flow-res">(ATP)</span>
+</div>
+<div class="flow-row">
+  <span class="flow-node"> 能量缓冲池</span>
+  <span class="flow-arrow"> →<span style="color:#fb923c">⚡</span>→ </span>
+  <span class="flow-node"> 核糖体集群</span>
+  <span class="flow-res">(ATP)</span>
+</div>
+<div class="flow-row">
+  <span class="flow-node"> ATP合成酶</span>
+  <span class="flow-arrow"> →<span style="color:#f97316">⚡</span>→ </span>
+  <span class="flow-node"> 固氮装置</span>
+  <span class="flow-res">(ATP)</span>
+</div>
+<div class="flow-row">
+  <span class="flow-node"> 固氮装置</span>
+  <span class="flow-arrow"> →<span style="color:#3b82f6">🔵</span>→ </span>
+  <span class="flow-node"> 蛋白质工厂</span>
+  <span class="flow-res">(氮源)</span>
+</div>
+<div class="flow-row">
+  <span class="flow-node"> ATP合成酶</span>
+  <span class="flow-arrow"> →<span style="color:#f97316">⚡</span>→ </span>
+  <span class="flow-node"> 蛋白质工厂</span>
+  <span class="flow-res">(ATP)</span>
+</div>
+<div class="flow-row">
+  <span class="flow-node"> 蛋白质工厂</span>
+  <span class="flow-arrow"> →<span style="color:#ec4899">🧪</span>→ </span>
+  <span class="flow-node"> DNA提取器</span>
+  <span class="flow-res">(蛋白质)</span>
+</div>
+<div class="flow-row">
+  <span class="flow-node"> ATP合成酶</span>
+  <span class="flow-arrow"> →<span style="color:#f97316">⚡</span>→ </span>
+  <span class="flow-node"> DNA提取器</span>
+  <span class="flow-res">(ATP)</span>
+</div>
+<div class="flow-row">
+  <span class="flow-node"> 固氮装置</span>
+  <span class="flow-arrow"> →<span style="color:#3b82f6">🔵</span>→ </span>
+  <span class="flow-node"> 氨基酸合成仪</span>
+  <span class="flow-res">(氮源)</span>
+</div>
+<div class="flow-row">
+  <span class="flow-node"> 碳源采集器</span>
+  <span class="flow-arrow"> →<span style="color:#22c55e">🟢</span>→ </span>
+  <span class="flow-node"> 氨基酸合成仪</span>
+  <span class="flow-res">(葡萄糖)</span>
+</div>
+<div class="flow-row">
+  <span class="flow-node"> 蛋白质工厂</span>
+  <span class="flow-arrow"> →<span style="color:#ec4899">🧪</span>→ </span>
+  <span class="flow-node"> 核糖体集群</span>
+  <span class="flow-res">(蛋白质)</span>
+</div>
+<div class="flow-row">
+  <span class="flow-node"> ATP合成酶</span>
+  <span class="flow-arrow"> →<span style="color:#f97316">⚡</span>→ </span>
+  <span class="flow-node"> 核糖体集群</span>
+  <span class="flow-res">(ATP)</span>
+</div>
+</div>
+<h3 style="color:#a855f7">P3 合成 产线</h3>
+<div class="flow-section">
+<div class="flow-row">
+  <span class="flow-node"> 能量缓冲池</span>
+  <span class="flow-arrow"> →<span style="color:#fb923c">⚡</span>→ </span>
+  <span class="flow-node"> 生物膜反应器</span>
+  <span class="flow-res">(ATP)</span>
+</div>
+<div class="flow-row">
+  <span class="flow-node"> 能量缓冲池</span>
+  <span class="flow-arrow"> →<span style="color:#fb923c">⚡</span>→ </span>
+  <span class="flow-node"> 孢子播种器</span>
+  <span class="flow-res">(ATP)</span>
+</div>
+<div class="flow-row">
+  <span class="flow-node"> 碳源采集器</span>
+  <span class="flow-arrow"> →<span style="color:#22c55e">🟢</span>→ </span>
+  <span class="flow-node"> 生物膜反应器</span>
+  <span class="flow-res">(葡萄糖)</span>
+</div>
+<div class="flow-row">
+  <span class="flow-node"> 固氮装置</span>
+  <span class="flow-arrow"> →<span style="color:#3b82f6">🔵</span>→ </span>
+  <span class="flow-node"> 生物膜反应器</span>
+  <span class="flow-res">(氮源)</span>
+</div>
+<div class="flow-row">
+  <span class="flow-node"> ATP合成酶</span>
+  <span class="flow-arrow"> →<span style="color:#f97316">⚡</span>→ </span>
+  <span class="flow-node"> 生物膜反应器</span>
+  <span class="flow-res">(ATP)</span>
+</div>
+<div class="flow-row">
+  <span class="flow-node"> 生物膜反应器</span>
+  <span class="flow-arrow"> →<span style="color:#14b8a6">🧱</span>→ </span>
+  <span class="flow-node"> 孢子播种器</span>
+  <span class="flow-res">(生物质)</span>
+</div>
+<div class="flow-row">
+  <span class="flow-node"> ATP合成酶</span>
+  <span class="flow-arrow"> →<span style="color:#f97316">⚡</span>→ </span>
+  <span class="flow-node"> 孢子播种器</span>
+  <span class="flow-res">(ATP)</span>
+</div>
+<div class="flow-row">
+  <span class="flow-node"> 蛋白质工厂</span>
+  <span class="flow-arrow"> →<span style="color:#ec4899">🧪</span>→ </span>
+  <span class="flow-node"> 生物质转化炉</span>
+  <span class="flow-res">(蛋白质)</span>
+</div>
+<div class="flow-row">
+  <span class="flow-node"> 氨基酸合成仪</span>
+  <span class="flow-arrow"> →<span style="color:#f472b6">🧪</span>→ </span>
+  <span class="flow-node"> 生物质转化炉</span>
+  <span class="flow-res">(蛋白质)</span>
+</div>
+<div class="flow-row">
+  <span class="flow-node"> ATP合成酶</span>
+  <span class="flow-arrow"> →<span style="color:#f97316">⚡</span>→ </span>
+  <span class="flow-node"> 生物质转化炉</span>
+  <span class="flow-res">(ATP)</span>
+</div>
+<div class="flow-row">
+  <span class="flow-node"> 能量缓冲池</span>
+  <span class="flow-arrow"> →<span style="color:#fb923c">⚡</span>→ </span>
+  <span class="flow-node"> 生物质转化炉</span>
+  <span class="flow-res">(ATP)</span>
+</div>
+<div class="flow-row">
+  <span class="flow-node"> 固氮装置</span>
+  <span class="flow-arrow"> →<span style="color:#3b82f6">🔵</span>→ </span>
+  <span class="flow-node"> 噬菌体裂解器</span>
+  <span class="flow-res">(氮源)</span>
+</div>
+<div class="flow-row">
+  <span class="flow-node"> ATP合成酶</span>
+  <span class="flow-arrow"> →<span style="color:#f97316">⚡</span>→ </span>
+  <span class="flow-node"> 噬菌体裂解器</span>
+  <span class="flow-res">(ATP)</span>
+</div>
+<div class="flow-row">
+  <span class="flow-node"> 能量缓冲池</span>
+  <span class="flow-arrow"> →<span style="color:#fb923c">⚡</span>→ </span>
+  <span class="flow-node"> 噬菌体裂解器</span>
+  <span class="flow-res">(ATP)</span>
+</div>
+<div class="flow-row">
+  <span class="flow-node"> 生物膜反应器</span>
+  <span class="flow-arrow"> →<span style="color:#10b981">🧱</span>→ </span>
+  <span class="flow-node"> 发酵液泡</span>
+  <span class="flow-res">(生物质)</span>
+</div>
+<div class="flow-row">
+  <span class="flow-node"> 生物质转化炉</span>
+  <span class="flow-arrow"> →<span style="color:#10b981">🧱</span>→ </span>
+  <span class="flow-node"> 发酵液泡</span>
+  <span class="flow-res">(生物质)</span>
+</div>
+<div class="flow-row">
+  <span class="flow-node"> 蛋白质工厂</span>
+  <span class="flow-arrow"> →<span style="color:#ec4899">🧪</span>→ </span>
+  <span class="flow-node"> 发酵液泡</span>
+  <span class="flow-res">(蛋白质)</span>
+</div>
+<div class="flow-row">
+  <span class="flow-node"> 氨基酸合成仪</span>
+  <span class="flow-arrow"> →<span style="color:#ec4899">🧪</span>→ </span>
+  <span class="flow-node"> 发酵液泡</span>
+  <span class="flow-res">(蛋白质)</span>
+</div>
+<div class="flow-row">
+  <span class="flow-node"> 发酵液泡</span>
+  <span class="flow-arrow"> →<span style="color:#f59e0b">⚡</span>→ </span>
+  <span class="flow-node"> 简易提取器</span>
+  <span class="flow-res">(ATP)</span>
+</div>
+<div class="flow-row">
+  <span class="flow-node"> 发酵液泡</span>
+  <span class="flow-arrow"> →<span style="color:#f59e0b">⚡</span>→ </span>
+  <span class="flow-node"> 固氮装置</span>
+  <span class="flow-res">(ATP)</span>
+</div>
+<div class="flow-row">
+  <span class="flow-node"> 发酵液泡</span>
+  <span class="flow-arrow"> →<span style="color:#f59e0b">⚡</span>→ </span>
+  <span class="flow-node"> 蛋白质工厂</span>
+  <span class="flow-res">(ATP)</span>
+</div>
+<div class="flow-row">
+  <span class="flow-node"> 发酵液泡</span>
+  <span class="flow-arrow"> →<span style="color:#f59e0b">⚡</span>→ </span>
+  <span class="flow-node"> DNA提取器</span>
+  <span class="flow-res">(ATP)</span>
+</div>
+<div class="flow-row">
+  <span class="flow-node"> 发酵液泡</span>
+  <span class="flow-arrow"> →<span style="color:#f59e0b">⚡</span>→ </span>
+  <span class="flow-node"> 核糖体集群</span>
+  <span class="flow-res">(ATP)</span>
+</div>
+<div class="flow-row">
+  <span class="flow-node"> 发酵液泡</span>
+  <span class="flow-arrow"> →<span style="color:#f59e0b">⚡</span>→ </span>
+  <span class="flow-node"> 生物膜反应器</span>
+  <span class="flow-res">(ATP)</span>
+</div>
+<div class="flow-row">
+  <span class="flow-node"> 发酵液泡</span>
+  <span class="flow-arrow"> →<span style="color:#f59e0b">⚡</span>→ </span>
+  <span class="flow-node"> 孢子播种器</span>
+  <span class="flow-res">(ATP)</span>
+</div>
+<div class="flow-row">
+  <span class="flow-node"> 发酵液泡</span>
+  <span class="flow-arrow"> →<span style="color:#f59e0b">⚡</span>→ </span>
+  <span class="flow-node"> 生物质转化炉</span>
+  <span class="flow-res">(ATP)</span>
+</div>
+<div class="flow-row">
+  <span class="flow-node"> 发酵液泡</span>
+  <span class="flow-arrow"> →<span style="color:#f59e0b">⚡</span>→ </span>
+  <span class="flow-node"> 噬菌体裂解器</span>
+  <span class="flow-res">(ATP)</span>
+</div>
+</div>
+<h3 style="color:#ef4444">P4 生态 产线</h3>
+<div class="flow-section">
+<div class="flow-row">
+  <span class="flow-node"> 能量缓冲池</span>
+  <span class="flow-arrow"> →<span style="color:#fb923c">⚡</span>→ </span>
+  <span class="flow-node"> 群体感应塔</span>
+  <span class="flow-res">(ATP)</span>
+</div>
+<div class="flow-row">
+  <span class="flow-node"> 能量缓冲池</span>
+  <span class="flow-arrow"> →<span style="color:#fb923c">⚡</span>→ </span>
+  <span class="flow-node"> 纳米组装线</span>
+  <span class="flow-res">(ATP)</span>
+</div>
+<div class="flow-row">
+  <span class="flow-node"> 能量缓冲池</span>
+  <span class="flow-arrow"> →<span style="color:#fb923c">⚡</span>→ </span>
+  <span class="flow-node"> 信息素广播站</span>
+  <span class="flow-res">(ATP)</span>
+</div>
+<div class="flow-row">
+  <span class="flow-node"> ATP合成酶</span>
+  <span class="flow-arrow"> →<span style="color:#f97316">⚡</span>→ </span>
+  <span class="flow-node"> 群体感应塔</span>
+  <span class="flow-res">(ATP)</span>
+</div>
+<div class="flow-row">
+  <span class="flow-node"> 群体感应塔</span>
+  <span class="flow-arrow"> →<span style="color:#eab308">📡</span>→ </span>
+  <span class="flow-node"> 纳米组装线</span>
+  <span class="flow-res">(QS信号)</span>
+</div>
+<div class="flow-row">
+  <span class="flow-node"> ATP合成酶</span>
+  <span class="flow-arrow"> →<span style="color:#f97316">⚡</span>→ </span>
+  <span class="flow-node"> 纳米组装线</span>
+  <span class="flow-res">(ATP)</span>
+</div>
+<div class="flow-row">
+  <span class="flow-node"> 蛋白质工厂</span>
+  <span class="flow-arrow"> →<span style="color:#ec4899">🧪</span>→ </span>
+  <span class="flow-node"> 信息素广播站</span>
+  <span class="flow-res">(蛋白质)</span>
+</div>
+<div class="flow-row">
+  <span class="flow-node"> ATP合成酶</span>
+  <span class="flow-arrow"> →<span style="color:#f97316">⚡</span>→ </span>
+  <span class="flow-node"> 信息素广播站</span>
+  <span class="flow-res">(ATP)</span>
+</div>
+<div class="flow-row">
+  <span class="flow-node"> 群体感应塔</span>
+  <span class="flow-arrow"> →<span style="color:#eab308">📡</span>→ </span>
+  <span class="flow-node"> 共振培养箱</span>
+  <span class="flow-res">(QS信号)</span>
+</div>
+<div class="flow-row">
+  <span class="flow-node"> 信息素广播站</span>
+  <span class="flow-arrow"> →<span style="color:#facc15">📡</span>→ </span>
+  <span class="flow-node"> 共振培养箱</span>
+  <span class="flow-res">(QS信号)</span>
+</div>
+<div class="flow-row">
+  <span class="flow-node"> ATP合成酶</span>
+  <span class="flow-arrow"> →<span style="color:#f97316">⚡</span>→ </span>
+  <span class="flow-node"> 共振培养箱</span>
+  <span class="flow-res">(ATP)</span>
+</div>
+<div class="flow-row">
+  <span class="flow-node"> 能量缓冲池</span>
+  <span class="flow-arrow"> →<span style="color:#fb923c">⚡</span>→ </span>
+  <span class="flow-node"> 共振培养箱</span>
+  <span class="flow-res">(ATP)</span>
+</div>
+<div class="flow-row">
+  <span class="flow-node"> 共振培养箱</span>
+  <span class="flow-arrow"> →<span style="color:#c084fc">🟢</span>→ </span>
+  <span class="flow-node"> ATP合成酶</span>
+  <span class="flow-res">(葡萄糖)</span>
+</div>
+<div class="flow-row">
+  <span class="flow-node"> 共振培养箱</span>
+  <span class="flow-arrow"> →<span style="color:#c084fc">🟢</span>→ </span>
+  <span class="flow-node"> 能量缓冲池</span>
+  <span class="flow-res">(葡萄糖)</span>
+</div>
+<div class="flow-row">
+  <span class="flow-node"> 共振培养箱</span>
+  <span class="flow-arrow"> →<span style="color:#c084fc">🟢</span>→ </span>
+  <span class="flow-node"> 简易提取器</span>
+  <span class="flow-res">(葡萄糖)</span>
+</div>
+<div class="flow-row">
+  <span class="flow-node"> 共振培养箱</span>
+  <span class="flow-arrow"> →<span style="color:#c084fc">🔵</span>→ </span>
+  <span class="flow-node"> 蛋白质工厂</span>
+  <span class="flow-res">(氮源)</span>
+</div>
+<div class="flow-row">
+  <span class="flow-node"> 共振培养箱</span>
+  <span class="flow-arrow"> →<span style="color:#c084fc">🔵</span>→ </span>
+  <span class="flow-node"> 氨基酸合成仪</span>
+  <span class="flow-res">(氮源)</span>
+</div>
+<div class="flow-row">
+  <span class="flow-node"> 共振培养箱</span>
+  <span class="flow-arrow"> →<span style="color:#c084fc">🔵</span>→ </span>
+  <span class="flow-node"> 生物膜反应器</span>
+  <span class="flow-res">(氮源)</span>
+</div>
+<div class="flow-row">
+  <span class="flow-node"> 共振培养箱</span>
+  <span class="flow-arrow"> →<span style="color:#c084fc">🧪</span>→ </span>
+  <span class="flow-node"> DNA提取器</span>
+  <span class="flow-res">(蛋白质)</span>
+</div>
+<div class="flow-row">
+  <span class="flow-node"> 共振培养箱</span>
+  <span class="flow-arrow"> →<span style="color:#c084fc">🧪</span>→ </span>
+  <span class="flow-node"> 生物质转化炉</span>
+  <span class="flow-res">(蛋白质)</span>
+</div>
+<div class="flow-row">
+  <span class="flow-node"> 纳米组装线</span>
+  <span class="flow-arrow"> →<span style="color:#10b981">🧱</span>→ </span>
+  <span class="flow-node"> 发酵液泡</span>
+  <span class="flow-res">(生物质)</span>
+</div>
+<div class="flow-row">
+  <span class="flow-node"> 发酵液泡</span>
+  <span class="flow-arrow"> →<span style="color:#f59e0b">⚡</span>→ </span>
+  <span class="flow-node"> 群体感应塔</span>
+  <span class="flow-res">(ATP)</span>
+</div>
+<div class="flow-row">
+  <span class="flow-node"> 发酵液泡</span>
+  <span class="flow-arrow"> →<span style="color:#f59e0b">⚡</span>→ </span>
+  <span class="flow-node"> 纳米组装线</span>
+  <span class="flow-res">(ATP)</span>
+</div>
+<div class="flow-row">
+  <span class="flow-node"> 发酵液泡</span>
+  <span class="flow-arrow"> →<span style="color:#f59e0b">⚡</span>→ </span>
+  <span class="flow-node"> 信息素广播站</span>
+  <span class="flow-res">(ATP)</span>
+</div>
+<div class="flow-row">
+  <span class="flow-node"> 发酵液泡</span>
+  <span class="flow-arrow"> →<span style="color:#f59e0b">⚡</span>→ </span>
+  <span class="flow-node"> 共振培养箱</span>
+  <span class="flow-res">(ATP)</span>
+</div>
+</div>
+<h2 id="ch6" class="page-break">6. 科技树</h2>
+<p>共 <strong>13</strong> 项科技研究：</p>
+<h3 style="color:#22c55e">P1 采集 科技</h3>
+<table><tr><th>科技名</th><th>研究费用</th><th>研究时间</th><th>互斥分支</th><th>描述</th></tr>
+<tr><td><strong>纯培养技术</strong></td><td>🧬 DNA ×3</td>
+         <td>15s</td><td>-</td>
+         <td style="font-size:0.82em;color:#8899aa">-</td></tr>
+<tr><td><strong>高效采集</strong></td><td>🧬 DNA ×8</td>
+         <td>20s</td><td>-</td>
+         <td style="font-size:0.82em;color:#8899aa">-</td></tr>
+<tr><td><strong>快速代谢</strong></td><td>🧬 DNA ×8， ⚡ ATP能量 ×15</td>
+         <td>20s</td><td>-</td>
+         <td style="font-size:0.82em;color:#8899aa">-</td></tr>
+</table>
+<h3 style="color:#f97316">P2 代谢 科技</h3>
+<table><tr><th>科技名</th><th>研究费用</th><th>研究时间</th><th>互斥分支</th><th>描述</th></tr>
+<tr><td><strong>基础代谢学</strong></td><td>🧬 DNA ×12</td>
+         <td>25s</td><td>-</td>
+         <td style="font-size:0.82em;color:#8899aa">-</td></tr>
+<tr><td><strong>氮循环工程</strong></td><td>🧬 DNA ×15， 🔵 氮源 ×8</td>
+         <td>30s</td><td>-</td>
+         <td style="font-size:0.82em;color:#8899aa">-</td></tr>
+<tr><td><strong>蛋白质工程</strong></td><td>🧬 DNA ×15， 🧪 蛋白质 ×5</td>
+         <td>30s</td><td>-</td>
+         <td style="font-size:0.82em;color:#8899aa">-</td></tr>
+</table>
+<h3 style="color:#a855f7">P3 合成 科技</h3>
+<table><tr><th>科技名</th><th>研究费用</th><th>研究时间</th><th>互斥分支</th><th>描述</th></tr>
+<tr><td><strong>生物膜技术</strong></td><td>🧬 DNA ×20， 🧪 蛋白质 ×10</td>
+         <td>35s</td><td>-</td>
+         <td style="font-size:0.82em;color:#8899aa">-</td></tr>
+<tr><td><strong>自适应物流</strong></td><td>🧬 DNA ×22， 🧱 生物质 ×8</td>
+         <td>30s</td><td>-</td>
+         <td style="font-size:0.82em;color:#8899aa">-</td></tr>
+<tr><td><strong>共生网络</strong></td><td>🧪 蛋白质 ×18， 🧱 生物质 ×10</td>
+         <td>35s</td><td>-</td>
+         <td style="font-size:0.82em;color:#8899aa">-</td></tr>
+</table>
+<h3 style="color:#ef4444">P4 生态 科技</h3>
+<table><tr><th>科技名</th><th>研究费用</th><th>研究时间</th><th>互斥分支</th><th>描述</th></tr>
+<tr><td><strong>群体感应</strong></td><td>🧬 DNA ×28， 🧪 蛋白质 ×15</td>
+         <td>40s</td><td>-</td>
+         <td style="font-size:0.82em;color:#8899aa">-</td></tr>
+<tr><td><strong>信号增幅器</strong></td><td>🧬 DNA ×30， 🧪 蛋白质 ×20， 📡 QS信号 ×5</td>
+         <td>35s</td><td>-</td>
+         <td style="font-size:0.82em;color:#8899aa">-</td></tr>
+<tr><td><strong>进化催化剂</strong></td><td>🧬 DNA ×35， 🧪 蛋白质 ×25</td>
+         <td>40s</td><td>-</td>
+         <td style="font-size:0.82em;color:#8899aa">-</td></tr>
+</table>
+<h3 style="color:#eab308">P5 终局 科技</h3>
+<table><tr><th>科技名</th><th>研究费用</th><th>研究时间</th><th>互斥分支</th><th>描述</th></tr>
+<tr><td><strong>微型戴森理论</strong></td><td>🧬 DNA ×40， 🧪 蛋白质 ×20， 🧱 生物质 ×15</td>
+         <td>60s</td><td>-</td>
+         <td style="font-size:0.82em;color:#8899aa">-</td></tr>
+</table>
+<h2 id="ch7" class="page-break">7. 经济系统与数值公式</h2>
+<h3>7.1 产出计算公式</h3>
+<div class="formula">实际产出 = 基础产出(prod) × 建筑等级倍率(bldMult) × 传送带效率(beltMult)
+         × 菌群加成(popMult) × 邻接加成(adjBonus) × 协同加成(syncBonus)
+         × 科技加成(techBonus) × 进化加成(evoBonus)
+         × 全局产出倍率(globalProdMult) × 变异加成(mutBonus)</div>
+<h3>7.2 建筑升级数值</h3>
+<table><tr><th>等级</th><th>产出倍率</th><th>升级费用倍率</th></tr>
+<tr><td>Lv.1</td><td>1.0x</td><td>-</td></tr>
+<tr><td>Lv.2</td><td>1.4x</td><td>基础造价 × 3.24</td></tr>
+<tr><td>Lv.3</td><td>1.8x</td><td>基础造价 × 5.83</td></tr>
+<tr><td>Lv.4</td><td>2.2x</td><td>基础造价 × 10.50</td></tr>
+<tr><td>Lv.5 <span class="badge" style="background:#eab308">★MAX</span></td><td>2.6x</td><td>基础造价 × 18.90</td></tr>
+</table>
+<div class="formula">升级倍率 = 1 + (Lv - 1) × 0.4
+升级费用 = baseCost × 1.8^Lv</div>
+<h3>7.3 建造费用递增</h3>
+<div class="formula">第 N 个同类建筑的造价 = baseCost × 1.4^N</div>
+<table><tr><th>第几个</th><th>费用倍率</th></tr>
+<tr><td>#1</td><td>1.00x</td></tr>
+<tr><td>#2</td><td>1.40x</td></tr>
+<tr><td>#3</td><td>1.96x</td></tr>
+<tr><td>#4</td><td>2.74x</td></tr>
+<tr><td>#5</td><td>3.84x</td></tr>
+<tr><td>#6</td><td>5.38x</td></tr>
+<tr><td>#7</td><td>7.53x</td></tr>
+</table>
+<h3>7.4 维护费系统</h3>
+<p><strong>P1 免维护</strong>，P2 起按阶段收取：</p>
+<table><tr><th>阶段</th><th>基础维护费 (每秒)</th></tr>
+<tr><td>P1</td><td></td></tr>
+<tr><td>P2</td><td>🟢 葡萄糖 ×0.15，⚡ ATP能量 ×0.05</td></tr>
+<tr><td>P3</td><td>🟢 葡萄糖 ×0.2，⚡ ATP能量 ×0.08</td></tr>
+<tr><td>P4</td><td>🟢 葡萄糖 ×0.25，⚡ ATP能量 ×0.1，🧪 蛋白质 ×0.03</td></tr>
+<tr><td>P5</td><td></td></tr>
+</table>
+<h3>7.5 资源竞争机制</h3>
+<table>
+<tr><th>参数</th><th>值</th></tr>
+<tr><td>生效阶段</td><td>P3+</td></tr>
+<tr><td>紧张阈值</td><td>消耗/产出 > 85%</td></tr>
+</table>
+<p>当资源消耗率超过产出率的 85% 时，建筑效率开始下降。</p>
+<h2 id="ch8" class="page-break">8. 传送带与端口系统</h2>
+<h3>8.1 传送带等级</h3>
+<table><tr><th>等级</th><th>效率倍率</th><th>容量 (/s)</th><th>升级费用</th></tr>
+<tr><td>Lv.1</td><td>0.75x</td><td>2.0</td><td>-</td></tr>
+<tr><td>Lv.2</td><td>1.0x</td><td>4.0</td><td>葡萄糖 50 + 能量 30</td></tr>
+<tr><td>Lv.3</td><td>1.15x</td><td>6.5</td><td>蛋白质 40 + 能量 60</td></tr>
+<tr><td>Lv.4</td><td>1.3x</td><td>9.0</td><td>脂质 30 + 生物质 50</td></tr>
+<tr><td>Lv.5</td><td>1.5x</td><td>12.0</td><td>DNA 20 + 生物质 80</td></tr>
+</table>
+<h3>8.2 端口系统</h3>
+<p>每种建筑有固定的输入/输出端口数和角色（源/汇/中转）：</p>
+<table><tr><th>建筑</th><th>最大输入</th><th>最大输出</th><th>角色</th></tr>
+<tr><td> 碳源采集器</td><td>0</td><td>2</td><td>source</td></tr>
+<tr><td> ATP合成酶</td><td>2</td><td>3</td><td>converter</td></tr>
+<tr><td> 简易提取器</td><td>2</td><td>1</td><td>converter</td></tr>
+<tr><td> 能量缓冲池</td><td>1</td><td>2</td><td>bypass</td></tr>
+<tr><td> 固氮装置</td><td>1</td><td>2</td><td>converter</td></tr>
+<tr><td> 蛋白质工厂</td><td>2</td><td>2</td><td>converter</td></tr>
+<tr><td> DNA提取器</td><td>2</td><td>1</td><td>converter</td></tr>
+<tr><td> 氨基酸合成仪</td><td>2</td><td>1</td><td>bypass</td></tr>
+<tr><td> 核糖体集群</td><td>2</td><td>2</td><td>converter</td></tr>
+<tr><td> 生物膜反应器</td><td>3</td><td>2</td><td>converter</td></tr>
+<tr><td> 菌丝运输网</td><td>0</td><td>0</td><td>boost</td></tr>
+<tr><td> 孢子播种器</td><td>2</td><td>2</td><td>converter</td></tr>
+<tr><td> 代谢回路</td><td>0</td><td>0</td><td>boost</td></tr>
+<tr><td> 生物质转化炉</td><td>2</td><td>1</td><td>bypass</td></tr>
+<tr><td> 噬菌体裂解器</td><td>2</td><td>1</td><td>bypass</td></tr>
+<tr><td> 发酵液泡</td><td>2</td><td>2</td><td>bypass</td></tr>
+<tr><td> 群体感应塔</td><td>1</td><td>2</td><td>converter</td></tr>
+<tr><td> 纳米组装线</td><td>2</td><td>2</td><td>converter</td></tr>
+<tr><td> 信息素广播站</td><td>2</td><td>1</td><td>bypass</td></tr>
+<tr><td> 共振培养箱</td><td>2</td><td>3</td><td>converter</td></tr>
+<tr><td> 微型戴森球</td><td>0</td><td>4</td><td>wonder</td></tr>
+</table>
+<h2 id="ch9" class="page-break">9. 邻接加成系统</h2>
+<p>共 <strong>53</strong> 条邻接规则，当两种建筑相邻放置时触发加成（或惩罚）：</p>
+<table><tr><th>来源建筑</th><th>相邻建筑</th><th>加成</th><th>类型</th></tr>
+<tr><td> 碳源采集器</td><td> 碳源采集器</td>
+       <td><span class="adj-synergy" style="padding:2px 8px;border-radius:4px">+10%</span></td>
+       <td>碳源共振</td></tr>
+<tr><td> ATP合成酶</td><td> ATP合成酶</td>
+       <td><span class="adj-synergy" style="padding:2px 8px;border-radius:4px">+8%</span></td>
+       <td>能量串联</td></tr>
+<tr><td> 固氮装置</td><td> 固氮装置</td>
+       <td><span class="adj-synergy" style="padding:2px 8px;border-radius:4px">+12%</span></td>
+       <td>固氮协同</td></tr>
+<tr><td> 蛋白质工厂</td><td> 蛋白质工厂</td>
+       <td><span class="adj-synergy" style="padding:2px 8px;border-radius:4px">+10%</span></td>
+       <td>蛋白质流水线</td></tr>
+<tr><td> DNA提取器</td><td> DNA提取器</td>
+       <td><span class="adj-synergy" style="padding:2px 8px;border-radius:4px">+8%</span></td>
+       <td>DNA双螺旋</td></tr>
+<tr><td> 生物膜反应器</td><td> 生物膜反应器</td>
+       <td><span class="adj-synergy" style="padding:2px 8px;border-radius:4px">+10%</span></td>
+       <td>生物膜矩阵</td></tr>
+<tr><td> 群体感应塔</td><td> 群体感应塔</td>
+       <td><span class="adj-synergy" style="padding:2px 8px;border-radius:4px">+12%</span></td>
+       <td>群体共振</td></tr>
+<tr><td> ATP合成酶</td><td> 碳源采集器</td>
+       <td><span class="adj-synergy" style="padding:2px 8px;border-radius:4px">+15%</span></td>
+       <td>碳源直供</td></tr>
+<tr><td> 简易提取器</td><td> ATP合成酶</td>
+       <td><span class="adj-synergy" style="padding:2px 8px;border-radius:4px">+12%</span></td>
+       <td>能量直供</td></tr>
+<tr><td> 简易提取器</td><td> 碳源采集器</td>
+       <td><span class="adj-synergy" style="padding:2px 8px;border-radius:4px">+8%</span></td>
+       <td>碳源捷径</td></tr>
+<tr><td> 能量缓冲池</td><td> 碳源采集器</td>
+       <td><span class="adj-synergy" style="padding:2px 8px;border-radius:4px">+10%</span></td>
+       <td>储能直供</td></tr>
+<tr><td> 能量缓冲池</td><td> ATP合成酶</td>
+       <td><span class="adj-synergy" style="padding:2px 8px;border-radius:4px">+15%</span></td>
+       <td>能量回路</td></tr>
+<tr><td> 蛋白质工厂</td><td> 固氮装置</td>
+       <td><span class="adj-synergy" style="padding:2px 8px;border-radius:4px">+12%</span></td>
+       <td>氮源直供</td></tr>
+<tr><td> 固氮装置</td><td> ATP合成酶</td>
+       <td><span class="adj-synergy" style="padding:2px 8px;border-radius:4px">+10%</span></td>
+       <td>ATP催化</td></tr>
+<tr><td> DNA提取器</td><td> 蛋白质工厂</td>
+       <td><span class="adj-synergy" style="padding:2px 8px;border-radius:4px">+15%</span></td>
+       <td>蛋白直供</td></tr>
+<tr><td> 蛋白质工厂</td><td> ATP合成酶</td>
+       <td><span class="adj-synergy" style="padding:2px 8px;border-radius:4px">+8%</span></td>
+       <td>ATP辅助</td></tr>
+<tr><td> DNA提取器</td><td> ATP合成酶</td>
+       <td><span class="adj-synergy" style="padding:2px 8px;border-radius:4px">+8%</span></td>
+       <td>ATP驱动</td></tr>
+<tr><td> 氨基酸合成仪</td><td> 固氮装置</td>
+       <td><span class="adj-synergy" style="padding:2px 8px;border-radius:4px">+12%</span></td>
+       <td>氨基酸捷径</td></tr>
+<tr><td> 氨基酸合成仪</td><td> 碳源采集器</td>
+       <td><span class="adj-synergy" style="padding:2px 8px;border-radius:4px">+10%</span></td>
+       <td>碳骨架直供</td></tr>
+<tr><td> 核糖体集群</td><td> 蛋白质工厂</td>
+       <td><span class="adj-synergy" style="padding:2px 8px;border-radius:4px">+12%</span></td>
+       <td>核糖体协同</td></tr>
+<tr><td> 核糖体集群</td><td> ATP合成酶</td>
+       <td><span class="adj-synergy" style="padding:2px 8px;border-radius:4px">+8%</span></td>
+       <td>翻译加速</td></tr>
+<tr><td> 生物膜反应器</td><td> 碳源采集器</td>
+       <td><span class="adj-synergy" style="padding:2px 8px;border-radius:4px">+10%</span></td>
+       <td>碳源直通</td></tr>
+<tr><td> 生物膜反应器</td><td> 固氮装置</td>
+       <td><span class="adj-synergy" style="padding:2px 8px;border-radius:4px">+12%</span></td>
+       <td>氮源直通</td></tr>
+<tr><td> 生物膜反应器</td><td> ATP合成酶</td>
+       <td><span class="adj-synergy" style="padding:2px 8px;border-radius:4px">+8%</span></td>
+       <td>ATP直通</td></tr>
+<tr><td> 孢子播种器</td><td> 生物膜反应器</td>
+       <td><span class="adj-synergy" style="padding:2px 8px;border-radius:4px">+15%</span></td>
+       <td>生物质通道</td></tr>
+<tr><td> 孢子播种器</td><td> ATP合成酶</td>
+       <td><span class="adj-synergy" style="padding:2px 8px;border-radius:4px">+8%</span></td>
+       <td>弹射加速</td></tr>
+<tr><td> 群体感应塔</td><td> ATP合成酶</td>
+       <td><span class="adj-synergy" style="padding:2px 8px;border-radius:4px">+12%</span></td>
+       <td>能量共鸣</td></tr>
+<tr><td> 纳米组装线</td><td> 群体感应塔</td>
+       <td><span class="adj-synergy" style="padding:2px 8px;border-radius:4px">+18%</span></td>
+       <td>QS直连</td></tr>
+<tr><td> 纳米组装线</td><td> ATP合成酶</td>
+       <td><span class="adj-synergy" style="padding:2px 8px;border-radius:4px">+8%</span></td>
+       <td>组装加速</td></tr>
+<tr><td> 信息素广播站</td><td> 蛋白质工厂</td>
+       <td><span class="adj-synergy" style="padding:2px 8px;border-radius:4px">+12%</span></td>
+       <td>底物直供</td></tr>
+<tr><td> 信息素广播站</td><td> ATP合成酶</td>
+       <td><span class="adj-synergy" style="padding:2px 8px;border-radius:4px">+8%</span></td>
+       <td>广播加速</td></tr>
+<tr><td>*</td><td> 菌丝运输网</td>
+       <td><span class="adj-synergy" style="padding:2px 8px;border-radius:4px">+6%</span></td>
+       <td>菌丝渗透</td></tr>
+<tr><td>*</td><td> 代谢回路</td>
+       <td><span class="adj-synergy" style="padding:2px 8px;border-radius:4px">+5%</span></td>
+       <td>代谢催化</td></tr>
+<tr><td>*</td><td> 能量缓冲池</td>
+       <td><span class="adj-synergy" style="padding:2px 8px;border-radius:4px">+4%</span></td>
+       <td>缓冲增益</td></tr>
+<tr><td> 孢子播种器</td><td> 碳源采集器</td>
+       <td><span class="adj-synergy" style="padding:2px 8px;border-radius:4px">+6%</span></td>
+       <td>孢子培养基</td></tr>
+<tr><td> 群体感应塔</td><td> 生物膜反应器</td>
+       <td><span class="adj-synergy" style="padding:2px 8px;border-radius:4px">+10%</span></td>
+       <td>信号介质</td></tr>
+<tr><td> 纳米组装线</td><td> DNA提取器</td>
+       <td><span class="adj-synergy" style="padding:2px 8px;border-radius:4px">+10%</span></td>
+       <td>纳米模板</td></tr>
+<tr><td> 信息素广播站</td><td> 群体感应塔</td>
+       <td><span class="adj-synergy" style="padding:2px 8px;border-radius:4px">+12%</span></td>
+       <td>信号耦合</td></tr>
+<tr><td> 生物质转化炉</td><td> 蛋白质工厂</td>
+       <td><span class="adj-synergy" style="padding:2px 8px;border-radius:4px">+15%</span></td>
+       <td>蛋白直供</td></tr>
+<tr><td> 生物质转化炉</td><td> 生物膜反应器</td>
+       <td><span class="adj-synergy" style="padding:2px 8px;border-radius:4px">+10%</span></td>
+       <td>生物质共振</td></tr>
+<tr><td colspan="4" style="text-align:center;color:#6b7b8d">… 还有 13 条规则（见 game.js ADJACENCY_RULES）</td></tr>
+</table>
+<h2 id="ch10" class="page-break">10. 进化与变异系统</h2>
+<h3>10.1 进化系统</h3>
+<div class="formula">进化费用 = ⌈12 + 10 × Lv^1.6⌉ DNA （Lv2+需蛋白质，Lv4+需生物质）
+效率奖励 = Lv1-2: +10%  |  Lv3-4: +15%  |  Lv5+: +20%</div>
+<table><tr><th>进化等级</th><th>DNA 花费</th><th>额外需求</th><th>效率加成</th></tr>
+<tr><td>Lv.1</td><td>22</td><td>-</td><td>+10%</td></tr>
+<tr><td>Lv.2</td><td>43</td><td>蛋白质</td><td>+10%</td></tr>
+<tr><td>Lv.3</td><td>70</td><td>蛋白质</td><td>+15%</td></tr>
+<tr><td>Lv.4</td><td>104</td><td>蛋白质 + 生物质</td><td>+15%</td></tr>
+<tr><td>Lv.5</td><td>144</td><td>蛋白质 + 生物质</td><td>+20%</td></tr>
+<tr><td>Lv.6</td><td>188</td><td>蛋白质 + 生物质</td><td>+20%</td></tr>
+<tr><td>Lv.7</td><td>237</td><td>蛋白质 + 生物质</td><td>+20%</td></tr>
+<tr><td>Lv.8</td><td>291</td><td>蛋白质 + 生物质</td><td>+20%</td></tr>
+</table>
+<h3>10.2 变异实验室</h3>
+<p>解锁条件：<strong>P3</strong> + 进化 Lv.4</p>
+<h3><span class="badge" style="background:#8aa0c0">普通</span> 突变 (6)</h3>
+<div class="card-grid">
+<div class="card" style="border-color:#8aa0c033">
+  <div class="card-title">🛡️ 🛡️</div>
+  <div class="card-desc">-</div>
+</div>
+<div class="card" style="border-color:#8aa0c033">
+  <div class="card-title">🔄 🔄</div>
+  <div class="card-desc">-</div>
+</div>
+<div class="card" style="border-color:#8aa0c033">
+  <div class="card-title">🚛 🚛</div>
+  <div class="card-desc">-</div>
+</div>
+<div class="card" style="border-color:#8aa0c033">
+  <div class="card-title">🍯 🍯</div>
+  <div class="card-desc">-</div>
+</div>
+<div class="card" style="border-color:#8aa0c033">
+  <div class="card-title">⚡ ⚡</div>
+  <div class="card-desc">-</div>
+</div>
+<div class="card" style="border-color:#8aa0c033">
+  <div class="card-title">🔵 🔵</div>
+  <div class="card-desc">-</div>
+</div>
+</div>
+<h3><span class="badge" style="background:#22c55e">稀有</span> 突变 (6)</h3>
+<div class="card-grid">
+<div class="card" style="border-color:#22c55e33">
+  <div class="card-title">🔥 🔥</div>
+  <div class="card-desc">-</div>
+</div>
+<div class="card" style="border-color:#22c55e33">
+  <div class="card-title">📡 📡</div>
+  <div class="card-desc">-</div>
+</div>
+<div class="card" style="border-color:#22c55e33">
+  <div class="card-title">🧱 🧱</div>
+  <div class="card-desc">-</div>
+</div>
+<div class="card" style="border-color:#22c55e33">
+  <div class="card-title">🧬 🧬</div>
+  <div class="card-desc">-</div>
+</div>
+<div class="card" style="border-color:#22c55e33">
+  <div class="card-title">🕸️ 🕸️</div>
+  <div class="card-desc">-</div>
+</div>
+<div class="card" style="border-color:#22c55e33">
+  <div class="card-title">🧪 🧪</div>
+  <div class="card-desc">-</div>
+</div>
+</div>
+<h3><span class="badge" style="background:#3b82f6">精良</span> 突变 (6)</h3>
+<div class="card-grid">
+<div class="card" style="border-color:#3b82f633">
+  <div class="card-title">💉 💉</div>
+  <div class="card-desc">-</div>
+</div>
+<div class="card" style="border-color:#3b82f633">
+  <div class="card-title">🌋 🌋</div>
+  <div class="card-desc">-</div>
+</div>
+<div class="card" style="border-color:#3b82f633">
+  <div class="card-title">🔬 🔬</div>
+  <div class="card-desc">-</div>
+</div>
+<div class="card" style="border-color:#3b82f633">
+  <div class="card-title">⚗️ ⚗️</div>
+  <div class="card-desc">-</div>
+</div>
+<div class="card" style="border-color:#3b82f633">
+  <div class="card-title">💎 💎</div>
+  <div class="card-desc">-</div>
+</div>
+<div class="card" style="border-color:#3b82f633">
+  <div class="card-title">🔀 🔀</div>
+  <div class="card-desc">-</div>
+</div>
+</div>
+<h3><span class="badge" style="background:#a855f7">史诗</span> 突变 (5)</h3>
+<div class="card-grid">
+<div class="card" style="border-color:#a855f733">
+  <div class="card-title">✂️ ✂️</div>
+  <div class="card-desc">-</div>
+</div>
+<div class="card" style="border-color:#a855f733">
+  <div class="card-title">🔮 🔮</div>
+  <div class="card-desc">-</div>
+</div>
+<div class="card" style="border-color:#a855f733">
+  <div class="card-title">🧠 🧠</div>
+  <div class="card-desc">-</div>
+</div>
+<div class="card" style="border-color:#a855f733">
+  <div class="card-title">⚛️ ⚛️</div>
+  <div class="card-desc">-</div>
+</div>
+<div class="card" style="border-color:#a855f733">
+  <div class="card-title">🔄 🔄</div>
+  <div class="card-desc">-</div>
+</div>
+</div>
+<h2 id="ch11" class="page-break">11. 转生系统</h2>
+<p>转生（Prestige）系统允许玩家重置进度以换取永久加成"进化因子"。</p>
+<h2 id="ch12" class="page-break">12. 成就系统</h2>
+<p>共 <strong>57</strong> 个成就，按品质分为铜/银/金三级：</p>
+<h3>🥉 铜 (14)</h3>
+<div class="card-grid">
+<div class="card" style="border-color:#cd7f3244">
+  <div class="card-title" style="color:#cd7f32">🏗️ 创世之砖</div>
+  <div class="card-desc">放下第一个建筑</div>
+</div>
+<div class="card" style="border-color:#cd7f3244">
+  <div class="card-title" style="color:#cd7f32">🏘️ 小有规模</div>
+  <div class="card-desc">拥有5个建筑</div>
+</div>
+<div class="card" style="border-color:#cd7f3244">
+  <div class="card-title" style="color:#cd7f32">🍬 糖分过剩</div>
+  <div class="card-desc">葡萄糖累计超过200</div>
+</div>
+<div class="card" style="border-color:#cd7f3244">
+  <div class="card-title" style="color:#cd7f32">⚡ 能量风暴</div>
+  <div class="card-desc">ATP能量超过300</div>
+</div>
+<div class="card" style="border-color:#cd7f3244">
+  <div class="card-title" style="color:#cd7f32">🧬 初次进化</div>
+  <div class="card-desc">完成第一次进化</div>
+</div>
+<div class="card" style="border-color:#cd7f3244">
+  <div class="card-title" style="color:#cd7f32">📖 开拓者</div>
+  <div class="card-desc">完成第一项研究</div>
+</div>
+<div class="card" style="border-color:#cd7f3244">
+  <div class="card-title" style="color:#cd7f32">⚗️ 代谢启动</div>
+  <div class="card-desc">进入阶段2</div>
+</div>
+<div class="card" style="border-color:#cd7f3244">
+  <div class="card-title" style="color:#cd7f32">🦠 百菌汇聚</div>
+  <div class="card-desc">种群达到100</div>
+</div>
+<div class="card" style="border-color:#cd7f3244">
+  <div class="card-title" style="color:#cd7f32">🔧 初试锋芒</div>
+  <div class="card-desc">完成第一次建筑升级</div>
+</div>
+<div class="card" style="border-color:#cd7f3244">
+  <div class="card-title" style="color:#cd7f32">🔗 传输先锋</div>
+  <div class="card-desc">拥有5条传送带连接</div>
+</div>
+<div class="card" style="border-color:#cd7f3244">
+  <div class="card-title" style="color:#cd7f32">⚡ 连线三连</div>
+  <div class="card-desc">达成3连击传送带连接</div>
+</div>
+<div class="card" style="border-color:#cd7f3244">
+  <div class="card-title" style="color:#cd7f32">🔧 入不敷出</div>
+  <div class="card-desc">首次经历维护费导致资源为负</div>
+</div>
+<div class="card" style="border-color:#cd7f3244">
+  <div class="card-title" style="color:#cd7f32">🧬 初次突变</div>
+  <div class="card-desc">激活第一个突变</div>
+</div>
+<div class="card" style="border-color:#cd7f3244">
+  <div class="card-title" style="color:#cd7f32">🧪 培育专家</div>
+  <div class="card-desc">累计培育10次突变</div>
+</div>
+</div>
+<h3>🥈 银 (21)</h3>
+<div class="card-grid">
+<div class="card" style="border-color:#c0c0c044">
+  <div class="card-title" style="color:#c0c0c0">🏙️ 微型都市</div>
+  <div class="card-desc">拥有12个建筑</div>
+</div>
+<div class="card" style="border-color:#c0c0c044">
+  <div class="card-title" style="color:#c0c0c0">🧬 基因宝库</div>
+  <div class="card-desc">DNA累计超过80</div>
+</div>
+<div class="card" style="border-color:#c0c0c044">
+  <div class="card-title" style="color:#c0c0c0">🧪 蛋白质大师</div>
+  <div class="card-desc">蛋白质超过50</div>
+</div>
+<div class="card" style="border-color:#c0c0c044">
+  <div class="card-title" style="color:#c0c0c0">🧬 进化加速</div>
+  <div class="card-desc">达到进化Lv.3</div>
+</div>
+<div class="card" style="border-color:#c0c0c044">
+  <div class="card-title" style="color:#c0c0c0">🔗 物流时代</div>
+  <div class="card-desc">进入阶段3</div>
+</div>
+<div class="card" style="border-color:#c0c0c044">
+  <div class="card-title" style="color:#c0c0c0">📈 效率突破</div>
+  <div class="card-desc">全局效率达到150%</div>
+</div>
+<div class="card" style="border-color:#c0c0c044">
+  <div class="card-title" style="color:#c0c0c0">🦠 千菌浩荡</div>
+  <div class="card-desc">种群达到500</div>
+</div>
+<div class="card" style="border-color:#c0c0c044">
+  <div class="card-title" style="color:#c0c0c0">🔧 强化狂人</div>
+  <div class="card-desc">累计升级10次</div>
+</div>
+<div class="card" style="border-color:#c0c0c044">
+  <div class="card-title" style="color:#c0c0c0">🔗 物流帝国</div>
+  <div class="card-desc">拥有15条传送带连接</div>
+</div>
+<div class="card" style="border-color:#c0c0c044">
+  <div class="card-title" style="color:#c0c0c0">🔗 手动连接大师</div>
+  <div class="card-desc">手动连接3条传送带</div>
+</div>
+<div class="card" style="border-color:#c0c0c044">
+  <div class="card-title" style="color:#c0c0c0">⚡ 连线五杀</div>
+  <div class="card-desc">达成5连击传送带连接</div>
+</div>
+<div class="card" style="border-color:#c0c0c044">
+  <div class="card-title" style="color:#c0c0c0">🔄 初次同步</div>
+  <div class="card-desc">首次达成供给同步加成（同步度≥50%）</div>
+</div>
+<div class="card" style="border-color:#c0c0c044">
+  <div class="card-title" style="color:#c0c0c0">⚡ 涅槃重生</div>
+  <div class="card-desc">从功率危机中恢复到满功率</div>
+</div>
+<div class="card" style="border-color:#c0c0c044">
+  <div class="card-title" style="color:#c0c0c0">📊 收支平衡</div>
+  <div class="card-desc">P2阶段拥有6+建筑且所有资源速率≥0</div>
+</div>
+<div class="card" style="border-color:#c0c0c044">
+  <div class="card-title" style="color:#c0c0c0">🔄 经济复苏</div>
+  <div class="card-desc">从维护费负值恢复到全正（经历过入不敷出后）</div>
+</div>
+<div class="card" style="border-color:#c0c0c044">
+  <div class="card-title" style="color:#c0c0c0">⏱️ 疾风建造</div>
+  <div class="card-desc">3分钟内建造8个建筑</div>
+</div>
+<div class="card" style="border-color:#c0c0c044">
+  <div class="card-title" style="color:#c0c0c0">🍯 糖分帝国</div>
+  <div class="card-desc">葡萄糖超过500</div>
+</div>
+<div class="card" style="border-color:#c0c0c044">
+  <div class="card-title" style="color:#c0c0c0">⚖️ 均衡发展</div>
+  <div class="card-desc">同时拥有4种不同类型的建筑</div>
+</div>
+<div class="card" style="border-color:#c0c0c044">
+  <div class="card-title" style="color:#c0c0c0">🧬 突变满载</div>
+  <div class="card-desc">填满所有基础突变槽(3个)</div>
+</div>
+<div class="card" style="border-color:#c0c0c044">
+  <div class="card-title" style="color:#c0c0c0">💎 精良品质</div>
+  <div class="card-desc">获得一个精良或更高品质的突变</div>
+</div>
+<div class="card" style="border-color:#c0c0c044">
+  <div class="card-title" style="color:#c0c0c0">📖 基因图鉴</div>
+  <div class="card-desc">发现10种不同的突变</div>
+</div>
+</div>
+<h3>🥇 金 (17)</h3>
+<div class="card-grid">
+<div class="card" style="border-color:#ffd70044">
+  <div class="card-title" style="color:#ffd700">🌆 生物大都会</div>
+  <div class="card-desc">拥有20个建筑</div>
+</div>
+<div class="card" style="border-color:#ffd70044">
+  <div class="card-title" style="color:#ffd700">🧬 超级物种</div>
+  <div class="card-desc">达到进化Lv.5</div>
+</div>
+<div class="card" style="border-color:#ffd70044">
+  <div class="card-title" style="color:#ffd700">📡 自动化纪元</div>
+  <div class="card-desc">进入阶段4</div>
+</div>
+<div class="card" style="border-color:#ffd70044">
+  <div class="card-title" style="color:#ffd700">🚀 效率翻倍</div>
+  <div class="card-desc">全局效率达到200%</div>
+</div>
+<div class="card" style="border-color:#ffd70044">
+  <div class="card-title" style="color:#ffd700">🔧 锻造大师</div>
+  <div class="card-desc">累计升级25次</div>
+</div>
+<div class="card" style="border-color:#ffd70044">
+  <div class="card-title" style="color:#ffd700">🔗 物流霸主</div>
+  <div class="card-desc">拥有25条传送带连接</div>
+</div>
+<div class="card" style="border-color:#ffd70044">
+  <div class="card-title" style="color:#ffd700">🔗 物流工程师</div>
+  <div class="card-desc">手动连接8条传送带</div>
+</div>
+<div class="card" style="border-color:#ffd70044">
+  <div class="card-title" style="color:#ffd700">⭐ 满级传送带</div>
+  <div class="card-desc">将任意传送带升级到Lv.5</div>
+</div>
+<div class="card" style="border-color:#ffd70044">
+  <div class="card-title" style="color:#ffd700">🔄 完美同步</div>
+  <div class="card-desc">任意建筑供给同步度达到100%</div>
+</div>
+<div class="card" style="border-color:#ffd70044">
+  <div class="card-title" style="color:#ffd700">🛡️ 永不断电</div>
+  <div class="card-desc">在线10分钟且功率从未低于70%</div>
+</div>
+<div class="card" style="border-color:#ffd70044">
+  <div class="card-title" style="color:#ffd700">📊 高效帝国</div>
+  <div class="card-desc">拥有12+建筑且所有资源速率为正</div>
+</div>
+<div class="card" style="border-color:#ffd70044">
+  <div class="card-title" style="color:#ffd700">⚖️ 供需大师</div>
+  <div class="card-desc">P3阶段10+建筑且无资源竞争惩罚</div>
+</div>
+<div class="card" style="border-color:#ffd70044">
+  <div class="card-title" style="color:#ffd700">⏱️ 闪电进化</div>
+  <div class="card-desc">5分钟内到达阶段2</div>
+</div>
+<div class="card" style="border-color:#ffd70044">
+  <div class="card-title" style="color:#ffd700">🌍 千菌一心</div>
+  <div class="card-desc">种群达到1000</div>
+</div>
+<div class="card" style="border-color:#ffd70044">
+  <div class="card-title" style="color:#ffd700">⚡ 无尽能源</div>
+  <div class="card-desc">ATP能量超过1000</div>
+</div>
+<div class="card" style="border-color:#ffd70044">
+  <div class="card-title" style="color:#ffd700">♻️ 轮回初始</div>
+  <div class="card-desc">完成第一次转生</div>
+</div>
+<div class="card" style="border-color:#ffd70044">
+  <div class="card-title" style="color:#ffd700">🟣 史诗突变</div>
+  <div class="card-desc">获得一个史诗品质的突变</div>
+</div>
+</div>
+<div style="text-align:center;color:#4a5568;margin-top:60px;padding-top:20px;border-top:1px solid #1e2a3a">
+  <p>🧬 微生物帝国 · 游戏设计文档 · v0.9.1</p>
+  <p style="font-size:0.8em">由 generate-doc.js 自动生成 | 2026/3/19 14:13:28</p>
+</div>
+</body></html>

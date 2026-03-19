@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>微生物帝国 - TOEM 手绘风 Demo</title>
+<link href="https://fonts.googleapis.com/css2?family=ZCOOL+KuaiLe&display=swap" rel="stylesheet">
+<style>
+  /* ====== 全局黑白手绘风格 (Monochrome Hand-drawn) ====== */
+  :root {
+    --bg: #f4f4f5; /* 纸张白 */
+    --ink: #18181b; /* 墨水黑 */
+    --ink-light: #52525b; /* 铅笔灰 */
+    --ink-lighter: #a1a1aa; /* 浅灰网点 */
+    --paper-texture: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" opacity="0.03"><rect width="100" height="100" fill="%23fff"/><path d="M0 0h100v100H0z" fill="url(%23noise)"/></svg>');
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  
+  body {
+    background-color: var(--bg);
+    background-image: var(--paper-texture);
+    color: var(--ink);
+    /* 使用卡通手写体 */
+    font-family: 'ZCOOL KuaiLe', cursive, 'Comic Sans MS', sans-serif;
+    height: 100vh;
+    display: flex;
+    overflow: hidden;
+  }
+
+  /* 模拟手绘边缘的不规则圆角 */
+  .doodle-box {
+    border: 3px solid var(--ink);
+    border-radius: 255px 15px 225px 15px/15px 225px 15px 255px;
+    box-shadow: 4px 4px 0px var(--ink-light);
+    background: #fff;
+    transition: all 0.2s;
+  }
+  .doodle-box:hover {
+    transform: translate(-2px, -2px);
+    box-shadow: 6px 6px 0px var(--ink);
+  }
+
+  /* ====== 侧边栏 (UI Panel) ====== */
+  .sidebar {
+    width: 320px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    border-right: 4px solid var(--ink);
+    background: #fff;
+    z-index: 10;
+  }
+
+  .title {
+    font-size: 28px;
+    text-align: center;
+    border-bottom: 3px dashed var(--ink-light);
+    padding-bottom: 10px;
+    letter-spacing: 2px;
+  }
+
+  .res-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .res-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 15px;
+    font-size: 18px;
+  }
+  .res-icon {
+    font-size: 24px;
+    filter: grayscale(100%) contrast(200%); /* 强行把原本的 Emoji 变黑白高对比 */
+  }
+
+  /* ====== 中央培养皿 (Grid Area) ====== */
+  .main {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: relative;
+    background: radial-gradient(circle at center, #fff 0%, #e4e4e7 100%);
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(5, 100px);
+    grid-template-rows: repeat(5, 100px);
+    gap: 10px;
+    padding: 20px;
+  }
+
+  .cell {
+    width: 100px;
+    height: 100px;
+    position: relative;
+    cursor: pointer;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 42px;
+    /* 细胞格子的不规则手绘风 */
+    border-radius: 40% 60% 70% 30% / 40% 50% 60% 50%;
+    border: 3px solid var(--ink);
+    background: #fff;
+    box-shadow: inset -5px -5px 0px rgba(0,0,0,0.1);
+    animation: cellWobble 4s ease-in-out infinite alternate;
+  }
+
+  @keyframes cellWobble {
+    0% { border-radius: 40% 60% 70% 30% / 40% 50% 60% 50%; }
+    100% { border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%; }
+  }
+
+  .cell.empty {
+    border: 2px dashed var(--ink-light);
+    background: transparent;
+    box-shadow: none;
+    animation: none;
+    border-radius: 15px;
+  }
+  .cell.empty:hover {
+    background: rgba(0,0,0,0.05);
+    border-style: solid;
+  }
+
+  /* 建筑内部的黑白 Emoji */
+  .bld-icon {
+    filter: grayscale(100%) brightness(0.8) contrast(150%);
+    position: relative;
+    z-index: 2;
+    animation: bldBounce 1s steps(2) infinite; /* 逐帧动画感 */
+  }
+  
+  @keyframes bldBounce {
+    0% { transform: scale(1) rotate(0deg); }
+    100% { transform: scale(1.05) rotate(2deg); }
+  }
+
+  /* 模拟黑白网点阴影 (Halftone shading) */
+  .halftone-shadow {
+    position: absolute;
+    bottom: 5px;
+    right: 5px;
+    width: 40px;
+    height: 20px;
+    background-image: radial-gradient(var(--ink-light) 20%, transparent 20%);
+    background-size: 4px 4px;
+    border-radius: 50%;
+    opacity: 0.5;
+    z-index: 1;
+  }
+
+  /* 角标也是手绘风 */
+  .badge {
+    position: absolute;
+    top: -5px;
+    left: -5px;
+    background: #fff;
+    border: 2px solid var(--ink);
+    border-radius: 50%;
+    width: 28px;
+    height: 28px;
+    font-size: 14px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-weight: bold;
+    box-shadow: 2px 2px 0px var(--ink);
+    z-index: 5;
+  }
+
+  /* ====== 模拟手绘传送带 (Conveyor Belts) ====== */
+  .belt {
+    position: absolute;
+    background: transparent;
+    z-index: 0;
+    pointer-events: none;
+  }
+  .belt-right {
+    top: 40px;
+    left: 80px;
+    width: 40px;
+    height: 20px;
+    border-top: 3px dashed var(--ink);
+    border-bottom: 3px dashed var(--ink);
+  }
+  
+  /* 传送带上的资源小泡泡 */
+  .belt-item {
+    position: absolute;
+    top: 2px;
+    left: 0;
+    font-size: 12px;
+    filter: grayscale(100%) contrast(200%);
+    animation: moveRight 2s linear infinite;
+  }
+  
+  @keyframes moveRight {
+    0% { left: 0px; transform: scale(0.8) translateY(0); }
+    50% { transform: scale(1) translateY(-2px); }
+    100% { left: 25px; transform: scale(0.8) translateY(0); }
+  }
+
+</style>
+</head>
+<body>
+
+  <!-- 左侧 UI -->
+  <div class="sidebar">
+    <div class="title">🦠 微生物帝国<br><span style="font-size: 14px; color: var(--ink-light)">手绘风格预览</span></div>
+    
+    <div class="res-panel">
+      <div class="doodle-box res-item">
+        <span class="res-icon">🟢</span>
+        <span>葡萄糖</span>
+        <span style="font-weight: bold;">1,250</span>
+      </div>
+      <div class="doodle-box res-item">
+        <span class="res-icon">⚡</span>
+        <span>ATP能量</span>
+        <span style="font-weight: bold;">840</span>
+      </div>
+      <div class="doodle-box res-item">
+        <span class="res-icon">🥩</span>
+        <span>蛋白质</span>
+        <span style="font-weight: bold;">320</span>
+      </div>
+    </div>
+
+    <div style="margin-top: auto; text-align: center; font-size: 14px; color: var(--ink-light);">
+      👈 注意看左边：全黑白边框，带歪歪扭扭的阴影。<br><br>
+      👉 注意看右边：格子变成了不规则的细胞壁，还会轻微蠕动。所有 Emoji 都被 CSS 强行洗成了黑白高对比度！
+    </div>
+  </div>
+
+  <!-- 中央培养皿 -->
+  <div class="main">
+    <div class="grid">
+      <!-- Row 1 -->
+      <div class="cell empty"></div>
+      <div class="cell">
+        <div class="badge">Lv1</div>
+        <div class="halftone-shadow"></div>
+        <div class="bld-icon">🌱</div>
+        
+        <!-- 向右的传送带 -->
+        <div class="belt belt-right">
+          <div class="belt-item">🟢</div>
+        </div>
+      </div>
+      <div class="cell">
+        <div class="badge">Lv2</div>
+        <div class="halftone-shadow"></div>
+        <div class="bld-icon">⚗️</div>
+      </div>
+      <div class="cell empty"></div>
+      <div class="cell empty"></div>
+
+      <!-- Row 2 -->
+      <div class="cell empty"></div>
+      <div class="cell empty"></div>
+      <div class="cell">
+        <div class="badge">★</div>
+        <div class="halftone-shadow"></div>
+        <div class="bld-icon">🧬</div>
+      </div>
+      <div class="cell empty"></div>
+      <div class="cell empty"></div>
+
+      <!-- Row 3 -->
+      <div class="cell">
+        <div class="halftone-shadow"></div>
+        <div class="bld-icon">🦠</div>
+      </div>
+      <div class="cell empty"></div>
+      <div class="cell empty"></div>
+      <div class="cell empty"></div>
+      <div class="cell empty"></div>
+    </div>
+  </div>
+
+</body>
+</html>

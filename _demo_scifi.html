@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>微生物帝国 - 赛博生物科幻风 Demo</title>
+<!-- 引入科幻感极强的字体 -->
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  /* ====== 核心赛博调色板 (Cyber-Biology Palette) ====== */
+  :root {
+    --bg-deep: #050a14;      /* 深海虚空黑 */
+    --neon-cyan: #0ff;       /* 赛博青 (ATP) */
+    --neon-green: #39ff14;   /* 荧光绿 (Glucose) */
+    --neon-purple: #b026ff;  /* 基因紫 (DNA) */
+    --neon-orange: #ff6a00;  /* 能量橙 (Energy) */
+    
+    --panel-bg: rgba(10, 20, 35, 0.6);
+    --panel-border: rgba(0, 255, 255, 0.3);
+    --grid-line: rgba(0, 255, 255, 0.05);
+    
+    --font-mech: 'Orbitron', sans-serif;
+    --font-ui: 'Rajdhani', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background-color: var(--bg-deep);
+    /* 背景带有深邃的网格和微弱的生命脉动感 */
+    background-image: 
+      linear-gradient(var(--grid-line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid-line) 1px, transparent 1px),
+      radial-gradient(circle at 50% 50%, rgba(176, 38, 255, 0.05) 0%, transparent 60%);
+    background-size: 50px 50px, 50px 50px, 100% 100%;
+    color: #fff;
+    font-family: var(--font-ui);
+    height: 100vh;
+    display: flex;
+    overflow: hidden;
+  }
+
+  /* ====== HUD 风格 UI 面板 (Sci-Fi Panel) ====== */
+  .sidebar {
+    width: 340px;
+    padding: 30px;
+    display: flex;
+    flex-direction: column;
+    gap: 25px;
+    /* 切角边框效果 (Clip-path) */
+    background: var(--panel-bg);
+    backdrop-filter: blur(10px);
+    border-right: 2px solid var(--panel-border);
+    box-shadow: 10px 0 30px rgba(0, 255, 255, 0.1);
+    z-index: 10;
+  }
+
+  .title {
+    font-family: var(--font-mech);
+    font-size: 32px;
+    font-weight: 900;
+    text-align: left;
+    color: #fff;
+    text-shadow: 0 0 10px var(--neon-cyan), 0 0 20px var(--neon-cyan);
+    letter-spacing: 2px;
+    border-bottom: 2px solid var(--panel-border);
+    padding-bottom: 15px;
+    position: relative;
+  }
+  .title::after {
+    content: ''; position: absolute; bottom: -2px; left: 0;
+    width: 40px; height: 2px; background: var(--neon-cyan);
+    box-shadow: 0 0 10px var(--neon-cyan);
+  }
+
+  .res-panel { display: flex; flex-direction: column; gap: 15px; }
+
+  /* 资源条框体：类似科幻机甲的切割感 */
+  .res-item {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    padding: 12px 18px;
+    background: rgba(0, 0, 0, 0.4);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 8px;
+    position: relative;
+    overflow: hidden;
+    transition: all 0.3s ease;
+  }
+  .res-item:hover {
+    background: rgba(0, 255, 255, 0.05);
+    border-color: var(--neon-cyan);
+    box-shadow: 0 0 15px rgba(0, 255, 255, 0.2) inset;
+  }
+  /* 左侧的发光装饰条 */
+  .res-item::before {
+    content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px;
+  }
+  .res-item.green::before { background: var(--neon-green); box-shadow: 0 0 8px var(--neon-green); }
+  .res-item.cyan::before { background: var(--neon-cyan); box-shadow: 0 0 8px var(--neon-cyan); }
+  .res-item.purple::before { background: var(--neon-purple); box-shadow: 0 0 8px var(--neon-purple); }
+
+  /* 抽象的几何图标替代 Emoji */
+  .sci-icon {
+    width: 32px; height: 32px;
+    display: flex; justify-content: center; align-items: center;
+    border: 2px solid; border-radius: 6px;
+    font-size: 16px; font-weight: bold;
+    font-family: var(--font-mech);
+  }
+  .green .sci-icon { border-color: var(--neon-green); color: var(--neon-green); box-shadow: 0 0 10px var(--neon-green) inset, 0 0 10px var(--neon-green); transform: rotate(45deg); }
+  .green .sci-icon span { transform: rotate(-45deg); }
+  .cyan .sci-icon { border-color: var(--neon-cyan); color: var(--neon-cyan); box-shadow: 0 0 10px var(--neon-cyan) inset, 0 0 10px var(--neon-cyan); border-radius: 50%; }
+  .purple .sci-icon { border-color: var(--neon-purple); color: var(--neon-purple); box-shadow: 0 0 10px var(--neon-purple) inset, 0 0 10px var(--neon-purple); }
+
+  .res-info { flex: 1; }
+  .res-name { font-size: 16px; font-weight: 700; letter-spacing: 1px; color: #a0b0c0; }
+  .res-val { font-family: var(--font-mech); font-size: 22px; font-weight: 700; text-shadow: 0 0 5px rgba(255,255,255,0.5); }
+  
+  /* 资源底下的发光能量条 */
+  .energy-bar { width: 100%; height: 4px; background: rgba(255,255,255,0.1); margin-top: 5px; border-radius: 2px; overflow: hidden; }
+  .energy-fill { height: 100%; width: 70%; animation: pulse-bar 2s infinite; }
+  .green .energy-fill { background: linear-gradient(90deg, transparent, var(--neon-green)); box-shadow: 0 0 8px var(--neon-green); }
+  .cyan .energy-fill { background: linear-gradient(90deg, transparent, var(--neon-cyan)); box-shadow: 0 0 8px var(--neon-cyan); width: 45%; }
+  .purple .energy-fill { background: linear-gradient(90deg, transparent, var(--neon-purple)); box-shadow: 0 0 8px var(--neon-purple); width: 85%; }
+
+  @keyframes pulse-bar { 0%, 100% { opacity: 0.7; } 50% { opacity: 1; filter: brightness(1.5); } }
+
+  /* ====== 中央深空培养皿 (Grid & Buildings) ====== */
+  .main {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: relative;
+    /* 模拟显微镜下的深渊感 */
+    background: radial-gradient(circle at center, rgba(0, 255, 255, 0.03) 0%, rgba(0,0,0,0.8) 100%);
+  }
+
+  /* 等距视角 (伪 3D) 倾斜网格 */
+  .grid-container {
+    transform: rotateX(55deg) rotateZ(-45deg);
+    transform-style: preserve-3d;
+    box-shadow: 0 0 100px rgba(0, 255, 255, 0.05);
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(4, 120px);
+    grid-template-rows: repeat(4, 120px);
+    gap: 25px;
+    padding: 40px;
+    background: rgba(10, 20, 35, 0.3);
+    border: 1px solid var(--panel-border);
+    border-radius: 20px;
+  }
+
+  /* 发光的生物科技容器 (Sci-Fi Cell) */
+  .cell {
+    width: 120px;
+    height: 120px;
+    position: relative;
+    cursor: pointer;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    /* 模拟厚度：立起来 */
+    transform: translateZ(10px);
+    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    
+    /* 圆角多边形外壳 */
+    background: rgba(5, 15, 25, 0.8);
+    border-radius: 20px;
+    border: 2px solid;
+    backdrop-filter: blur(5px);
+  }
+
+  .cell:hover { transform: translateZ(25px); }
+
+  /* 不同类型建筑的颜色光效 */
+  .cell.type-green { 
+    border-color: var(--neon-green); 
+    box-shadow: 0 0 20px rgba(57, 255, 20, 0.2), inset 0 0 20px rgba(57, 255, 20, 0.1); 
+  }
+  .cell.type-cyan { 
+    border-color: var(--neon-cyan); 
+    box-shadow: 0 0 20px rgba(0, 255, 255, 0.2), inset 0 0 20px rgba(0, 255, 255, 0.1); 
+  }
+  .cell.type-purple { 
+    border-color: var(--neon-purple); 
+    box-shadow: 0 0 20px rgba(176, 38, 255, 0.2), inset 0 0 20px rgba(176, 38, 255, 0.1); 
+  }
+
+  /* 容器内部发光的“核心”图案 */
+  .core-icon {
+    width: 60px;
+    height: 60px;
+    display: flex; justify-content: center; align-items: center;
+    font-size: 32px;
+    font-family: var(--font-mech);
+    /* 让内容始终面向屏幕（抵消父级的旋转） */
+    transform: rotateZ(45deg) rotateX(-55deg) translateZ(20px);
+    filter: drop-shadow(0 0 10px currentColor);
+    animation: corePulse 2s infinite alternate;
+  }
+  .type-green .core-icon { color: var(--neon-green); }
+  .type-cyan .core-icon { color: var(--neon-cyan); }
+  .type-purple .core-icon { color: var(--neon-purple); }
+
+  @keyframes corePulse { 0% { opacity: 0.6; filter: drop-shadow(0 0 5px currentColor) scale(0.95); } 100% { opacity: 1; filter: drop-shadow(0 0 20px currentColor) scale(1.05); } }
+
+  /* 建筑底座（3D阴影感） */
+  .cell::before {
+    content: ''; position: absolute; inset: -2px; border-radius: 20px;
+    transform: translateZ(-20px);
+    background: rgba(0,0,0,0.8);
+    filter: blur(8px);
+    z-index: -1;
+  }
+
+  /* 内部全息网格装饰 */
+  .cell::after {
+    content: ''; position: absolute; inset: 10px; border-radius: 12px;
+    border: 1px dashed rgba(255,255,255,0.2);
+    pointer-events: none;
+  }
+
+  /* 角标：全息投影数据板 */
+  .badge {
+    position: absolute;
+    top: -20px;
+    left: 10px;
+    background: rgba(0,0,0,0.7);
+    border: 1px solid currentColor;
+    color: currentColor;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-family: var(--font-mech);
+    font-size: 12px;
+    font-weight: 700;
+    transform: rotateZ(45deg) rotateX(-55deg) translateZ(30px);
+    box-shadow: 0 0 10px currentColor;
+    letter-spacing: 1px;
+  }
+
+  /* ====== 发光半透明能量管 (Conveyor Tubes) ====== */
+  .tube {
+    position: absolute;
+    background: rgba(255, 255, 255, 0.05);
+    border: 2px solid;
+    border-radius: 10px;
+    z-index: 0;
+    pointer-events: none;
+    backdrop-filter: blur(2px);
+    /* 管道内的流水光效 */
+    overflow: hidden;
+  }
+  /* 连接：从 Cell1 (0,0) 到 Cell2 (0,1) -> 向右 */
+  .tube-right {
+    top: 50px;
+    left: 100px;
+    width: 65px;
+    height: 20px;
+    border-color: rgba(57, 255, 20, 0.3); /* 绿色管道 */
+    box-shadow: 0 0 15px rgba(57, 255, 20, 0.1) inset;
+  }
+  
+  /* 能量管中的光球 (Resource Orb) */
+  .orb {
+    position: absolute;
+    top: 3px;
+    left: -15px;
+    width: 10px;
+    height: 10px;
+    background: var(--neon-green);
+    border-radius: 50%;
+    box-shadow: 0 0 10px 2px var(--neon-green), 0 0 20px var(--neon-green);
+    animation: flowRight 2s linear infinite;
+  }
+  
+  @keyframes flowRight {
+    0% { left: -10px; opacity: 0; }
+    10% { opacity: 1; }
+    90% { opacity: 1; }
+    100% { left: 65px; opacity: 0; }
+  }
+
+  /* 第二根管子：从 (0,1) 到 (1,1) -> 向下 */
+  .tube-down {
+    top: 100px;
+    left: 50px;
+    width: 20px;
+    height: 65px;
+    border-color: rgba(0, 255, 255, 0.3); /* 青色管道 */
+    box-shadow: 0 0 15px rgba(0, 255, 255, 0.1) inset;
+  }
+  .orb-cyan {
+    top: -10px;
+    left: 3px;
+    background: var(--neon-cyan);
+    box-shadow: 0 0 10px 2px var(--neon-cyan), 0 0 20px var(--neon-cyan);
+    animation: flowDown 2s linear infinite;
+    animation-delay: 1s; /* 交错流动 */
+  }
+  @keyframes flowDown {
+    0% { top: -10px; opacity: 0; }
+    10% { opacity: 1; }
+    90% { opacity: 1; }
+    100% { top: 65px; opacity: 0; }
+  }
+
+</style>
+</head>
+<body>
+
+  <!-- 左侧 UI: HUD 发光数据板 -->
+  <div class="sidebar">
+    <div class="title">
+      BIOSPHERE
+      <div style="font-size: 14px; color: var(--neon-cyan); font-weight: 500; font-family: var(--font-ui); text-shadow: none; letter-spacing: 5px; margin-top: 5px;">EMPIRE_SYSTEMS</div>
+    </div>
+    
+    <div class="res-panel">
+      <!-- Glucose -->
+      <div class="res-item green">
+        <div class="sci-icon"><span>G</span></div>
+        <div class="res-info">
+          <div class="res-name">GLUCOSE</div>
+          <div class="energy-bar"><div class="energy-fill"></div></div>
+        </div>
+        <div class="res-val">12,500</div>
+      </div>
+      
+      <!-- ATP -->
+      <div class="res-item cyan">
+        <div class="sci-icon">A</div>
+        <div class="res-info">
+          <div class="res-name">ATP ENERGY</div>
+          <div class="energy-bar"><div class="energy-fill"></div></div>
+        </div>
+        <div class="res-val">8,420</div>
+      </div>
+
+      <!-- DNA -->
+      <div class="res-item purple">
+        <div class="sci-icon">D</div>
+        <div class="res-info">
+          <div class="res-name">DNA SEQUENCE</div>
+          <div class="energy-bar"><div class="energy-fill"></div></div>
+        </div>
+        <div class="res-val">1,024</div>
+      </div>
+    </div>
+
+    <div style="margin-top: auto; font-size: 15px; color: #7f9fbf; line-height: 1.6;">
+      <span style="color: var(--neon-cyan)">[SYSTEM MSG]</span><br>
+      注意看右边的培养皿，我用 CSS 强行写出了 <b>伪3D等距视角</b> (Isometric)。<br><br>
+      建筑变成了发光的悬浮科技容器，传送带变成了 <b>半透明能量软管</b>，资源变成了流动的 <b>光球</b>！
+    </div>
+  </div>
+
+  <!-- 中央培养皿 -->
+  <div class="main">
+    <div class="grid-container">
+      <div class="grid">
+        
+        <!-- Row 1 -->
+        <div class="cell type-green">
+          <div class="badge">LV.1</div>
+          <div class="core-icon">🌿</div> <!-- 用简单的符号代替原先的大Emoji -->
+          
+          <!-- 向右的能量管 -->
+          <div class="tube tube-right">
+            <div class="orb"></div>
+            <div class="orb" style="animation-delay: 1s;"></div>
+          </div>
+        </div>
+
+        <div class="cell type-cyan">
+          <div class="badge" style="color: var(--neon-cyan);">LV.2</div>
+          <div class="core-icon">⚡</div>
+          
+          <!-- 向下的能量管 -->
+          <div class="tube tube-down">
+            <div class="orb orb-cyan"></div>
+            <div class="orb orb-cyan" style="animation-delay: 2s;"></div>
+          </div>
+        </div>
+
+        <div style="visibility: hidden"></div>
+        <div style="visibility: hidden"></div>
+
+        <!-- Row 2 -->
+        <div style="visibility: hidden"></div>
+        <div class="cell type-purple">
+          <div class="badge" style="color: var(--neon-purple);">★ MAX</div>
+          <div class="core-icon">🧬</div>
+        </div>
+        <div style="visibility: hidden"></div>
+        <div style="visibility: hidden"></div>
+        
+        <!-- Row 3 -->
+        <div style="visibility: hidden"></div>
+        <div style="visibility: hidden"></div>
+        <div class="cell type-green" style="filter: hue-rotate(90deg);">
+          <div class="core-icon">🦠</div>
+        </div>
+        <div style="visibility: hidden"></div>
+
+        <!-- Row 4 -->
+        <div style="visibility: hidden"></div>
+        <div style="visibility: hidden"></div>
+        <div style="visibility: hidden"></div>
+        <div style="visibility: hidden"></div>
+
+      </div>
+    </div>
+  </div>
+
+</body>
+</html>

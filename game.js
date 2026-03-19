@@ -1483,6 +1483,33 @@ const ACHIEVE = [
   { id:'mutLegend', n:'🌟 传说降临', d:'获得一个传说品质的突变', tier:'diamond', check: s => s._mutSlots.some(m => MUTATIONS[m.id]?.rarity === 'legend'), reward:{ energy:300, dna:80, protein:50 } },
   { id:'mutCollect10', n:'📖 基因图鉴', d:'发现10种不同的突变', tier:'silver', check: s => s._mutHistory.length >= 10, reward:{ energy:80, dna:30 } },
   { id:'mutBrew10', n:'🧪 培育专家', d:'累计培育10次突变', tier:'bronze', check: s => s._mutBrewCount >= 10, reward:{ energy:60, dna:15 } },
+  // ★ v0.9.3：邻接加成成就
+  { id:'adjFirst', n:'🔗 初次共振', d:'首个建筑获得邻接加成', tier:'bronze', check: s => {
+    for (let i = 0; i < s.grid.length; i++) { if (s.grid[i] && s.getAdjacencyBonus(i).bonus > 0) return true; } return false;
+  }, reward:{ energy:30, glucose:20 } },
+  { id:'adjCount5', n:'🔗 供给链达人', d:'5栋建筑同时有邻接加成', tier:'silver', check: s => {
+    let c = 0; for (let i = 0; i < s.grid.length; i++) { if (s.grid[i] && s.getAdjacencyBonus(i).bonus > 0) c++; } return c >= 5;
+  }, reward:{ energy:60, dna:15 } },
+  { id:'adjTotal50', n:'🔗 空间规划师', d:'全局邻接加成总和达50%', tier:'silver', check: s => {
+    let t = 0; for (let i = 0; i < s.grid.length; i++) { if (s.grid[i]) t += s.getAdjacencyBonus(i).bonus; } return t >= 0.50;
+  }, reward:{ energy:80, dna:20, protein:10 } },
+  { id:'adjSingle30', n:'🔗 完美邻接', d:'单栋建筑邻接加成≥30%', tier:'gold', check: s => {
+    for (let i = 0; i < s.grid.length; i++) { if (s.grid[i] && s.getAdjacencyBonus(i).bonus >= 0.30) return true; } return false;
+  }, reward:{ energy:120, dna:30, protein:15 } },
+  { id:'adjTotal100', n:'🔗 协同大师', d:'全局邻接加成总和达100%', tier:'gold', check: s => {
+    let t = 0; for (let i = 0; i < s.grid.length; i++) { if (s.grid[i]) t += s.getAdjacencyBonus(i).bonus; } return t >= 1.00;
+  }, reward:{ energy:150, dna:40, protein:20 } },
+  { id:'adjAll', n:'🔗 共生网络', d:'所有已建建筑都有邻接加成', tier:'diamond', check: s => {
+    let hasBuilding = false;
+    for (let i = 0; i < s.grid.length; i++) {
+      if (!s.grid[i]) continue;
+      const bd = BLDS[s.grid[i].type];
+      if (!bd || bd.isBoost || bd.isWonder) continue;
+      hasBuilding = true;
+      if (s.getAdjacencyBonus(i).bonus <= 0) return false;
+    }
+    return hasBuilding;
+  }, reward:{ energy:200, dna:60, protein:30 } },
 ];
 
 // ===== ACHIEVEMENT CATEGORIES =====
@@ -1501,6 +1528,7 @@ const ACHV_CATEGORIES = {
   'speed':    { name:'速度', icon:'⏱️', ids:['speedPhase2','speedBuild8'] },
   'prestige': { name:'转生', icon:'♻️', ids:['firstPrestige','prestige3'] },
   'mutation': { name:'变异', icon:'🧬', ids:['mutFirst','mutSlotsFull','mutRare','mutEpic','mutLegend','mutCollect10','mutBrew10'] },
+  'adjacency': { name:'邻接', icon:'🔗', ids:['adjFirst','adjCount5','adjTotal50','adjSingle30','adjTotal100','adjAll'] },
 };
 
 const ACHV_TIER_LABELS = { bronze:'铜', silver:'银', gold:'金', diamond:'钻石' };
@@ -5275,6 +5303,10 @@ const G = {
       return;
     }
 
+    // ★ v0.9.3：记录放置前的全局邻接加成总量
+    this._invalidateAdjStats();
+    const _prevAdjTotal = this._getAdjStats().totalBonus;
+
     this.spend(actualCost);
     this.grid[idx] = { type: this.sel };
 
@@ -5342,6 +5374,15 @@ const G = {
 
     // v2.0: 放置后清除邻接预览
     this._clearAdjPreview();
+
+    // ★ v0.9.3：邻接加成变化飘字
+    this._invalidateAdjStats();
+    const _newAdjTotal = this._getAdjStats().totalBonus;
+    if (_newAdjTotal > _prevAdjTotal + 0.001) {
+      const oldPct = Math.round(_prevAdjTotal * 100);
+      const newPct = Math.round(_newAdjTotal * 100);
+      this._showAdjFloat(`🔗 总邻接 +${oldPct}% → +${newPct}%`, idx);
+    }
 
     // 爽感系统
     this.stats.totalBuilt++;
@@ -5640,6 +5681,36 @@ const G = {
     setTimeout(() => el.remove(), 2000);
   },
 
+  // ★ v0.9.3：邻接加成变化飘字 — 从放置的格子位置浮出
+  _showAdjFloat(text, cellIdx) {
+    const cell = document.querySelector(`.cell[data-i="${cellIdx}"]`);
+    if (!cell) return;
+    const rect = cell.getBoundingClientRect();
+    const el = document.createElement('div');
+    el.className = 'score-float';
+    el.textContent = text;
+    el.style.color = '#06d6a0';
+    el.style.textShadow = '0 0 12px rgba(6,214,160,0.5), 0 0 24px rgba(6,214,160,0.3)';
+    el.style.left = (rect.left + rect.width / 2) + 'px';
+    el.style.top = (rect.top - 10) + 'px';
+    el.style.transform = 'translateX(-50%)';
+    el.style.fontSize = '0.85em';
+    el.style.whiteSpace = 'nowrap';
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 2500);
+  },
+
+  // ★ v0.9.3：点击 Top 5 排行中的建筑，高亮对应格子
+  _focusCell(idx) {
+    document.querySelectorAll('.cell.cell-selected').forEach(c => c.classList.remove('cell-selected'));
+    const cell = document.querySelector(`.cell[data-i="${idx}"]`);
+    if (!cell) return;
+    cell.classList.add('cell-selected');
+    cell.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+    clearTimeout(this._cellSelTimer);
+    this._cellSelTimer = setTimeout(() => { cell.classList.remove('cell-selected'); }, 3000);
+  },
+
   showAchievement(name, desc, reward, tier) {
     this._enqueueNotify({
       dur: tier === 'diamond' ? 6000 : tier === 'gold' ? 5000 : 4500,
@@ -5815,7 +5886,11 @@ const G = {
     // 10. 奇观完成 — 终极大分
     if (this.wonderComplete) score += 2000;
 
-    // 11. 效率奖励 — 越快到达高阶段，分数越高（在线时长短=高效率）
+    // 11. 邻接加成 — 每10%总加成=25分（封顶200分）
+    const adjStats = this._getAdjStats();
+    score += Math.min(200, Math.floor(adjStats.totalBonus * 10 * 25));
+
+    // 12. 效率奖励 — 越快到达高阶段，分数越高（在线时长短=高效率）
     //     前30分钟不扣分，之后每小时-50分（但不低于0扣减）
     const hours = Math.max(0, this.stats.onlineTime / 3600 - 0.5);
     const timePenalty = Math.min(Math.floor(hours * 50), Math.floor(score * 0.15)); // 最多扣15%
@@ -5885,7 +5960,7 @@ const G = {
       </div>
       ${rows}
       <div style="text-align:center;margin-top:8px;padding-top:6px;border-top:1px solid rgba(255,255,255,0.04);color:var(--dim);font-size:0.75em">
-        分数 = 阶段 + 进化 + 建筑 + 科技 + 成就 + 挑战 + 资源峰值 + 效率 − 时间惩罚
+        分数 = 阶段 + 进化 + 建筑 + 科技 + 成就 + 挑战 + 资源峰值 + 效率 + 邻接加成 − 时间惩罚
       </div>
     `;
 
@@ -5925,6 +6000,7 @@ const G = {
 
     const _resets = parseInt(localStorage.getItem('bioResetCount') || '0', 10);
     const _highScore = parseInt(localStorage.getItem('bioHighScore') || '0', 10);
+    const adjStats = this._getAdjStats();
     const historyRows = _resets > 0 ? `
       <div style="border-top:1px solid rgba(251,191,36,0.1);margin-top:4px;padding-top:4px">
         <div class="stat-row"><span class="stat-label">📜 历史最高分</span><span class="stat-value" style="color:#fbbf24">${formatNum(Math.max(this.calcScore(), _highScore))}</span></div>
@@ -5942,6 +6018,7 @@ const G = {
       <div class="stat-row"><span class="stat-label">🧬 峰值DNA</span><span class="stat-value">${formatNum(this.stats.peakDna)}</span></div>
       <div class="stat-row"><span class="stat-label">🦠 峰值种群</span><span class="stat-value">${formatNum(this.stats.peakPop || 0)}</span></div>
       <div class="stat-row"><span class="stat-label">🏆 成就</span><span class="stat-value">${Object.keys(this.achievements).length}/${ACHIEVE.length}</span></div>
+      <div class="stat-row"><span class="stat-label">🔗 邻接加成</span><span class="stat-value" style="color:${adjStats.adjCount > 0 ? '#06d6a0' : 'var(--dim)'}">${adjStats.adjCount > 0 ? `×${adjStats.adjCount}栋 · +${Math.round(adjStats.totalBonus * 100)}%` : '无'}</span></div>
       <div class="stat-row"><span class="stat-label">🎯 挑战完成</span><span class="stat-value">${Object.keys(this.completedChallenges).length}/${CHALLENGES.length}</span></div>${historyRows}
       <div style="text-align:center;padding:6px 0 2px;border-top:1px solid rgba(255,255,255,0.06);margin-top:4px">
         <button onclick="G.shareScore()" style="font-size:0.7em;padding:4px 14px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:4px;color:var(--blue);cursor:pointer;transition:all 0.2s" onmouseover="this.style.background='rgba(59,130,246,0.12)'" onmouseout="this.style.background='rgba(255,255,255,0.06)'">📋 复制分数卡片</button>
@@ -5964,6 +6041,7 @@ const G = {
 
     const highScore = parseInt(localStorage.getItem('bioHighScore') || '0', 10);
     const resets = parseInt(localStorage.getItem('bioResetCount') || '0', 10);
+    const adjS = this._getAdjStats();
     const highLine = resets > 0 ? `\n📜 历史最高: ${formatNum(Math.max(score, highScore))}  |  重置: ${resets}次` : '';
 
     const card = [
@@ -5973,8 +6051,8 @@ const G = {
       `⏱ 在线: ${timeStr}  |  📡 阶段: P${this.phase}`,
       `🧬 进化: Lv.${this.eL}  |  📈 效率: ${Math.round(this.gEff*100)}%`,
       `🏗️ 建筑: ${this.totalBuildings()}  |  🦠 峰值种群: ${formatNum(this.stats.peakPop || 0)}`,
-      `📖 科技: ${techDone}/${Object.keys(TECHS).length}  |  🏆 成就: ${achieves}/${ACHIEVE.length}`,
-      `🎯 挑战: ${challenges}/${CHALLENGES.length}${this.wonderComplete ? '  |  ☀️ 戴森球已完成!' : ''}${highLine}`,
+      `🔗 邻接: ${adjS.adjCount}栋 +${Math.round(adjS.totalBonus * 100)}%  |  📖 科技: ${techDone}/${Object.keys(TECHS).length}`,
+      `🏆 成就: ${achieves}/${ACHIEVE.length}  |  🎯 挑战: ${challenges}/${CHALLENGES.length}${this.wonderComplete ? '  |  ☀️ 戴森球已完成!' : ''}${highLine}`,
       ``,
       `═══════════════════════`,
     ].join('\n');
@@ -6586,6 +6664,35 @@ const G = {
   // ★ 改进3：获取当前阶段已解锁的邻接规则数量
   getUnlockedAdjacencyCount() {
     return ADJACENCY_RULES.filter(r => !r.phase || r.phase <= this.phase).length;
+  },
+
+  // ★ v0.9.3：全局邻接加成统计（带5秒缓存，避免重复计算）
+  _adjStatsCache: null,
+  _adjStatsCacheTime: 0,
+  _getAdjStats() {
+    const now = Date.now();
+    if (this._adjStatsCache && now - this._adjStatsCacheTime < 5000) return this._adjStatsCache;
+    let totalBonus = 0, adjCount = 0, bestIdx = -1, bestBonus = 0;
+    const top5 = [];
+    for (let i = 0; i < this.grid.length; i++) {
+      if (!this.grid[i]) continue;
+      const adj = this.getAdjacencyBonus(i);
+      if (adj.bonus > 0) {
+        adjCount++;
+        totalBonus += adj.bonus;
+        top5.push({ idx: i, type: this.grid[i].type, bonus: adj.bonus, details: adj.details });
+        if (adj.bonus > bestBonus) { bestBonus = adj.bonus; bestIdx = i; }
+      }
+    }
+    top5.sort((a, b) => b.bonus - a.bonus);
+    this._adjStatsCache = { totalBonus, adjCount, bestIdx, bestBonus, top5: top5.slice(0, 5) };
+    this._adjStatsCacheTime = now;
+    return this._adjStatsCache;
+  },
+
+  // 强制刷新邻接统计缓存
+  _invalidateAdjStats() {
+    this._adjStatsCacheTime = 0;
   },
 
   // ★ 方案F：计算所有多输入建筑的供给同步加成
@@ -11174,8 +11281,11 @@ const G = {
     const beltCount = belts.length;
 
     // --- 计算数据指纹（轻量级） ---
-    // 包含：活跃链条数、传送带数量、每条传送带的key+等级
+    // 包含：活跃链条数、传送带数量、每条传送带的key+等级、邻接统计
     let hashParts = [];
+    // ★ v0.9.3：邻接统计纳入hash
+    const adjHash = this._getAdjStats();
+    hashParts.push('ADJ:' + adjHash.adjCount + ':' + Math.round(adjHash.totalBonus * 100));
     CHAINS.forEach(ch => {
       const active = ch.reqs.every(r => this.grid.some(g => g && g.type === r));
       if (active) hashParts.push('C:' + ch.n);
@@ -11198,6 +11308,35 @@ const G = {
     // --- 以下为原有的 DOM 重建逻辑 ---
     list.innerHTML = '';
     let hasActive = false;
+
+    // --- ★ v0.9.3：邻接加成统计行 ---
+    const adjStats = this._getAdjStats();
+    if (adjStats.adjCount > 0) {
+      hasActive = true;
+      const adjRow = document.createElement('div');
+      adjRow.style.cssText = 'padding:5px 0;border-bottom:1px solid rgba(6,214,160,0.08);display:flex;justify-content:space-between;align-items:center';
+      const bestName = adjStats.bestIdx >= 0 && this.grid[adjStats.bestIdx] ? (BLDS[this.grid[adjStats.bestIdx].type]?.emoji || '') + (BLDS[this.grid[adjStats.bestIdx].type]?.n || '') : '';
+      adjRow.innerHTML = `<span style="color:#06d6a0;font-size:0.95em">🔗 邻接加成 ×<span style="font-weight:700">${adjStats.adjCount}</span>条 · <span style="font-weight:700">+${Math.round(adjStats.totalBonus * 100)}%</span></span>`
+        + (bestName ? `<span style="font-size:0.8em;color:var(--dim)">最强: ${bestName} +${Math.round(adjStats.bestBonus * 100)}%</span>` : '');
+      list.appendChild(adjRow);
+
+      // ★ v0.9.3：邻接 Top 5 小排行
+      if (adjStats.top5.length > 0) {
+        const medals = ['🥇','🥈','🥉','④','⑤'];
+        const top5El = document.createElement('div');
+        top5El.style.cssText = 'padding:2px 0 4px 6px;border-bottom:1px solid rgba(6,214,160,0.05);font-size:0.78em;color:var(--dim);line-height:1.6';
+        let top5Html = '';
+        adjStats.top5.forEach((item, i) => {
+          const bld = BLDS[item.type];
+          const name = (bld?.emoji || '') + (bld?.n || '?');
+          const pct = Math.round(item.bonus * 100);
+          const pctColor = pct >= 30 ? '#fbbf24' : pct >= 15 ? '#06d6a0' : '#8aa0c0';
+          top5Html += `<span style="cursor:pointer;display:inline-block;margin-right:6px" onclick="G._focusCell(${item.idx})">${medals[i]} ${name} <span style="color:${pctColor};font-weight:600">+${pct}%</span></span>`;
+        });
+        top5El.innerHTML = top5Html;
+        list.appendChild(top5El);
+      }
+    }
 
     // --- 流水线链展示 ---
     CHAINS.forEach(ch => {
