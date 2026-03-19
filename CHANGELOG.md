@@ -8,7 +8,7 @@
 
 > **Endgame Climax System**
 > 本版本为游戏终局添加了宏大的高潮演出系统,包括史诗级音效、文明编年史弹窗和视觉特效,为玩家的完整旅程画上震撼的句点。
-> 代码变更：game.js +430/-11 行，index.html +430/-11 行
+> 代码变更：game.js +432/-12 行，index.html +441/-11 行
 
 ### ✨ 新功能 — 史诗终章音效 (Finale Soundtrack)
 - [office] 新增 `wonderFinale()` 音效方法：4阶段渐进式史诗终章
@@ -41,7 +41,13 @@
   - CSS 变量控制动画方向（`--dx`, `--dy`）
   - 渐隐 + 缩放消失效果
 
-### 🎨 视觉 / UI 调整
+### 🎨 视觉 / UI 调整 — 方案D：建筑格子视觉降噪
+- [office] **Lv.1 角标默认隐藏**：`.tier-lv1` 类 `opacity:0` + `translateX(-4px)`，hover 时 0.3s 滑入显示
+- [office] **序号角标半透明化**：`.cell-seq` 默认 `opacity:0.45`，hover 时全亮，减少视觉噪音
+- [office] **Lv.2+ / ★MAX 不受影响**：升级后等级角标始终常驻显示，保留有意义的信息
+- [office] JS 端 Lv.1 分支新增 `tier-lv1` class 标记，配合 CSS 选择器实现差异化显示
+
+### 🎨 视觉 / UI 调整 — 终局视觉效果
 - [office] 新增 `.chronicle-*` 系列 CSS 类：弹窗标题、副标题、旅程、统计、引言、按钮
 - [office] 新增 `.finale-*` 系列 CSS 类：金色飘字、粒子喷发
 - [office] 新增 `.wonder-flash-overlay`、`.wonder-ripple`、`.afterglow-overlay` 覆盖层样式

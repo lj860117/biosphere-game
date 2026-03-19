@@ -2695,6 +2695,17 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
   font-family:'Share Tech Mono',monospace;font-size:0.48em;font-weight:700;
   background:rgba(0,0,0,0.65);padding:var(--sp-3xs) var(--sp-xs-sm);border-radius:2px;
   pointer-events:none;letter-spacing:0.5px;
+  opacity:0.45;transition:opacity 0.3s ease;
+}
+.cell:hover .cell-seq{opacity:1}
+
+/* ===== 方案D增强：Lv.1 默认隐藏，hover淡入；升级后常驻 ===== */
+.cell-tier.tier-lv1{
+  opacity:0;transform:translateX(-4px);
+  transition:opacity 0.3s ease,transform 0.3s ease;
+}
+.cell:hover .cell-tier.tier-lv1{
+  opacity:1;transform:translateX(0);
 }
 
 /* ===== MOBILE TAB BAR ===== */

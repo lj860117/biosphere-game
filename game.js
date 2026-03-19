@@ -3910,7 +3910,7 @@ const G = {
         emojiEl.textContent = bd.emoji || '🔧';
         cell.appendChild(emojiEl);
 
-        // Tier等级角标 — 始终显示等级信息
+        // Tier等级角标 — 方案D：Lv.1默认隐藏(hover淡入)，升级后常驻
         const bldLv = this.buildingLevels[i] || 1;
         const tierEl = document.createElement('div');
         tierEl.className = 'cell-tier tier-' + (bd.tier || 1);
@@ -3924,6 +3924,7 @@ const G = {
           tierEl.style.color = 'var(--color-upgrade)';
           tierEl.style.borderColor = 'rgba(251,191,36,0.38)';
         } else {
+          tierEl.classList.add('tier-lv1');  // 方案D：标记Lv.1，CSS控制隐藏/hover显示
           tierEl.textContent = 'Lv.1';
           tierEl.style.color = 'var(--color-muted)';
           tierEl.style.borderColor = 'rgba(90,122,154,0.25)';
