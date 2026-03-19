@@ -60,6 +60,7 @@
 - [office] 新增 HTML 结构：闪光、涟漪、余晖、编年史弹窗等 DOM 元素
 
 ### 🐛 Bug 修复
+- [office] 修复 `.cell-seq` 序号角标与等级角标重叠：旧定义残留 `bottom/left` 未被重置，新增 `bottom:auto;left:auto` 确保右上角定位生效
 - [office] 修复技能树（`skill-tree`）display 样式被错误覆盖的问题
 - [office] 确保编年史弹窗关闭时正确清理状态
 
