@@ -4,6 +4,60 @@
 
 ---
 
+## v0.9.3 — 2026-03-21 · 建筑系统2.0完善 + 距离-效率衰减
+
+> **Building System 2.0 Polish + Distance-Efficiency Decay (INTEGRATED_DESIGN §4)**
+> 建筑系统2.0收尾（休眠、冲击预览、邻接图鉴、端口突变/转生、P3分散解锁、引导视觉统一），以及融合设计文档§4距离-效率衰减系统全部实施。
+> 代码变更：game.js +719/-148 行，index.html +83/-17 行
+
+### ✨ 新功能 — 距离-效率衰减（INTEGRATED_DESIGN §4）
+- [home] `getBeltDistance(beltKey)` — 新增曼哈顿距离计算函数
+- [home] `_distanceEfficiency(dist)` — 距离衰减查找表：1格=100%, 2格=92%, 3格=80%, 4格=65%
+- [home] `getBeltEfficiency()` 整合距离衰减：效率 = 等级效率 × 距离因子
+- [home] 远距传送带维护费 — 距离≥3时扣除ATP: `0.3 × (dist - 2)` /s
+- [home] 连线高亮时显示距离+效率标签（`belt-dist-badge`），远距目标橙色、近距青色
+- [home] 传送带tooltip增加距离衰减%和维护费信息
+- [home] 传送带渲染：远距线条按distScale缩细（0.92/0.8/0.65）
+
+### 🏆 新成就 — 远距传送带（4项）
+- [home] `longBelt2` 远程传输（2格首次）、`longBelt3` 远程物流（3格首次）
+- [home] `longBelt4` 物流大师（4格首次）、`longBelt10` 网络编织者（累计10条远距）
+- [home] 首次远距弹窗提示（showEvent），含策略引导文案
+- [home] stats追踪：`maxBeltDist`, `longBeltCount`
+
+### ✨ 新功能 — 建筑休眠系统（v2.1）
+- [home] 右键菜单→💤休眠/☀️唤醒，休眠建筑不生产不消耗，维护费降至25%
+- [home] 休眠建筑灰色虚线边框 + 顶部灰色badge脉冲动画
+- [home] 休眠传送带灰色渲染、停止货物传输
+- [home] 回收时自动清除休眠状态
+
+### ✨ 新功能 — 建造前资源冲击预览（v2.1）
+- [home] 空格hover（按Space）显示建造成本占比+速率变化+赤字警告
+
+### ✨ 新功能 — 邻接图鉴面板（v2.1 §10.4）
+- [home] 邻接发现追踪系统 + 邻接图鉴UI面板
+- [home] 邻接发现成就
+
+### ✨ 新功能 — 端口突变/转生加成（v2.1 §9.2/§9.3）
+- [home] 突变端口加成（branchPipeline/hubNode extraIn/extraOut）
+- [home] 转生端口扩展（inf_port）
+- [home] 菌丝运输网加成提升至20%（0.05→0.10）+ beltCapBonus 0.30
+
+### ✨ 新功能 — P3配方分散解锁（v2.1 §8.2）
+- [home] 培养皿P3+配方按探索进度分散解锁
+- [home] 解锁引导提示
+
+### 🎨 视觉 / UI 调整
+- [home] 引导系统视觉统一为琥珀金色系（#fbbf24）：呼吸高亮、提示条、箭头浮层
+- [home] 箭头字体放大 0.6em→0.78em + text-shadow发光
+
+### 📄 文档
+- [home] 新增 INTEGRATED_DESIGN.md — 节奏×连线融合设计 v1.0
+- [home] 新增 PACING_ENHANCEMENT.md — 节奏增强方案（已被INTEGRATED_DESIGN替代）
+- [home] BUILDING_SYSTEM_2_0.md 更新至 v2.1（Checklist 100%）
+
+---
+
 ## v0.9.2 — 2026-03-19 · 邻接分数热力图 — 可视化放置引导系统
 
 > **Adjacency Score Heatmap**

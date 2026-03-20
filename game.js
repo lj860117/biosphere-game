@@ -678,10 +678,13 @@ function hasAvailablePort(idx, direction) {
   if (!type) return false;
   const def = PORT_DEFS[type];
   if (!def) return true;
-  const max = direction === 'in' ? def.maxIn : def.maxOut;
   // 科技加成：自适应物流 +1 输出端口
   const techExtra = (direction === 'out' && G._extraOutPorts) ? G._extraOutPorts : 0;
-  return getUsedPorts(idx, direction) < (max + techExtra);
+  // v2.1 §9.2/§9.3: 突变+转生端口加成
+  const mpb = G._mutPortBonuses?.[type];
+  const mutExtra = mpb ? (direction === 'out' ? mpb.extraOut : mpb.extraIn) : 0;
+  const max = direction === 'in' ? def.maxIn : def.maxOut;
+  return getUsedPorts(idx, direction) < (max + techExtra + mutExtra);
 }
 
 /**
@@ -1126,7 +1129,7 @@ const TECHS = {
     n:'自适应物流', phase:3, cost:{ dna:22, biomass:8 }, time:30,
     d:'智能物流路径规划', ef:'菌丝运输网加成→20%，全局+1输出端口，传送带容量+30%',
     req:['biofilmTech'], exclusive:['symbioticNetwork'],
-    fn: s => { s._transportBonus = (s._transportBonus || 0) + 0.05; s._extraOutPorts = 1; s._beltCapBonus = 0.30 },
+    fn: s => { s._transportBonus = (s._transportBonus || 0) + 0.10; s._extraOutPorts = 1; s._beltCapBonus = 0.30 }, // v2.1: 0.05→0.10 使菌丝运输网加成从15%→20%
   },
   symbioticNetwork: {
     n:'共生网络', phase:3, cost:{ protein:18, biomass:10 }, time:35,
@@ -1446,6 +1449,11 @@ const ACHIEVE = [
   { id:'manualBelt8', n:'🔗 物流工程师', d:'手动连接8条传送带', tier:'gold', check: s => Object.keys(s.manualBelts || {}).length >= 8, reward:{ energy:100, dna:25, protein:10 } },
   { id:'beltCombo3', n:'⚡ 连线三连', d:'达成3连击传送带连接', tier:'bronze', check: s => (s.stats.maxBeltCombo || 0) >= 3, reward:{ energy:40, glucose:25 } },
   { id:'beltCombo5', n:'⚡ 连线五杀', d:'达成5连击传送带连接', tier:'silver', check: s => (s.stats.maxBeltCombo || 0) >= 5, reward:{ energy:80, dna:20 } },
+  // v3.0 §4: 远距传送带成就
+  { id:'longBelt2', n:'🔗 远程传输', d:'首次建立2格距离的传送带', tier:'bronze', check: s => (s.stats.maxBeltDist || 0) >= 2, reward:{ energy:10 } },
+  { id:'longBelt3', n:'🔗 远程物流', d:'首次建立3格距离的传送带', tier:'silver', check: s => (s.stats.maxBeltDist || 0) >= 3, reward:{ energy:20, glucose:3 } },
+  { id:'longBelt4', n:'🔗 物流大师', d:'首次建立4格距离的传送带', tier:'gold', check: s => (s.stats.maxBeltDist || 0) >= 4, reward:{ energy:30, glucose:5 } },
+  { id:'longBelt10', n:'🔗 网络编织者', d:'累计建立10条远距(2格+)传送带', tier:'gold', check: s => (s.stats.longBeltCount || 0) >= 10, reward:{ energy:50, dna:10 } },
   { id:'beltLv5', n:'⭐ 满级传送带', d:'将任意传送带升级到Lv.5', tier:'gold', check: s => Object.values(s.beltLevels || {}).some(lv => lv >= 5), reward:{ energy:100, dna:20 } },
   { id:'firstSync', n:'🔄 初次同步', d:'首次达成供给同步加成（同步度≥50%）', tier:'silver', check: s => Object.values(s._syncBonuses || {}).some(sb => sb.sync >= 0.5), reward:{ energy:60, dna:15 } },
   { id:'perfectSync', n:'🔄 完美同步', d:'任意建筑供给同步度达到100%', tier:'gold', check: s => Object.values(s._syncBonuses || {}).some(sb => sb.sync >= 0.99), reward:{ energy:150, dna:35, protein:20 } },
@@ -1483,6 +1491,11 @@ const ACHIEVE = [
   { id:'mutLegend', n:'🌟 传说降临', d:'获得一个传说品质的突变', tier:'diamond', check: s => s._mutSlots.some(m => MUTATIONS[m.id]?.rarity === 'legend'), reward:{ energy:300, dna:80, protein:50 } },
   { id:'mutCollect10', n:'📖 基因图鉴', d:'发现10种不同的突变', tier:'silver', check: s => s._mutHistory.length >= 10, reward:{ energy:80, dna:30 } },
   { id:'mutBrew10', n:'🧪 培育专家', d:'累计培育10次突变', tier:'bronze', check: s => s._mutBrewCount >= 10, reward:{ energy:60, dna:15 } },
+  // v2.1 §10.4: 邻接发现成就
+  { id:'adj5', n:'🔗 初识协同', d:'发现5条邻接规则', tier:'bronze', check: s => Object.keys(s._discoveredAdj||{}).length >= 5, reward:{ glucose:30, energy:20 } },
+  { id:'adj15', n:'🔗 邻接学徒', d:'发现15条邻接规则', tier:'silver', check: s => Object.keys(s._discoveredAdj||{}).length >= 15, reward:{ energy:60, dna:15 } },
+  { id:'adj30', n:'🔗 协同大师', d:'发现30条邻接规则', tier:'gold', check: s => Object.keys(s._discoveredAdj||{}).length >= 30, reward:{ energy:120, dna:30, protein:20 } },
+  { id:'adjAll', n:'🔗 完美图鉴', d:'发现所有当前可用的邻接规则', tier:'diamond', check: s => { const u = ADJACENCY_RULES.filter(r => !r.phase || r.phase <= s.phase).length; return u > 0 && Object.keys(s._discoveredAdj||{}).length >= u; }, reward:{ energy:250, dna:60, protein:40 } },
 ];
 
 // ===== ACHIEVEMENT CATEGORIES =====
@@ -1501,6 +1514,7 @@ const ACHV_CATEGORIES = {
   'speed':    { name:'速度', icon:'⏱️', ids:['speedPhase2','speedBuild8'] },
   'prestige': { name:'转生', icon:'♻️', ids:['firstPrestige','prestige3'] },
   'mutation': { name:'变异', icon:'🧬', ids:['mutFirst','mutSlotsFull','mutRare','mutEpic','mutLegend','mutCollect10','mutBrew10'] },
+  'adjacency': { name:'邻接', icon:'🔗', ids:['adj5','adj15','adj30','adjAll'] },
 };
 
 const ACHV_TIER_LABELS = { bronze:'铜', silver:'银', gold:'金', diamond:'钻石' };
@@ -1576,6 +1590,9 @@ const GUIDE = {
     { check: s => Object.values(s._syncBonuses || {}).some(sb => sb.sync >= 0.5 && sb.sync < 0.85), text:'🔄 同步生效中！传送带颜色变绿表示供给平衡，继续优化让所有输入都满载 → 金色光效=完美同步！', icon:'✨' },
     { check: s => s.bldCount('biofilmReactor') > 0 && s.bldCount('transport') === 0 && Object.values(s._syncBonuses || {}).some(sb => sb.sync >= 0.5), text:'建造「菌丝运输网」— 全局产出+10%！多造叠加效率', icon:'🔗' },
     { check: s => s.bldCount('transport') > 0, text:'多造运输网叠加效率，目标+30%以上！别忘了升级传送带（点线条→升级）', icon:'📈' },
+    // v2.1 §8.2: 培养皿P3配方分散解锁引导
+    { check: s => s.bldCount('transport') > 0 && s.bldCount('biofilmReactor') >= 1 && !s._petriP3Unlocked, text:'🧫 高阶实验配方｜再建造1个生物膜反应器（共需2个）+ 菌丝运输网 → 解锁P3培养皿配方！', icon:'🧫' },
+    { check: s => s._petriP3Unlocked && s._petriCount < 8, text:'🧫 新配方已解锁！在培养皿实验中放置P3建筑组合，触发生物膜培育、菌丝渗透等高阶配方', icon:'🧫' },
     // v2.0 §11.3: 资源竞争启用教学（P3+3分钟）
     { check: s => s._competitionEnabled && !s._competitionTutorialShown, text:'⚖️ 供需平衡｜资源竞争系统已启用！当某种资源的消耗接近产出时，所有消费建筑效率会下降。保持充足的资源供给，或者减少不必要的消费者', icon:'⚖️', once:'competitionTutorial' },
     // ★ 资源竞争教学（已激活后持续提示）
@@ -2075,6 +2092,7 @@ const G = {
   _prevSyncState: {},      // 上一帧同步状态（用于检测阈值跨越）
   _beltCombo: 0,           // ★ 方案A：传送带连击计数
   _beltComboTimer: null,   // 传送带连击计时器
+  _beltMaintCost: 0,       // v3.0 §4: 远距传送带维护费总计
   // ★ 方案A+C：维护费与资源竞争
   _maintenanceCost: {},    // 当前帧总维护费 { energy: X, glucose: Y, ... }
   _maintenanceOverhead: 1, // 当前管理开销倍率
@@ -2105,6 +2123,8 @@ const G = {
   _competitionEnabled: false,       // 资源竞争系统已启用
   _competitionTutorialShown: false, // 资源竞争教学已显示
   _portFullShown: false,            // 首次端口满提示已显示
+  // v2.1 §8.2: 培养皿P3+配方分散解锁
+  _petriP3Unlocked: false,          // P3+配方是否已解锁（需2×生物膜反应器+菌丝运输网）
 
   // ===== INIT =====
   init() {
@@ -3887,6 +3907,18 @@ const G = {
         if (portDef) {
           cell.classList.add('role-' + portDef.role);
         }
+        // v2.1: 休眠建筑视觉
+        if (this._dormantCells[i]) {
+          cell.classList.add('dormant');
+          cell.style.borderColor = '';  // 清除内联色，让CSS class接管
+        }
+        // v2.1: 休眠状态badge（顶部灰色标签）
+        const dormBadge = document.createElement('div');
+        dormBadge.className = 'cell-dormant-badge';
+        dormBadge.id = 'dormantBadge-' + i;
+        dormBadge.textContent = '💤 休眠中';
+        dormBadge.style.display = this._dormantCells[i] ? 'block' : 'none';
+        cell.appendChild(dormBadge);
 
         // 主题色 L 型色标（左竖条 + 顶横条）
         const stripe = document.createElement('div');
@@ -3986,10 +4018,14 @@ const G = {
         // v2.0 §4 — 端口UI视觉渲染（基于PORT_DEFS，P2+才显示）
         if (this.phase >= 2 && portDef && (portDef.maxIn > 0 || portDef.maxOut > 0)) {
           const techExtra = this._extraOutPorts || 0;
+          // v2.1 §9.2/§9.3: 突变+转生端口加成
+          const mpb = this._mutPortBonuses?.[btype];
+          const mutExtraIn = mpb ? mpb.extraIn : 0;
+          const mutExtraOut = mpb ? mpb.extraOut : 0;
           const usedIn = getUsedPorts(i, 'in');
           const usedOut = getUsedPorts(i, 'out');
-          const totalMaxIn = portDef.maxIn;
-          const totalMaxOut = portDef.maxOut + techExtra;
+          const totalMaxIn = portDef.maxIn + mutExtraIn;
+          const totalMaxOut = portDef.maxOut + techExtra + mutExtraOut;
 
           // 输入端口（左侧半圆形）
           if (totalMaxIn > 0) {
@@ -4141,7 +4177,7 @@ const G = {
         self.showCursorTooltip('已取消建造');
         return;
       }
-      if (self.grid[idx]) self.showRecycle(idx);
+      if (self.grid[idx]) self.showBuildingContextMenu(idx, e);
     });
 
     gridEl.addEventListener('mouseenter', (e) => {
@@ -4169,38 +4205,51 @@ const G = {
         self._dragOverIdx = idx;
       }
       if (!self.grid[idx]) {
-        // 邻接预览 tooltip：空格子且有预览数据时显示加成明细
-        if (self._adjPreviewData && self._adjPreviewData[idx]) {
-          const p = self._adjPreviewData[idx];
+        const hasAdj = self._adjPreviewData && self._adjPreviewData[idx];
+        const hasSel = !!self.sel;
+        if (hasAdj || hasSel) {
           const tt = document.getElementById('tooltip');
-          const bld = BLDS[self.sel];
-          const bldName = bld ? `${bld.emoji||''} ${bld.n}` : self.sel;
-          let html = `<span style="color:#06d6a0;font-weight:700">🔗 邻接加成预览</span> — 放置 ${bldName}`;
-          // 正向加成明细
-          const forward = p.result.bonuses.filter(b => !b.isReverse);
-          if (forward.length > 0) {
-            html += `<br><span style="color:#22d3ee;font-size:0.85em;margin-top:2px;display:inline-block">▼ 自身获得：+${Math.round(p.forwardPct * 100)}%</span>`;
-            for (const b of forward) {
-              const nType = self.grid[b.neighborIdx]?.type;
-              const nBld = nType ? BLDS[nType] : null;
-              const nName = nBld ? `${nBld.emoji||''} ${nBld.n}` : '?';
-              html += `<br><span style="color:#06d6a080;font-size:0.85em">  ${b.rule.icon} ${b.rule.name} +${Math.round(b.bonus * 100)}% ← ${nName}</span>`;
+          const bld = hasSel ? BLDS[self.sel] : null;
+          const bldName = bld ? `${bld.emoji||''} ${bld.n}` : (self.sel || '');
+          let html = '';
+          let ttTitle = '';
+
+          // 邻接预览部分
+          if (hasAdj) {
+            const p = self._adjPreviewData[idx];
+            html += `<span style="color:#06d6a0;font-weight:700">🔗 邻接加成预览</span> — 放置 ${bldName}`;
+            const forward = p.result.bonuses.filter(b => !b.isReverse);
+            if (forward.length > 0) {
+              html += `<br><span style="color:#22d3ee;font-size:0.85em;margin-top:2px;display:inline-block">▼ 自身获得：+${Math.round(p.forwardPct * 100)}%</span>`;
+              for (const b of forward) {
+                const nType = self.grid[b.neighborIdx]?.type;
+                const nBld = nType ? BLDS[nType] : null;
+                const nName = nBld ? `${nBld.emoji||''} ${nBld.n}` : '?';
+                html += `<br><span style="color:#06d6a080;font-size:0.85em">  ${b.rule.icon} ${b.rule.name} +${Math.round(b.bonus * 100)}% ← ${nName}</span>`;
+              }
             }
-          }
-          // 反向加成明细
-          const reverse = p.result.bonuses.filter(b => b.isReverse);
-          if (reverse.length > 0) {
-            html += `<br><span style="color:#fbbf24;font-size:0.85em;margin-top:2px;display:inline-block">▼ 邻居受益：+${Math.round(p.reversePct * 100)}%</span>`;
-            for (const b of reverse) {
-              const nType = self.grid[b.neighborIdx]?.type;
-              const nBld = nType ? BLDS[nType] : null;
-              const nName = nBld ? `${nBld.emoji||''} ${nBld.n}` : '?';
-              html += `<br><span style="color:#fbbf2480;font-size:0.85em">  ${b.rule.icon} ${b.rule.name} +${Math.round(b.bonus * 100)}% → ${nName}</span>`;
+            const reverse = p.result.bonuses.filter(b => b.isReverse);
+            if (reverse.length > 0) {
+              html += `<br><span style="color:#fbbf24;font-size:0.85em;margin-top:2px;display:inline-block">▼ 邻居受益：+${Math.round(p.reversePct * 100)}%</span>`;
+              for (const b of reverse) {
+                const nType = self.grid[b.neighborIdx]?.type;
+                const nBld = nType ? BLDS[nType] : null;
+                const nName = nBld ? `${nBld.emoji||''} ${nBld.n}` : '?';
+                html += `<br><span style="color:#fbbf2480;font-size:0.85em">  ${b.rule.icon} ${b.rule.name} +${Math.round(b.bonus * 100)}% → ${nName}</span>`;
+              }
             }
+            html += `<br><span style="color:#fff;font-weight:700;font-size:0.9em;margin-top:3px;display:inline-block">∑ 综合加成：+${Math.round(p.totalPct * 100)}%</span>`;
+            ttTitle = `🔗 邻接分数：<span style="color:#06d6a0;font-weight:700">+${Math.round(p.totalPct * 100)}%</span>`;
           }
-          // 总计
-          html += `<br><span style="color:#fff;font-weight:700;font-size:0.9em;margin-top:3px;display:inline-block">∑ 综合加成：+${Math.round(p.totalPct * 100)}%</span>`;
-          document.getElementById('ttName').innerHTML = `🔗 邻接分数：<span style="color:#06d6a0;font-weight:700">+${Math.round(p.totalPct * 100)}%</span>`;
+
+          // v2.1: 资源冲击预览部分
+          if (hasSel) {
+            const impact = self._calcBuildImpact(self.sel, idx);
+            html += self._renderBuildImpactHTML(impact);
+            if (!ttTitle) ttTitle = `📊 ${bldName} — 建造预览`;
+          }
+
+          document.getElementById('ttName').innerHTML = ttTitle;
           document.getElementById('ttDesc').innerHTML = html;
           tt.classList.add('show');
           tt.style.left = Math.min(e.clientX + 12, window.innerWidth - 280) + 'px';
@@ -4347,11 +4396,16 @@ const G = {
         const usedIn = getUsedPorts(idx, 'in');
         const usedOut = getUsedPorts(idx, 'out');
         const techExtra = self._extraOutPorts || 0;
-        const maxOutEff = portDef.maxOut + techExtra;
-        const freeIn = portDef.maxIn - usedIn;
+        // v2.1 §9.2/§9.3: 突变+转生端口加成
+        const mpb = self._mutPortBonuses?.[gridType];
+        const mutExtraIn = mpb ? mpb.extraIn : 0;
+        const mutExtraOut = mpb ? mpb.extraOut : 0;
+        const maxInEff = portDef.maxIn + mutExtraIn;
+        const maxOutEff = portDef.maxOut + techExtra + mutExtraOut;
+        const freeIn = maxInEff - usedIn;
         const freeOut = maxOutEff - usedOut;
         const portColor = (freeIn === 0 && freeOut === 0) ? '#facc15' : (freeIn > 0 || freeOut > 0) ? '#06d6a0' : '#888';
-        portStr = `<br><span style="color:${portColor};font-size:0.9em">📥 输入: ${usedIn}/${portDef.maxIn}${freeIn > 0 ? ` (空闲${freeIn})` : ''} 📤 输出: ${usedOut}/${maxOutEff}${freeOut > 0 ? ` (空闲${freeOut})` : ''}</span>`;
+        portStr = `<br><span style="color:${portColor};font-size:0.9em">📥 输入: ${usedIn}/${maxInEff}${freeIn > 0 ? ` (空闲${freeIn})` : ''} 📤 输出: ${usedOut}/${maxOutEff}${freeOut > 0 ? ` (空闲${freeOut})` : ''}</span>`;
         if (freeIn === 0 && freeOut === 0) portStr += `<br><span style="color:#facc15;font-size:0.85em">✨ 端口满载！</span>`;
       }
       // 资源竞争影响
@@ -4483,12 +4537,13 @@ const G = {
         collectorSeq++;
       }
 
-      // 更新资源阻塞状态
+      // 更新资源阻塞状态（休眠建筑排除——它是主动停机，不是阻塞）
       const overlayEl = document.getElementById('blockOverlay-' + idx);
       const badgeEl = document.getElementById('blockBadge-' + idx);
       if (overlayEl || badgeEl) {
+        const isDormant = !!this._dormantCells[idx];
         const beltMult = this.getBeltMultiplierForBuilding(idx);
-        const isBlocked = beltMult === 0;
+        const isBlocked = !isDormant && beltMult === 0;
         const gridEl = document.getElementById('grid');
         const cellEl = gridEl && gridEl.children[idx];
         if (cellEl) {
@@ -4496,6 +4551,12 @@ const G = {
         }
         if (overlayEl) overlayEl.style.display = isBlocked ? 'block' : 'none';
         if (badgeEl) badgeEl.style.display = isBlocked ? 'block' : 'none';
+      }
+      // v2.1: 更新休眠状态badge
+      const dormBadgeEl = document.getElementById('dormantBadge-' + idx);
+      if (dormBadgeEl) {
+        const isDorm = !!this._dormantCells[idx];
+        dormBadgeEl.style.display = isDorm ? 'block' : 'none';
       }
 
       // 更新邻接加成badge
@@ -5355,9 +5416,237 @@ const G = {
     }
   },
 
+  // ===== BUILD IMPACT PREVIEW (建造前资源冲击预览) =====
+  _calcBuildImpact(bldType, targetIdx) {
+    const bd = BLDS[bldType];
+    if (!bd) return null;
+    const result = { cost: {}, costPct: {}, rateChanges: {}, warnings: [] };
+
+    // 1. 建造成本 & 库存占比
+    const actualCost = this.scaledCost(bldType);
+    for (let k in actualCost) {
+      result.cost[k] = actualCost[k];
+      const have = this.res[k] || 0;
+      result.costPct[k] = have > 0 ? Math.round(actualCost[k] / have * 100) : 999;
+      if (have < actualCost[k]) {
+        result.warnings.push(`${RES[k]?.icon||k} 不足`);
+      }
+    }
+
+    // 2. 预估速率变化（基于当前全局乘数的近似值）
+    if (!bd.isWonder && !bd.isBoost) {
+      // 产出侧乘数估算
+      const popEffMult = this._popEffMult || 1;
+      const harvestPop = Math.min(this.pop, this._popCap()) * (this.popAlloc.harvest / 100);
+      const popMult = 1 + harvestPop * 0.003 * popEffMult;
+      let techBonus = 1;
+      if (bldType === 'glucoseCollector' && this._collectorBonus) techBonus += this._collectorBonus;
+      if (bldType === 'energyStation' && this._energyBonus) techBonus += this._energyBonus;
+      if (bldType === 'nitrogenFixer' && this._nitrogenBonus) techBonus += this._nitrogenBonus;
+      if (bldType === 'proteinFactory' && this._proteinBonus) techBonus += this._proteinBonus;
+      // 邻接预估
+      let adjBonus = 1;
+      if (targetIdx != null) {
+        const adjR = previewAdjacencyBonuses(targetIdx, bldType);
+        const fwd = adjR.bonuses.filter(b => !b.isReverse).reduce((s, b) => s + b.bonus, 0);
+        adjBonus = 1 + fwd;
+      }
+      const globalProdMult = this._prodMult || 1;
+      const mutGlobalBonus = 1 + (this._mutActiveEffects?.globalProdBonus || 0);
+      const gEff = this.gEff || 1;
+      const foodPwr = this._foodPowerLevel || 1;
+      const prodMult = gEff * popMult * techBonus * adjBonus * foodPwr * globalProdMult * mutGlobalBonus;
+
+      for (let k in (bd.prod || {})) {
+        const mutResBonus = 1 + (this._mutActiveEffects?.resProdBonus?.[k] || 0);
+        result.rateChanges[k] = (result.rateChanges[k] || 0) + bd.prod[k] * prodMult * mutResBonus;
+      }
+      for (let k in (bd.cons || {})) {
+        result.rateChanges[k] = (result.rateChanges[k] || 0) - bd.cons[k]; // 消耗以基础值计（Lv1无传送带）
+      }
+
+      // 3. 维护费影响
+      if (this.phase >= 2) {
+        const tier = bd.phase || 1;
+        const baseMaint = MAINTENANCE.baseCost[tier];
+        if (baseMaint && !MAINTENANCE.exempt.includes(bldType)) {
+          const totalBld = this.totalBuildings();
+          const excess = Math.max(0, totalBld + 1 - MAINTENANCE.overheadThreshold);
+          const overhead = Math.min(1 + excess * MAINTENANCE.overheadRate, MAINTENANCE.maxOverhead);
+          for (let k in baseMaint) {
+            result.rateChanges[k] = (result.rateChanges[k] || 0) - baseMaint[k] * overhead;
+          }
+        }
+      }
+
+      // 4. 核心供给检查
+      if (bd.corePowered) {
+        const cc = CORE_COLONY[this.phase] || CORE_COLONY[1];
+        const maxC = (cc.maxCollectors || 2) + (this._coreBonus || 0);
+        const cur = this.bldCount(bldType);
+        if (cur >= maxC) {
+          result.warnings.push('⚠ 超出核心供给上限（将闲置）');
+        }
+      }
+
+      // 5. 关键资源警告：建造后某资源净速率变负
+      for (let k in result.rateChanges) {
+        const curRate = this.rates[k] || 0;
+        const newRate = curRate + result.rateChanges[k];
+        if (curRate >= 0 && newRate < -0.01) {
+          result.warnings.push(`⚠ ${RES[k]?.icon||k} 将变为赤字`);
+        }
+      }
+    } else if (bd.isBoost) {
+      result.rateChanges = { _boost: 0.12 }; // 全局+12%
+    }
+
+    return result;
+  },
+
+  _renderBuildImpactHTML(impact) {
+    if (!impact) return '';
+    let html = `<br><span style="color:var(--bright);font-weight:700;font-size:0.9em;margin-top:4px;display:inline-block;border-top:1px solid rgba(150,170,190,0.15);padding-top:4px;width:100%">📊 建造冲击预览</span>`;
+
+    // 建造成本
+    html += `<br><span style="color:var(--dim);font-size:0.82em">建造花费：</span>`;
+    for (let k in impact.cost) {
+      const pct = impact.costPct[k];
+      const color = pct > 90 ? '#ef4444' : pct > 60 ? '#f59e0b' : '#22c55e';
+      html += `<span style="color:${color};font-size:0.82em"> ${RES[k]?.icon||k}${formatNum(impact.cost[k])}(${pct}%)</span>`;
+    }
+
+    // 速率变化
+    const rKeys = Object.keys(impact.rateChanges).filter(k => k !== '_boost' && Math.abs(impact.rateChanges[k]) > 0.005);
+    if (rKeys.length > 0) {
+      html += `<br><span style="color:var(--dim);font-size:0.82em">速率影响（/秒）：</span>`;
+      for (const k of rKeys) {
+        const v = impact.rateChanges[k];
+        const sign = v > 0 ? '+' : '';
+        const color = v > 0 ? '#22c55e' : '#ef4444';
+        html += `<br><span style="color:${color};font-size:0.82em;padding-left:8px">${RES[k]?.icon||k} ${sign}${formatNum(v, 2)}/s</span>`;
+        // 显示建造后的新净速率
+        const curRate = this.rates[k] || 0;
+        const newRate = curRate + v;
+        const nColor = newRate >= 0 ? 'var(--dim)' : '#ef4444';
+        html += `<span style="color:${nColor};font-size:0.75em"> (${formatNum(curRate, 2)}→${formatNum(newRate, 2)})</span>`;
+      }
+    }
+    if (impact.rateChanges._boost) {
+      html += `<br><span style="color:#14b8a6;font-size:0.82em;padding-left:8px">✦ 全局产出 +${Math.round(impact.rateChanges._boost * 100)}%</span>`;
+    }
+
+    // 警告
+    if (impact.warnings.length > 0) {
+      for (const w of impact.warnings) {
+        html += `<br><span style="color:#ef4444;font-weight:700;font-size:0.82em">${w}</span>`;
+      }
+    }
+
+    return html;
+  },
+
+  // ===== BUILDING DORMANCY (建筑休眠) =====
+  _dormantCells: {}, // { cellIdx: true }
+
+  isDormant(idx) {
+    return !!this._dormantCells[idx];
+  },
+
+  toggleDormant(idx) {
+    const g = this.grid[idx];
+    if (!g || !BLDS[g.type]) return;
+    const bd = BLDS[g.type];
+    if (bd.isWonder) { this.log('奇观不可休眠', 'w'); return; }
+    if (bd.corePowered) { this.log('核心供能建筑不可休眠', 'w'); return; }
+
+    if (this._dormantCells[idx]) {
+      // 唤醒
+      delete this._dormantCells[idx];
+      this.log(`▸ ${bd.emoji||''} ${bd.n} 已唤醒`, 's');
+      SFX.build();
+    } else {
+      // 休眠
+      this._dormantCells[idx] = true;
+      this.log(`💤 ${bd.emoji||''} ${bd.n} 已休眠 — 停止生产，维护费降至25%`, 'w');
+      SFX.click();
+    }
+
+    this.renderGrid();
+    this.updateRates();
+    this.renderBuildings();
+    this.updateUI();
+  },
+
   // ===== RECYCLE =====
   recycleIdx: null,
   RECYCLE_RATE: 0.5, // 返还50%资源
+
+  // ===== BUILDING CONTEXT MENU (右键菜单) =====
+  showBuildingContextMenu(idx, e) {
+    const g = this.grid[idx];
+    if (!g || !BLDS[g.type]) return;
+    const bd = BLDS[g.type];
+
+    // 移除旧的上下文菜单
+    document.getElementById('bldContextMenu')?.remove();
+
+    const menu = document.createElement('div');
+    menu.id = 'bldContextMenu';
+    menu.style.cssText = `position:fixed;z-index:10010;background:rgba(6,10,18,0.96);border:1px solid rgba(150,170,190,0.25);border-radius:6px;padding:6px;box-shadow:0 4px 20px rgba(0,0,0,0.6);font-size:0.82em;min-width:140px`;
+
+    const isDormant = this.isDormant(idx);
+    const canDormant = !bd.isWonder && !bd.corePowered;
+
+    let html = `<div style="color:var(--bright);font-weight:700;padding:4px 8px;border-bottom:1px solid rgba(150,170,190,0.12);margin-bottom:4px">${bd.emoji||''} ${bd.n}</div>`;
+
+    // 休眠/唤醒按钮
+    if (canDormant) {
+      if (isDormant) {
+        html += `<div class="ctx-item ctx-wake" data-action="dormant" style="display:flex;align-items:center;gap:6px;padding:6px 8px;cursor:pointer;border-radius:4px;color:#22c55e;transition:background 0.15s" onmouseenter="this.style.background='rgba(34,197,94,0.1)'" onmouseleave="this.style.background=''">☀️ 唤醒</div>`;
+      } else {
+        html += `<div class="ctx-item ctx-dormant" data-action="dormant" style="display:flex;align-items:center;gap:6px;padding:6px 8px;cursor:pointer;border-radius:4px;color:#fbbf24;transition:background 0.15s" onmouseenter="this.style.background='rgba(251,191,36,0.1)'" onmouseleave="this.style.background=''">💤 休眠</div>`;
+      }
+    }
+
+    // 回收按钮
+    html += `<div class="ctx-item ctx-recycle" data-action="recycle" style="display:flex;align-items:center;gap:6px;padding:6px 8px;cursor:pointer;border-radius:4px;color:#ef4444;transition:background 0.15s" onmouseenter="this.style.background='rgba(239,68,68,0.1)'" onmouseleave="this.style.background=''">♻️ 回收</div>`;
+
+    menu.innerHTML = html;
+
+    // 定位
+    const x = (e?.clientX || 200);
+    const y = (e?.clientY || 200);
+    menu.style.left = Math.min(x, window.innerWidth - 160) + 'px';
+    menu.style.top = Math.min(y, window.innerHeight - 120) + 'px';
+
+    // 事件
+    menu.addEventListener('click', (ev) => {
+      const item = ev.target.closest('[data-action]');
+      if (!item) return;
+      menu.remove();
+      if (item.dataset.action === 'dormant') {
+        this.toggleDormant(idx);
+      } else if (item.dataset.action === 'recycle') {
+        this.showRecycle(idx);
+      }
+    });
+
+    // 点击其他地方关闭
+    const closeHandler = (ev) => {
+      if (!menu.contains(ev.target)) {
+        menu.remove();
+        document.removeEventListener('click', closeHandler, true);
+        document.removeEventListener('contextmenu', closeHandler, true);
+      }
+    };
+    setTimeout(() => {
+      document.addEventListener('click', closeHandler, true);
+      document.addEventListener('contextmenu', closeHandler, true);
+    }, 50);
+
+    document.body.appendChild(menu);
+  },
 
   showRecycle(idx) {
     const g = this.grid[idx];
@@ -5412,6 +5701,8 @@ const G = {
     this.grid[idx] = null;
     this.recycleIdx = null;
     this.stats.totalRecycled++;
+    // v2.1: 回收时清除休眠状态
+    delete this._dormantCells[idx];
     // 清理与该格子相关的传送带等级记录
     for (const key of Object.keys(this.beltLevels)) {
       const [a, b] = key.split('-').map(Number);
@@ -6532,6 +6823,12 @@ const G = {
       const ruleBonus = rule.bonus * stacks;
       totalBonus += ruleBonus;
       details.push({ name: rule.name, icon: rule.icon, bonus: ruleBonus, count: stacks });
+      // v2.1 §10.4: 追踪已发现的邻接规则
+      const rIdx = ADJACENCY_RULES.indexOf(rule);
+      if (!this._discoveredAdj) this._discoveredAdj = {};
+      if (!this._discoveredAdj[rIdx]) {
+        this._discoveredAdj[rIdx] = true;
+      }
     }
 
     // v2.0 §10.5: 虚拟邻接（传送带直连建筑，加成为物理邻接的50%，最多2条）
@@ -6586,6 +6883,77 @@ const G = {
   // ★ 改进3：获取当前阶段已解锁的邻接规则数量
   getUnlockedAdjacencyCount() {
     return ADJACENCY_RULES.filter(r => !r.phase || r.phase <= this.phase).length;
+  },
+
+  // v2.1 §10.4: 邻接图鉴面板
+  showAdjGuide() {
+    const disc = this._discoveredAdj || {};
+    const discovered = Object.keys(disc).length;
+    const unlocked = this.getUnlockedAdjacencyCount();
+    const total = ADJACENCY_RULES.length;
+    const pct = unlocked > 0 ? Math.round(discovered / unlocked * 100) : 0;
+
+    // 分类显示
+    const categories = {
+      '同类协同': [], '核心供给链': [], '特殊增益': [],
+      '跨阶段协同': [], '旁路专属': [], '发酵液泡': [],
+    };
+    const catNames = ['同类协同', '核心供给链', '特殊增益', '跨阶段协同', '旁路专属', '发酵液泡'];
+    let catIdx = 0;
+    for (let i = 0; i < ADJACENCY_RULES.length; i++) {
+      const rule = ADJACENCY_RULES[i];
+      // 根据规则索引确定类别（参照ADJACENCY_RULES的分段注释）
+      if (i <= 6) catIdx = 0;
+      else if (i <= 39) catIdx = 1;
+      else if (i <= 46) catIdx = 2;
+      else if (i <= 54) catIdx = 3;
+      else if (i <= 67) catIdx = 4;
+      else catIdx = 5;
+      const cat = catNames[catIdx];
+      const isUnlocked = !rule.phase || rule.phase <= this.phase;
+      const isDiscovered = !!disc[i];
+      categories[cat].push({ rule, idx: i, isUnlocked, isDiscovered });
+    }
+
+    let html = `<div style="max-height:70vh;overflow-y:auto;padding:8px">`;
+    html += `<div style="text-align:center;margin-bottom:8px">`;
+    html += `<div style="font-size:1.1em;font-weight:700;color:var(--cyan)">🔗 邻接图鉴</div>`;
+    html += `<div style="color:var(--dim);font-size:0.8em;margin-top:4px">已发现 ${discovered}/${unlocked} | 解锁率 ${pct}% | 总规则 ${total}</div>`;
+    // 进度条
+    html += `<div style="width:100%;height:6px;background:#333;border-radius:3px;margin-top:6px"><div style="width:${pct}%;height:100%;background:linear-gradient(90deg,#14b8a6,#06d6a0);border-radius:3px;transition:width 0.3s"></div></div>`;
+    html += `</div>`;
+
+    for (const catName of catNames) {
+      const items = categories[catName];
+      if (items.length === 0) continue;
+      const discCount = items.filter(it => it.isDiscovered).length;
+      html += `<div style="margin-top:10px;font-weight:600;color:#ccc;font-size:0.78em;border-bottom:1px solid #333;padding-bottom:3px">${catName} <span style="color:var(--dim)">(${discCount}/${items.length})</span></div>`;
+      for (const it of items) {
+        if (!it.isUnlocked) {
+          html += `<div style="font-size:0.7em;color:#555;padding:2px 4px">🔒 ???×??? <span style="font-size:0.85em">(P${it.rule.phase}解锁)</span></div>`;
+        } else if (!it.isDiscovered) {
+          html += `<div style="font-size:0.7em;color:#666;padding:2px 4px">❓ ${BLDS[it.rule.self]?.n || '通用'}×??? <span style="font-size:0.85em">(+?%)</span></div>`;
+        } else {
+          const selfName = it.rule.self === '*' ? '通用' : (BLDS[it.rule.self]?.n || it.rule.self);
+          const neighborName = BLDS[it.rule.neighbor]?.n || it.rule.neighbor;
+          html += `<div style="font-size:0.7em;color:#aaa;padding:2px 4px">`;
+          html += `${it.rule.icon} <span style="color:#06d6a0;font-weight:600">${it.rule.name}</span> <span style="color:#22c55e">+${Math.round(it.rule.bonus*100)}%</span> — ${selfName} ← ${neighborName}`;
+          if (it.rule.stackable) html += ` <span style="color:var(--dim)">(max×${it.rule.maxStack})</span>`;
+          html += `</div>`;
+        }
+      }
+    }
+    html += `</div>`;
+    // 使用自定义覆盖层
+    const overlay = document.createElement('div');
+    overlay.id = 'adjGuideOverlay';
+    overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.85);z-index:9999;display:flex;align-items:center;justify-content:center';
+    overlay.innerHTML = `<div style="background:#1a1a2e;border:1px solid #14b8a640;border-radius:8px;padding:16px;max-width:420px;width:90%;max-height:80vh;overflow-y:auto;position:relative">
+      <button onclick="document.getElementById('adjGuideOverlay').remove()" style="position:absolute;top:8px;right:12px;background:none;border:none;color:#888;font-size:1.2em;cursor:pointer">✕</button>
+      ${html}
+    </div>`;
+    overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+    document.body.appendChild(overlay);
   },
 
   // ★ 方案F：计算所有多输入建筑的供给同步加成
@@ -6901,6 +7269,9 @@ const G = {
         return;
       }
 
+      // v2.1: 休眠建筑不生产不消耗
+      if (this._dormantCells[idx]) return;
+
       // 碳源采集器受核心供给上限限制
       if (bd.corePowered) {
         collectorCount++;
@@ -6980,14 +7351,35 @@ const G = {
         const lvMult = 1 + (bldLv - 1) * 0.15;
         // v2.0: 端口效率折扣 — 端口利用率高的建筑维护费更低
         const portDiscount = getPortEfficiencyDiscount(idx);
+        // v2.1: 休眠建筑维护费降至25%
+        const dormantMult = this._dormantCells[idx] ? 0.25 : 1;
         for (let k in baseMaint) {
-          const cost = baseMaint[k] * maint.overhead * lvMult * maintReduce * Math.max(0.1, mutMaintMod) * portDiscount;
+          const cost = baseMaint[k] * maint.overhead * lvMult * maintReduce * Math.max(0.1, mutMaintMod) * portDiscount * dormantMult;
           r[k] = (r[k]||0) - cost;
           maint.total[k] = (maint.total[k]||0) + cost;
           breakdown[k].maint += cost;
         }
       });
     }
+    // v3.0 §4: 远距传送带维护费 — 距离>=3时消耗ATP
+    // 公式: dist >= 3 ? 0.3 * (dist - 2) : 0
+    let beltMaintTotal = 0;
+    const beltsForMaint = this._activeBelts || [];
+    for (const belt of beltsForMaint) {
+      const bk = Math.min(belt.fi, belt.ti) + '-' + Math.max(belt.fi, belt.ti);
+      const dist = this.getBeltDistance(bk);
+      if (dist >= 3) {
+        const beltMaintCost = 0.3 * (dist - 2);
+        beltMaintTotal += beltMaintCost;
+      }
+    }
+    if (beltMaintTotal > 0) {
+      r.energy = (r.energy || 0) - beltMaintTotal;
+      maint.total.energy = (maint.total.energy || 0) + beltMaintTotal;
+      breakdown.energy.maint += beltMaintTotal;
+    }
+    this._beltMaintCost = beltMaintTotal; // 记录供UI显示
+
     this._maintenanceCost = maint.total;
     this._maintenanceOverhead = maint.overhead;
 
@@ -7616,6 +8008,7 @@ const G = {
 
   // 重新计算所有突变效果的缓存
   _recalcMutEffects() {
+    const portBonuses = {}; // v2.1: { buildingType: { extraIn, extraOut } }
     const ef = {
       maintReduce: 0, maintIncrease: 0,
       popGrowthMult: 0, beltEffBonus: 0,
@@ -7661,8 +8054,49 @@ const G = {
           ef.resProdBonus[k] = (ef.resProdBonus[k] || 0) + e.resProdBonus[k];
         }
       }
+      // v2.1 §9.2: 端口突变 — extraOutPort/extraInPort + targetRandom
+      if (e.extraOutPort || e.extraInPort) {
+        if (!this._mutPortTargets) this._mutPortTargets = {};
+        // 首次为此突变随机选一种有端口的建筑类型
+        if (!this._mutPortTargets[slot.id]) {
+          const candidates = Object.keys(PORT_DEFS).filter(t => {
+            const d = PORT_DEFS[t];
+            return d && (d.maxOut > 0 || d.maxIn > 0) && d.role !== 'wonder';
+          });
+          if (candidates.length > 0) {
+            this._mutPortTargets[slot.id] = candidates[Math.floor(Math.random() * candidates.length)];
+          }
+        }
+        const target = this._mutPortTargets[slot.id];
+        if (target) {
+          if (!portBonuses[target]) portBonuses[target] = { extraIn: 0, extraOut: 0 };
+          portBonuses[target].extraOut += (e.extraOutPort || 0);
+          portBonuses[target].extraIn += (e.extraInPort || 0);
+        }
+      }
     }
     this._mutActiveEffects = ef;
+    // v2.1 §9.2 + §9.3: 合并突变端口加成 + 转生端口扩展
+    // 转生管线工程学: _presPortExpand = lv → 随机 lv 种建筑各+1输出端口(每种上限+2)
+    if (this._presPortExpand && this._presPortExpand > 0) {
+      if (!this._presPortTargets || this._presPortTargets.length !== this._presPortExpand) {
+        const candidates = Object.keys(PORT_DEFS).filter(t => {
+          const d = PORT_DEFS[t];
+          return d && d.maxOut > 0 && d.role !== 'wonder';
+        });
+        const targets = [];
+        const shuffled = [...candidates].sort(() => Math.random() - 0.5);
+        for (let i = 0; i < Math.min(this._presPortExpand, shuffled.length); i++) {
+          targets.push(shuffled[i]);
+        }
+        this._presPortTargets = targets;
+      }
+      for (const t of this._presPortTargets) {
+        if (!portBonuses[t]) portBonuses[t] = { extraIn: 0, extraOut: 0 };
+        portBonuses[t].extraOut = Math.min(portBonuses[t].extraOut + 1, 2); // 每种上限+2
+      }
+    }
+    this._mutPortBonuses = portBonuses;
   },
 
   // ★ Q4：渲染变异实验室面板（完整重绘）
@@ -8096,7 +8530,8 @@ const G = {
     if (adjHint) {
       const unlocked = this.getUnlockedAdjacencyCount();
       const total = ADJACENCY_RULES.length;
-      adjHint.innerHTML = `<span style="color:var(--cyan);font-size:0.72em">🔗 已解锁 ${unlocked}/${total} 条邻接规则</span>`;
+      const discovered = Object.keys(this._discoveredAdj || {}).length;
+      adjHint.innerHTML = `<span style="color:var(--cyan);font-size:0.72em">🔗 已解锁 ${unlocked}/${total} 条邻接规则 | <a href="#" onclick="G.showAdjGuide();return false" style="color:#14b8a6;text-decoration:underline">图鉴 (${discovered}/${unlocked})</a></span>`;
     }
   },
 
@@ -8308,6 +8743,8 @@ const G = {
         // ★ Q4：变异实验室tick
         this._tickMutBrewing();
         this._checkMutLabUnlock();
+        // v2.1 §8.2：培养皿P3+配方分散解锁检查
+        this._checkPetriP3Unlock();
         this.rt++;
       }
 
@@ -8756,12 +9193,18 @@ const G = {
                 (bonusPct > 0 ? ` <span style="color:#22c55e">+${bonusPct}%产出</span>` : ' <span style="color:var(--dim)">需≥50%触发加成</span>');
             }
           }
+          // v3.0 §4: 距离衰减信息
+          const distEffFactor = this._distanceEfficiency(cellDist);
+          const distEffPct = Math.round(distEffFactor * 100);
+          const distEffStr = distEffFactor < 1 ? ` <span style="color:var(--orange)">📉 距离衰减: ${distEffPct}%</span>` : '';
+          const beltMaintStr = cellDist >= 3 ? `<br><span style="color:var(--orange)">🔧 远距维护: -${(0.3 * (cellDist - 2)).toFixed(1)}⚡/s</span>` : '';
           document.getElementById('ttDesc').innerHTML =
             `${fromName} → ${toName}` +
             `<br><span style="color:${effColor}">⚡ 传输效率: ${effPct}%</span> · <span style="color:var(--color-info)">📦 容量: ${cap}/s</span>` +
-            `<br><span style="color:${distColor}">${distLabel} (距离${cellDist}格)</span>` +
+            `<br><span style="color:${distColor}">${distLabel} (距离${cellDist}格)</span>${distEffStr}` +
+            beltMaintStr +
             syncLine +
-            `<br><span style="color:#7a9aba;font-size:0.9em">💡 建筑放得越近，传送带越短，资源传输更快更稳定！</span>` +
+            `<br><span style="color:#7a9aba;font-size:0.9em">💡 距离越近效率越高；远距连线可获取额外邻接加成</span>` +
             `<br><span style="color:var(--dim);font-size:0.85em">点击可升级/撤销传送带</span>`;
           tt.classList.add('show');
           tt.style.left = Math.min(e.clientX + 14, window.innerWidth - 260) + 'px';
@@ -9016,11 +9459,15 @@ const G = {
             if (fromPort) {
               const usage = getPortUsage(link.fi);
               const techExtra = this._extraOutPorts || 0;
-              if (usage.out >= fromPort.maxOut + techExtra) continue; // 输出端口已满
+              const mpbF = this._mutPortBonuses?.[fromType];
+              const mutExtraOut = mpbF ? mpbF.extraOut : 0;
+              if (usage.out >= fromPort.maxOut + techExtra + mutExtraOut) continue; // 输出端口已满
             }
             if (toPort) {
               const usage = getPortUsage(link.ti);
-              if (usage.in >= toPort.maxIn) continue; // 输入端口已满
+              const mpbT = this._mutPortBonuses?.[toType];
+              const mutExtraIn = mpbT ? mpbT.extraIn : 0;
+              if (usage.in >= toPort.maxIn + mutExtraIn) continue; // 输入端口已满
             }
           }
 
@@ -9148,8 +9595,11 @@ const G = {
         const beltKey = Math.min(belt.fi, belt.ti) + '-' + Math.max(belt.fi, belt.ti);
         const beltLv = this.getBeltLevel(beltKey);
         const beltEff = this.getBeltEfficiency(beltKey);
-        const lvScale = 0.7 + beltLv * 0.15; // Lv1=0.85, Lv5=1.45
-        const trackW = (isMulti ? 10 : 8) * lvScale;  // 轨道宽度随等级增长（加粗）
+        // v3.0 §4: 距离影响线条粗细
+        const beltDist = this.getBeltDistance(beltKey);
+        const distScale = beltDist <= 1 ? 1.0 : beltDist <= 2 ? 0.92 : beltDist <= 3 ? 0.8 : 0.65;
+        const lvScale = (0.7 + beltLv * 0.15) * distScale;
+        const trackW = (isMulti ? 10 : 8) * lvScale;  // 轨道宽度随等级增长（加粗），远距变细
         const innerW = (isMulti ? 7 : 5) * lvScale;
 
         // 判断是否需要 L 形拐弯（非直线方向）
@@ -9174,6 +9624,43 @@ const G = {
         const segments = isOrthogonal
           ? [[sx, sy, ex, ey]]
           : [[sx, sy, mx, my], [mx, my, ex, ey]];
+
+        // ★ v2.1: 休眠建筑 — 传送带灰色渲染，停止货物传输
+        const fiDormant = this._dormantCells[belt.fi];
+        const tiDormant = this._dormantCells[belt.ti];
+        if (fiDormant || tiDormant) {
+          const pulse = 0.2 + Math.sin(Date.now() / 800) * 0.08;
+          // 灰色虚线轨道
+          ctx.lineWidth = 5;
+          ctx.strokeStyle = `rgba(80,90,100,${pulse})`;
+          ctx.setLineDash([5, 5]);
+          ctx.lineDashOffset = -(Date.now() / 300) % 10;
+          ctx.lineCap = 'butt';
+          ctx.lineJoin = 'miter';
+          drawLPath(); ctx.stroke();
+          ctx.lineWidth = 2.5;
+          ctx.strokeStyle = `rgba(40,50,60,${pulse + 0.1})`;
+          ctx.setLineDash([3, 3]);
+          drawLPath(); ctx.stroke();
+          ctx.setLineDash([]);
+          // 两端灰色小方块
+          const tSz = 2.5;
+          ctx.fillStyle = `rgba(80,90,100,${pulse + 0.15})`;
+          ctx.fillRect(sx - tSz, sy - tSz, tSz*2, tSz*2);
+          ctx.fillRect(ex - tSz, ey - tSz, tSz*2, tSz*2);
+          // 悬停高亮仍可操作
+          if (this._hoverBeltKey === beltKey) {
+            ctx.save();
+            ctx.lineWidth = 8;
+            ctx.strokeStyle = 'rgba(249,115,22,0.25)';
+            ctx.setLineDash([]);
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            drawLPath(); ctx.stroke();
+            ctx.restore();
+          }
+          continue; // 跳过正常渲染和粒子
+        }
 
         // ★ 无效传送带（没有 FLOW_MAP 对应关系）→ 灰色虚线渲染
         if (belt.invalid) {
@@ -10351,7 +10838,8 @@ const G = {
         if (mc.glucose) parts.push(`-${formatNum(mc.glucose, 1)}🟢`);
         if (mc.protein) parts.push(`-${formatNum(mc.protein, 1)}🧪`);
         const overheadPct = Math.round((this._maintenanceOverhead - 1) * 100);
-        maintEl.textContent = parts.length > 0 ? parts.join(' ') + (overheadPct > 0 ? ` (+${overheadPct}%开销)` : '') : '无';
+        const beltMaintStr = this._beltMaintCost > 0 ? ` (含远距管线-${formatNum(this._beltMaintCost, 1)}⚡)` : '';
+        maintEl.textContent = parts.length > 0 ? parts.join(' ') + (overheadPct > 0 ? ` (+${overheadPct}%开销)` : '') + beltMaintStr : '无';
         // 颜色：维护费越高越红
         const totalMaint = Object.values(mc).reduce((a,b) => a + b, 0);
         maintEl.style.color = totalMaint > 3 ? '#ef4444' : totalMaint > 1.5 ? '#f97316' : totalMaint > 0.5 ? '#eab308' : '#22c55e';
@@ -10887,7 +11375,7 @@ const G = {
     // 箭头浮层（在按钮右侧）
     const arrow = document.createElement('div');
     arrow.className = 'guide-arrow-float';
-    arrow.textContent = '◀ 点这里';
+    arrow.textContent = '👈 点这里';
     arrow.style.left = (rect.right + 6) + 'px';
     arrow.style.top = (rect.top + rect.height / 2 - 8) + 'px';
     document.body.appendChild(arrow);
@@ -11482,6 +11970,10 @@ const G = {
         _competitionEnabled: this._competitionEnabled,
         _competitionTutorialShown: this._competitionTutorialShown,
         _portFullShown: this._portFullShown,
+        // v3.0 §4: 远距首次弹窗标志
+        _firstDist2Shown: this._firstDist2Shown,
+        _firstDist3Shown: this._firstDist3Shown,
+        _firstDist4Shown: this._firstDist4Shown,
         _nitrogenBonus: this._nitrogenBonus,
         _proteinBonus: this._proteinBonus,
         _transportBonus: this._transportBonus,
@@ -11502,12 +11994,17 @@ const G = {
         _petriBuff: this._petriBuff || null,
         _petriCount: this._petriCount || 0,
         _petriActiveZone: this._petriActiveZone || null,
+        _petriP3Unlocked: this._petriP3Unlocked || false, // v2.1 §8.2
         // ★ Q4：变异实验室
         _mutLabUnlocked: this._mutLabUnlocked || false,
         _mutSlots: this._mutSlots || [],
         _mutBrewing: this._mutBrewing || null,
         _mutOffers: this._mutOffers || [],
         _mutHistory: this._mutHistory || [],
+        _mutPortTargets: this._mutPortTargets || {},  // v2.1 §9.2
+        _presPortTargets: this._presPortTargets || [], // v2.1 §9.3
+        _discoveredAdj: this._discoveredAdj || {},     // v2.1 §10.4
+        _dormantCells: this._dormantCells || {},       // v2.1 建筑休眠
         _mutCategoryLock: this._mutCategoryLock || null,
         _mutBrewCount: this._mutBrewCount || 0,
         // ★ 终局高潮系统
@@ -11615,6 +12112,10 @@ const G = {
       if (s._competitionEnabled) this._competitionEnabled = s._competitionEnabled;
       if (s._competitionTutorialShown) this._competitionTutorialShown = s._competitionTutorialShown;
       if (s._portFullShown) this._portFullShown = s._portFullShown;
+      // v3.0 §4: 远距首次弹窗标志
+      if (s._firstDist2Shown) this._firstDist2Shown = s._firstDist2Shown;
+      if (s._firstDist3Shown) this._firstDist3Shown = s._firstDist3Shown;
+      if (s._firstDist4Shown) this._firstDist4Shown = s._firstDist4Shown;
       if (s._nitrogenBonus) this._nitrogenBonus = s._nitrogenBonus;
       if (s._proteinBonus) this._proteinBonus = s._proteinBonus;
       if (s._transportBonus) this._transportBonus = s._transportBonus;
@@ -11635,12 +12136,17 @@ const G = {
       this._petriBuff = s._petriBuff || null;
       this._petriCount = s._petriCount || 0;
       this._petriActiveZone = s._petriActiveZone || null;
+      this._petriP3Unlocked = s._petriP3Unlocked || false; // v2.1 §8.2
       // ★ Q4：变异实验室状态恢复
       this._mutLabUnlocked = s._mutLabUnlocked || false;
       this._mutSlots = s._mutSlots || [];
       this._mutBrewing = s._mutBrewing || null;
       this._mutOffers = s._mutOffers || [];
       this._mutHistory = s._mutHistory || [];
+      this._mutPortTargets = s._mutPortTargets || {};  // v2.1 §9.2
+      this._presPortTargets = s._presPortTargets || []; // v2.1 §9.3
+      this._discoveredAdj = s._discoveredAdj || {};     // v2.1 §10.4
+      this._dormantCells = s._dormantCells || {};       // v2.1 建筑休眠
       this._mutCategoryLock = s._mutCategoryLock || null;
       this._mutBrewCount = s._mutBrewCount || 0;
       // ★ 终局高潮系统状态恢复
@@ -12014,11 +12520,32 @@ const G = {
     return this.beltLevels[beltKey] || 1;
   },
 
-  // 传送带效率（产出乘数）
+  // v3.0 §4: 传送带距离（曼哈顿距离）
+  getBeltDistance(beltKey) {
+    const [a, b] = beltKey.split('-').map(Number);
+    const SZ = this.gridSize;
+    const r1 = Math.floor(a / SZ), c1 = a % SZ;
+    const r2 = Math.floor(b / SZ), c2 = b % SZ;
+    return Math.abs(r1 - r2) + Math.abs(c1 - c2);
+  },
+
+  // v3.0 §4: 距离效率衰减因子
+  // dist=1: 100%, dist=2: 92%, dist=3: 80%, dist=4: 65%
+  _distanceEfficiency(dist) {
+    if (dist <= 1) return 1.0;
+    const map = { 2: 0.92, 3: 0.80, 4: 0.65 };
+    return map[dist] || Math.max(0.1, 1.0 - 0.12 * (dist - 1));
+  },
+
+  // 传送带效率（产出乘数）— v3.0: 包含距离衰减
   getBeltEfficiency(beltKey) {
     const lv = this.getBeltLevel(beltKey);
     const effMap = { 1: 0.75, 2: 0.9, 3: 1.0, 4: 1.2, 5: 1.5 };
-    return effMap[lv] || 0.75;
+    const baseEff = effMap[lv] || 0.75;
+    // v3.0 §4: 距离衰减
+    const dist = this.getBeltDistance(beltKey);
+    const distFactor = this._distanceEfficiency(dist);
+    return baseEff * distFactor;
   },
 
   // 传送带容量上限（每秒资源吞吐量）
@@ -12061,6 +12588,8 @@ const G = {
   getBeltMultiplierForBuilding(idx) {
     const g = this.grid[idx];
     if (!g) return 1;
+    // v2.1: 休眠建筑不参与物流
+    if (this._dormantCells[idx]) return 0;
     const type = g.type;
     const bd = BLDS[type];
     if (!bd) return 1;
@@ -12332,6 +12861,7 @@ const G = {
     // 移除高亮
     document.querySelectorAll('.cell.belt-connect-from').forEach(c => c.classList.remove('belt-connect-from'));
     document.querySelectorAll('.cell.belt-connect-target').forEach(c => c.classList.remove('belt-connect-target', 'belt-target-valid', 'belt-target-invalid'));
+    document.querySelectorAll('.belt-dist-badge').forEach(b => b.remove()); // v3.0 §4
     // ★ Q2：移除浮动标签和闲置计时器
     this._hideBeltModeBanner();
     this._stopBeltIdleTimer();
@@ -12394,7 +12924,8 @@ const G = {
       if (!hasAvailablePort(fromIdx, 'out')) {
         const fromBldName = BLDS[this.grid[fromIdx].type]?.n || '建筑';
         const fromDef = PORT_DEFS[this.grid[fromIdx].type];
-        const maxOut = (fromDef?.maxOut || 0) + (this._extraOutPorts || 0);
+        const mpbF = this._mutPortBonuses?.[this.grid[fromIdx].type];
+        const maxOut = (fromDef?.maxOut || 0) + (this._extraOutPorts || 0) + (mpbF?.extraOut || 0);
         this.log(`⚠️ ${fromBldName} 输出端口已满 (${maxOut}/${maxOut})`, 'w');
         return true;
       }
@@ -12465,17 +12996,42 @@ const G = {
           '#f97316');
         SFX.buildFail();
       } else {
-        this.log(`✅ 已连接: ${fromBld?.emoji||''}${fromBld?.n||''} → ${toBld?.emoji||''}${toBld?.n||''}`, 's');
-        this.showCursorTooltip(`✅ 已连接！`, 's');
+        // v3.0 §4: 计算距离并记录stats
+        const distEffPct = Math.round(this._distanceEfficiency(dist) * 100);
+        const distInfo = dist >= 2 ? ` (距离${dist}格·${distEffPct}%效率)` : '';
+        this.log(`✅ 已连接: ${fromBld?.emoji||''}${fromBld?.n||''} → ${toBld?.emoji||''}${toBld?.n||''}${distInfo}`, 's');
+        this.showCursorTooltip(`✅ 已连接！${distInfo}`, 's');
         SFX.build();
         // ★ 方案A：连接爆发特效 + 连击系统
         this.beltConnectBurst(fromIdx, idx);
         this.addBeltCombo();
+
+        // v3.0 §4: 远距统计追踪
+        if (dist > (this.stats.maxBeltDist || 0)) {
+          this.stats.maxBeltDist = dist;
+        }
+        if (dist >= 2) {
+          this.stats.longBeltCount = (this.stats.longBeltCount || 0) + 1;
+          // 首次远距成就弹窗
+          const firstDistKey = '_firstDist' + dist + 'Shown';
+          if (!this[firstDistKey]) {
+            this[firstDistKey] = true;
+            const msgs = {
+              2: { title: '🔗 远程传输', text: '突破了物理限制！\n首次建立2格距离的传送带\n\n💡 远距传送带效率稍低，但可以连接到更远的建筑获取邻接加成', color: '#14b8a6' },
+              3: { title: '🔗 远程物流', text: '化学信号跨越三格！\n首次建立3格距离的传送带\n\n⚠️ 3格距离需要0.3⚡/s维护费\n💡 虚拟邻接加成不受距离衰减影响', color: '#06d6a0' },
+              4: { title: '🔗 物流大师', text: '极限距离的精密控制！\n首次建立4格距离的传送带\n\n⚠️ 4格距离需要0.6⚡/s维护费\n💡 远距连线虽然传输效率低，但邻接加成很赚', color: '#fbbf24' },
+            };
+            if (msgs[dist]) {
+              this.showEvent(msgs[dist].title, msgs[dist].text, msgs[dist].color);
+            }
+          }
+        }
       }
       // ★ 连续连接模式：不退出，重置起点让用户继续连接下一条
       // 清除当前高亮
       document.querySelectorAll('.cell.belt-connect-from').forEach(c => c.classList.remove('belt-connect-from'));
       document.querySelectorAll('.cell.belt-connect-target').forEach(c => c.classList.remove('belt-connect-target', 'belt-target-valid', 'belt-target-invalid'));
+      document.querySelectorAll('.belt-dist-badge').forEach(b => b.remove()); // v3.0 §4
       // 重置起点但保持连接模式
       this._beltConnectFrom = null;
       document.getElementById('buildHint').textContent = '🔗 连接成功！继续选择下一个起点（ESC/右键退出）';
@@ -12496,8 +13052,10 @@ const G = {
           const def = PORT_DEFS[type];
           if (!def) return false;
           const techExtra = this._extraOutPorts || 0;
-          const totalOut = def.maxOut + techExtra;
-          return (getUsedPorts(idx, 'in') >= def.maxIn && getUsedPorts(idx, 'out') >= totalOut);
+          const mpb = this._mutPortBonuses?.[type];
+          const totalOut = def.maxOut + techExtra + (mpb?.extraOut || 0);
+          const totalIn = def.maxIn + (mpb?.extraIn || 0);
+          return (getUsedPorts(idx, 'in') >= totalIn && getUsedPorts(idx, 'out') >= totalOut);
         };
         if (checkPortFull(fromIdx, fromType) || checkPortFull(toIdx, toType)) {
           this._portFullShown = true;
@@ -12531,6 +13089,20 @@ const G = {
         );
         if (hasValidFlow) {
           cell.classList.add('belt-connect-target', 'belt-target-valid');
+          // v3.0 §4: 显示距离效率标签
+          if (dist >= 2) {
+            const distEff = Math.round(this._distanceEfficiency(dist) * 100);
+            let badge = cell.querySelector('.belt-dist-badge');
+            if (!badge) {
+              badge = document.createElement('div');
+              badge.className = 'belt-dist-badge';
+              badge.style.cssText = 'position:absolute;top:1px;right:1px;font-size:9px;z-index:20;pointer-events:none;padding:1px 3px;border-radius:3px;' +
+                (dist >= 3 ? 'background:rgba(249,115,22,0.8);color:#fff' : 'background:rgba(20,184,166,0.8);color:#fff');
+              cell.style.position = 'relative';
+              cell.appendChild(badge);
+            }
+            badge.textContent = `${dist}格·${distEff}%`;
+          }
         } else {
           cell.classList.add('belt-connect-target', 'belt-target-invalid');
         }
@@ -12728,6 +13300,22 @@ const G = {
   },
 
   // ===== PETRI DISH EXPERIMENT =====
+
+  // v2.1 §8.2: 检查P3+配方分散解锁条件
+  _checkPetriP3Unlock() {
+    if (this._petriP3Unlocked) return;
+    if (this.phase < 3) return;
+    // 条件：建造2个生物膜反应器 + 拥有菌丝运输网
+    if (this.bldCount('biofilmReactor') >= 2 && this.bldCount('transport') >= 1) {
+      this._petriP3Unlocked = true;
+      this.log('🧫 培养皿实验·高阶配方解锁！生物膜矩阵+菌丝网络为实验打开了新可能', 's');
+      this.showMilestone('🧫', '高阶配方解锁！');
+      this.showEvent('🧫 培养皿·高阶配方', '生物膜反应器的密集培养与菌丝运输网的渗透效应，\n解锁了全新的P3+实验配方！\n\n尝试在实验区域中放置P3建筑来触发新配方。', '#14b8a6');
+      SFX.achieve();
+      this.updatePetriUI();
+    }
+  },
+
   startPetriMode() {
     if (this.phase < 2) { this.log('需要进入阶段2后解锁培养皿实验', 'w'); SFX.buildFail(); return; }
     if (this._petriCooldown > 0) { this.log(`🧫 实验冷却中 (${this._petriCooldown}s)`, 'w'); SFX.buildFail(); return; }
@@ -12790,8 +13378,10 @@ const G = {
   // 匹配最佳配方
   _matchPetriRecipe(scan) {
     // 按优先级排序：高阶段 > 低阶段，特殊条件 > 通用
+    // v2.1 §8.2: P3+配方需要分散解锁条件（2×生物膜反应器+菌丝运输网）
+    const maxPhase = (this.phase >= 3 && !this._petriP3Unlocked) ? 2 : this.phase;
     const sorted = [...PETRI_RECIPES]
-      .filter(r => r.phase <= this.phase)
+      .filter(r => r.phase <= maxPhase)
       .sort((a, b) => {
         // 优先高阶段
         if (b.phase !== a.phase) return b.phase - a.phase;
@@ -12977,6 +13567,21 @@ const G = {
           <div style="height:100%;width:${pct}%;background:${b.color};border-radius:2px;transition:width 1s linear"></div>
         </div>
       </div>`;
+    }
+
+    // v2.1 §8.2: P3+配方解锁状态提示
+    if (this.phase >= 3 && !this._petriP3Unlocked) {
+      const hasReactor = this.bldCount('biofilmReactor');
+      const hasTransport = this.bldCount('transport');
+      html += `<div style="border:1px solid #14b8a620;border-radius:4px;padding:6px;margin-top:4px;background:#14b8a608;font-size:0.72em">
+        <div style="color:#14b8a6;font-weight:600;margin-bottom:3px">🔒 高阶配方（P3+）未解锁</div>
+        <div style="color:var(--dim)">
+          ${hasReactor >= 2 ? '✅' : '❌'} 生物膜反应器 ×2 <span style="color:${hasReactor >= 2 ? '#22c55e' : 'var(--dim)'}">(${hasReactor}/2)</span><br>
+          ${hasTransport >= 1 ? '✅' : '❌'} 菌丝运输网 ×1 <span style="color:${hasTransport >= 1 ? '#22c55e' : 'var(--dim)'}">(${hasTransport}/1)</span>
+        </div>
+      </div>`;
+    } else if (this.phase >= 3 && this._petriP3Unlocked) {
+      html += `<div style="font-size:0.65em;color:#14b8a6;margin-top:4px">✅ P3+高阶配方已解锁</div>`;
     }
 
     // 实验次数
