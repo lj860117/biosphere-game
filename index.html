@@ -708,6 +708,27 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
   pointer-events:none;
 }
 .tt-node.locked{opacity:0.25;cursor:not-allowed;pointer-events:none}
+/* v3.0 §3: 前置条件未满足 — 半透明但可交互（点击时弹提示） */
+.tt-node.prereq-locked{
+  opacity:0.55;cursor:not-allowed;
+  border-color:rgba(249,115,22,0.3);
+  background:linear-gradient(135deg,rgba(249,115,22,0.04),rgba(6,12,22,0.9));
+}
+.tt-prereq{
+  font-size:0.72em;color:#f97316;padding:3px 0;line-height:1.4;
+}
+.tt-prereq.met{
+  color:#14b8a6;font-size:0.72em;padding:3px 0;
+}
+.tt-prereq-prog{
+  color:#94a3b8;font-size:0.9em;
+}
+.tt-prereq-bar{
+  height:3px;background:rgba(255,255,255,0.06);border-radius:2px;margin-top:2px;overflow:hidden;
+}
+.tt-prereq-fill{
+  height:100%;background:#f97316;border-radius:2px;transition:width 0.5s;
+}
 .tt-node.exclusive-locked{
   opacity:0.35;cursor:not-allowed;pointer-events:none;
   border-color:rgba(239,68,68,0.25);
@@ -856,6 +877,9 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
   0%,100%{opacity:0.85}
   50%{opacity:0.55}
 }
+/* v3.0 §2: 探索度面板 */
+.expl-collapsed{display:none !important}
+.expl-panel{transition:all 0.3s}
 
 /* 滚动提示渐变阴影 — 在 dish-view-wrap 的伪元素上实现，不受 dish-view 滚动影响 */
 .dish-view-wrap{position:relative;flex:1;min-height:45vh;display:flex;flex-direction:column}

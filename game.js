@@ -643,6 +643,7 @@ const PORT_DEFS = {
   biomassConverter: { maxIn: 2, maxOut: 1, role: 'bypass' },
   quantumExtractor: { maxIn: 2, maxOut: 1, role: 'bypass' },
   fermentVacuole:   { maxIn: 2, maxOut: 2, role: 'bypass' },
+  signalRelay:      { maxIn: 3, maxOut: 3, role: 'relay' },  // v3.0 §5: 中继节点
   // Phase 4
   qsController:    { maxIn: 1, maxOut: 2, role: 'converter' },
   nanoAssembler:    { maxIn: 2, maxOut: 2, role: 'converter' },
@@ -683,8 +684,15 @@ function hasAvailablePort(idx, direction) {
   // v2.1 §9.2/§9.3: 突变+转生端口加成
   const mpb = G._mutPortBonuses?.[type];
   const mutExtra = mpb ? (direction === 'out' ? mpb.extraOut : mpb.extraIn) : 0;
+  // v3.0 §9.2: 建筑特化端口加成
+  const specBld = G._specCache?.perBuilding?.[idx];
+  let specExtra = 0;
+  if (specBld) {
+    if (direction === 'out' && specBld.extraOutPort) specExtra += specBld.extraOutPort;
+    if (specBld.extraPorts) specExtra += specBld.extraPorts; // relay_hub: 双向+N
+  }
   const max = direction === 'in' ? def.maxIn : def.maxOut;
-  return getUsedPorts(idx, direction) < (max + techExtra + mutExtra);
+  return getUsedPorts(idx, direction) < (max + techExtra + mutExtra + specExtra);
 }
 
 /**
@@ -961,6 +969,17 @@ const BLDS = {
     color:'#f59e0b', bg:'bg-amber', emoji:'🫧', tier:3, techReq:'biofilmTech',
   },
 
+  // Phase 3 — v3.0 §5: 信号中继站（P3b物流辅助）
+  signalRelay: {
+    n:'信号中继站', phase:3,
+    d:'化学信号中继·延伸物流距离',
+    ratio:'中继模式·衰减减半',
+    cost:{ protein:8, biomass:5 }, prod:{}, cons:{},
+    color:'#60a5fa', bg:'bg-blue', emoji:'📡', tier:3,
+    isRelay: true, // 标记为中继建筑
+    techReq:'biofilmTech', // P3b解锁后可建
+  },
+
   // Phase 4 — 旁路建筑（新增）
   resonanceChamber: {
     n:'共振培养箱', phase:4,
@@ -1079,6 +1098,14 @@ const ADJACENCY_RULES = [
   // 反向：发酵液泡作为邻居对其他建筑的增益
   { self:'biofilmReactor',   neighbor:'fermentVacuole',   bonus:0.08, name:'能量回流', icon:'🫧', stackable:true, maxStack:1, phase:3 },
   { self:'sporeSower',       neighbor:'fermentVacuole',   bonus:0.10, name:'发酵驱动', icon:'🫧', stackable:true, maxStack:1, phase:3 },
+
+  // ═══════════════════════════════════════════════════
+  // ⑦ v3.0 §5: 信号中继站邻接
+  // ═══════════════════════════════════════════════════
+  { self:'signalRelay',      neighbor:'signalRelay',       bonus:0.12, name:'中继共振', icon:'📡', stackable:true, maxStack:2, phase:3 },
+  { self:'signalRelay',      neighbor:'biofilmReactor',    bonus:0.08, name:'膜下中继', icon:'🧫', stackable:true, maxStack:1, phase:3 },
+  { self:'signalRelay',      neighbor:'transport',         bonus:0.10, name:'菌丝中继', icon:'🕸️', stackable:true, maxStack:1, phase:3 },
+  { self:'signalRelay',      neighbor:'sporeSower',        bonus:0.06, name:'孢子中继', icon:'🍄', stackable:true, maxStack:1, phase:3 },
 ];
 
 // ===== TECHS =====
@@ -1162,6 +1189,92 @@ const TECHS = {
   },
 };
 
+// ===== v3.0 §3: TECH PREREQS — 科技研究前置操作条件 =====
+// check(s): 是否满足, progress(s): 当前进度, max: 目标值, label: UI显示文字
+const TECH_PREREQS = {
+  // pureCulture: 无前置条件 (P1入门不设门槛)
+  efficientHarvest: {
+    label: '拥有3+传送带连接',
+    icon: '🔗', max: 3,
+    check: s => (s._activeBelts||[]).length >= (s._prereqMax('efficientHarvest')),
+    progress: s => Math.min((s._activeBelts||[]).length, s._prereqMax('efficientHarvest')),
+  },
+  rapidMetabolism: {
+    label: '拥有2台ATP合成酶',
+    icon: '⚡', max: 2,
+    check: s => s.bldCount('energyStation') >= (s._prereqMax('rapidMetabolism')),
+    progress: s => Math.min(s.bldCount('energyStation'), s._prereqMax('rapidMetabolism')),
+  },
+  basicMetab: {
+    label: '发现3条邻接规则',
+    icon: '🏗️', max: 3,
+    check: s => Object.keys(s._discoveredAdj||{}).length >= (s._prereqMax('basicMetab')),
+    progress: s => Math.min(Object.keys(s._discoveredAdj||{}).length, s._prereqMax('basicMetab')),
+  },
+  nitrogenCycle: {
+    label: '拥有1条2格+距离传送带',
+    icon: '🔗', max: 1,
+    check: s => (s.stats.maxBeltDist||0) >= 2,
+    progress: s => (s.stats.maxBeltDist||0) >= 2 ? 1 : 0,
+  },
+  proteinEngineering: {
+    label: '完成1个培养皿实验',
+    icon: '🧫', max: 1,
+    check: s => (s._petriCount||0) >= (s._prereqMax('proteinEngineering')),
+    progress: s => Math.min(s._petriCount||0, s._prereqMax('proteinEngineering')),
+  },
+  biofilmTech: {
+    label: '手动连接5+传送带',
+    icon: '🔗', max: 5,
+    check: s => Object.keys(s.manualBelts||{}).length >= (s._prereqMax('biofilmTech')),
+    progress: s => Math.min(Object.keys(s.manualBelts||{}).length, s._prereqMax('biofilmTech')),
+  },
+  adaptiveLogistics: {
+    label: '拥有2条2格+距离传送带',
+    icon: '🔗', max: 2,
+    check: s => {
+      const belts = Object.keys(s.manualBelts||{});
+      let c = 0; for (const k of belts) { if (s.getBeltDistance(k) >= 2) c++; }
+      return c >= (s._prereqMax('adaptiveLogistics'));
+    },
+    progress: s => {
+      const belts = Object.keys(s.manualBelts||{});
+      let c = 0; for (const k of belts) { if (s.getBeltDistance(k) >= 2) c++; }
+      return Math.min(c, s._prereqMax('adaptiveLogistics'));
+    },
+  },
+  symbioticNetwork: {
+    label: '发现8条邻接规则',
+    icon: '🏗️', max: 8,
+    check: s => Object.keys(s._discoveredAdj||{}).length >= (s._prereqMax('symbioticNetwork')),
+    progress: s => Math.min(Object.keys(s._discoveredAdj||{}).length, s._prereqMax('symbioticNetwork')),
+  },
+  quorumSensing: {
+    label: '2个建筑达到供给同步',
+    icon: '⚡', max: 2,
+    check: s => Object.values(s._syncBonuses||{}).filter(sb => sb.sync >= 0.5).length >= (s._prereqMax('quorumSensing')),
+    progress: s => Math.min(Object.values(s._syncBonuses||{}).filter(sb => sb.sync >= 0.5).length, s._prereqMax('quorumSensing')),
+  },
+  signalAmplifier: {
+    label: '传送带总数≥15',
+    icon: '🔗', max: 15,
+    check: s => (s._activeBelts||[]).length >= (s._prereqMax('signalAmplifier')),
+    progress: s => Math.min((s._activeBelts||[]).length, s._prereqMax('signalAmplifier')),
+  },
+  evolutionCatalyst: {
+    label: '激活2个突变',
+    icon: '🧬', max: 2,
+    check: s => (s._mutSlots||[]).length >= (s._prereqMax('evolutionCatalyst')),
+    progress: s => Math.min((s._mutSlots||[]).length, s._prereqMax('evolutionCatalyst')),
+  },
+  dysonTheory: {
+    label: '传送带总数≥15',
+    icon: '🔗', max: 15,
+    check: s => (s._activeBelts||[]).length >= (s._prereqMax('dysonTheory')),
+    progress: s => Math.min((s._activeBelts||[]).length, s._prereqMax('dysonTheory')),
+  },
+};
+
 // ===== SVGs =====
 const SVG = {
   glucoseCollector:`<svg viewBox="0 0 64 64" fill="none"><rect x="12" y="18" width="40" height="32" rx="3" fill="#0a1a10" stroke="#22c55e" stroke-width="1.5"/><path d="M22 18V12h20v6" fill="none" stroke="#22c55e" stroke-width="1.2"/><circle cx="26" cy="34" r="6" fill="none" stroke="#22c55e" stroke-width="1"/><circle cx="26" cy="34" r="2" fill="#22c55e" opacity="0.5"/><rect x="36" y="27" width="10" height="8" rx="1" fill="#22c55e" opacity="0.1" stroke="#22c55e" stroke-width="0.8"/><circle cx="17" cy="22" r="2" fill="#22c55e" opacity="0.8"><animate attributeName="opacity" values="0.4;1;0.4" dur="1.5s" repeatCount="indefinite"/></circle></svg>`,
@@ -1182,6 +1295,7 @@ const SVG = {
   nanoAssembler:`<svg viewBox="0 0 64 64" fill="none"><rect x="10" y="12" width="44" height="40" rx="3" fill="#0a1208" stroke="#a3e635" stroke-width="1.5"/><rect x="18" y="22" width="10" height="10" rx="1" fill="none" stroke="#a3e635" stroke-width="0.8" opacity="0.5"/><rect x="36" y="22" width="10" height="10" rx="1" fill="none" stroke="#a3e635" stroke-width="0.8" opacity="0.5"/><rect x="27" y="36" width="10" height="10" rx="1" fill="#a3e635" opacity="0.1" stroke="#a3e635" stroke-width="0.8"/><circle cx="32" cy="41" r="2" fill="#a3e635" opacity="0.5"><animate attributeName="r" values="1.5;3;1.5" dur="2s" repeatCount="indefinite"/></circle><path d="M28 27 L22 27M46 27 L40 27M32 36 L32 33" fill="none" stroke="#a3e635" stroke-width="0.8" opacity="0.4"/></svg>`,
   pheromoneStation:`<svg viewBox="0 0 64 64" fill="none"><rect x="10" y="12" width="44" height="40" rx="3" fill="#151208" stroke="#facc15" stroke-width="1.5"/><circle cx="32" cy="28" r="5" fill="#facc15" opacity="0.15" stroke="#facc15" stroke-width="1"/><path d="M26 28 A8 8 0 0 0 22 36" fill="none" stroke="#facc15" stroke-width="0.8" opacity="0.3"><animate attributeName="opacity" values="0.1;0.5;0.1" dur="2s" repeatCount="indefinite"/></path><path d="M38 28 A8 8 0 0 1 42 36" fill="none" stroke="#facc15" stroke-width="0.8" opacity="0.3"><animate attributeName="opacity" values="0.1;0.5;0.1" dur="2s" begin="0.5s" repeatCount="indefinite"/></path><text x="32" y="44" text-anchor="middle" fill="#facc15" font-size="7" opacity="0.4">📢</text></svg>`,
   // 新旁路建筑 SVG
+  signalRelay:`<svg viewBox="0 0 64 64" fill="none"><rect x="10" y="12" width="44" height="40" rx="3" fill="#0a1020" stroke="#60a5fa" stroke-width="1.5"/><circle cx="32" cy="28" r="5" fill="#60a5fa" opacity="0.3"/><circle cx="32" cy="28" r="10" fill="none" stroke="#60a5fa" stroke-width="0.8" opacity="0.2"><animate attributeName="r" values="8;14;8" dur="2s" repeatCount="indefinite"/></circle><circle cx="32" cy="28" r="16" fill="none" stroke="#60a5fa" stroke-width="0.5" opacity="0.1"><animate attributeName="r" values="12;18;12" dur="2.5s" repeatCount="indefinite"/></circle><path d="M20 40 L32 34 L44 40" fill="none" stroke="#60a5fa" stroke-width="1" opacity="0.4"/><circle cx="20" cy="40" r="2" fill="#60a5fa" opacity="0.4"/><circle cx="44" cy="40" r="2" fill="#60a5fa" opacity="0.4"/><text x="32" y="48" text-anchor="middle" fill="#60a5fa" font-size="6" opacity="0.4">📡</text></svg>`,
   biomassConverter:`<svg viewBox="0 0 64 64" fill="none"><rect x="10" y="12" width="44" height="40" rx="3" fill="#051210" stroke="#2dd4bf" stroke-width="1.5"/><path d="M22 25 L32 20 L42 25 L42 38 L32 43 L22 38 Z" fill="#2dd4bf" opacity="0.08" stroke="#2dd4bf" stroke-width="1"/><circle cx="32" cy="32" r="5" fill="#2dd4bf" opacity="0.2"><animate attributeName="r" values="4;6;4" dur="2s" repeatCount="indefinite"/></circle><path d="M28 32 L36 32M32 28 L32 36" stroke="#2dd4bf" stroke-width="1.5" opacity="0.4"/></svg>`,
   quantumExtractor:`<svg viewBox="0 0 64 64" fill="none"><rect x="10" y="12" width="44" height="40" rx="3" fill="#0a0818" stroke="#818cf8" stroke-width="1.5"/><circle cx="32" cy="30" r="10" fill="none" stroke="#818cf8" stroke-width="0.8" opacity="0.3"/><circle cx="32" cy="30" r="5" fill="none" stroke="#818cf8" stroke-width="1.2" opacity="0.5"><animate attributeName="r" values="4;7;4" dur="2.5s" repeatCount="indefinite"/></circle><circle cx="32" cy="30" r="2" fill="#818cf8" opacity="0.6"/><path d="M24 42 L32 38 L40 42" fill="none" stroke="#818cf8" stroke-width="1" opacity="0.4"/></svg>`,
   resonanceChamber:`<svg viewBox="0 0 64 64" fill="none"><rect x="10" y="12" width="44" height="40" rx="3" fill="#0f0520" stroke="#c084fc" stroke-width="1.5"/><circle cx="32" cy="30" r="12" fill="none" stroke="#c084fc" stroke-width="0.8" opacity="0.2"/><circle cx="32" cy="30" r="8" fill="none" stroke="#c084fc" stroke-width="1" opacity="0.3"><animateTransform attributeName="transform" type="rotate" from="0 32 30" to="360 32 30" dur="5s" repeatCount="indefinite"/></circle><circle cx="32" cy="30" r="3" fill="#c084fc" opacity="0.4"><animate attributeName="opacity" values="0.2;0.6;0.2" dur="2s" repeatCount="indefinite"/></circle><text x="32" y="46" text-anchor="middle" fill="#c084fc" font-size="6" opacity="0.4">QS</text></svg>`,
@@ -1716,6 +1830,55 @@ const FLOW_MAP = [
   { from:'fermentVacuole',   to:'nanoAssembler',      res:'energy',   icon:'⚡', color:'#f59e0b', label:'ATP' },
   { from:'fermentVacuole',   to:'pheromoneStation',   res:'energy',   icon:'⚡', color:'#f59e0b', label:'ATP' },
   { from:'fermentVacuole',   to:'resonanceChamber',   res:'energy',   icon:'⚡', color:'#f59e0b', label:'ATP' },
+  // v3.0 §5: 信号中继站 — 万能中继（所有产出建筑可发→中继，中继可发→所有消耗建筑）
+  // 中继不生产不消耗，只转发。FLOW_MAP用于验证连接合法性。
+  { from:'glucoseCollector', to:'signalRelay',         res:'glucose',  icon:'🟢', color:'#22c55e', label:'葡萄糖' },
+  { from:'energyStation',    to:'signalRelay',         res:'energy',   icon:'⚡', color:'#f97316', label:'ATP' },
+  { from:'energyBuffer',     to:'signalRelay',         res:'energy',   icon:'⚡', color:'#fb923c', label:'ATP' },
+  { from:'nitrogenFixer',    to:'signalRelay',         res:'nitrogen', icon:'🔵', color:'#3b82f6', label:'氮源' },
+  { from:'proteinFactory',   to:'signalRelay',         res:'protein',  icon:'🧪', color:'#ec4899', label:'蛋白质' },
+  { from:'aminoSynth',       to:'signalRelay',         res:'protein',  icon:'🧪', color:'#f472b6', label:'蛋白质' },
+  { from:'geneExtractor',    to:'signalRelay',         res:'dna',      icon:'🧬', color:'#a855f7', label:'DNA' },
+  { from:'biofilmReactor',   to:'signalRelay',         res:'biomass',  icon:'🧱', color:'#14b8a6', label:'生物质' },
+  { from:'sporeSower',       to:'signalRelay',         res:'dna',      icon:'🧬', color:'#34d399', label:'DNA' },
+  { from:'qsController',     to:'signalRelay',         res:'qs',       icon:'📡', color:'#eab308', label:'QS信号' },
+  { from:'fermentVacuole',   to:'signalRelay',         res:'energy',   icon:'⚡', color:'#f59e0b', label:'ATP' },
+  { from:'nanoAssembler',    to:'signalRelay',         res:'biomass',  icon:'🧱', color:'#a3e635', label:'生物质' },
+  { from:'resonanceChamber', to:'signalRelay',         res:'glucose',  icon:'🟢', color:'#c084fc', label:'葡萄糖' },
+  // 中继→消耗建筑
+  { from:'signalRelay',      to:'energyStation',       res:'glucose',  icon:'🟢', color:'#60a5fa', label:'葡萄糖' },
+  { from:'signalRelay',      to:'simpleExtractor',     res:'glucose',  icon:'🟢', color:'#60a5fa', label:'葡萄糖' },
+  { from:'signalRelay',      to:'simpleExtractor',     res:'energy',   icon:'⚡', color:'#60a5fa', label:'ATP' },
+  { from:'signalRelay',      to:'energyBuffer',        res:'glucose',  icon:'🟢', color:'#60a5fa', label:'葡萄糖' },
+  { from:'signalRelay',      to:'nitrogenFixer',       res:'energy',   icon:'⚡', color:'#60a5fa', label:'ATP' },
+  { from:'signalRelay',      to:'proteinFactory',      res:'nitrogen', icon:'🔵', color:'#60a5fa', label:'氮源' },
+  { from:'signalRelay',      to:'proteinFactory',      res:'energy',   icon:'⚡', color:'#60a5fa', label:'ATP' },
+  { from:'signalRelay',      to:'geneExtractor',       res:'protein',  icon:'🧪', color:'#60a5fa', label:'蛋白质' },
+  { from:'signalRelay',      to:'geneExtractor',       res:'energy',   icon:'⚡', color:'#60a5fa', label:'ATP' },
+  { from:'signalRelay',      to:'aminoSynth',          res:'nitrogen', icon:'🔵', color:'#60a5fa', label:'氮源' },
+  { from:'signalRelay',      to:'aminoSynth',          res:'glucose',  icon:'🟢', color:'#60a5fa', label:'葡萄糖' },
+  { from:'signalRelay',      to:'ribosomeCluster',     res:'protein',  icon:'🧪', color:'#60a5fa', label:'蛋白质' },
+  { from:'signalRelay',      to:'ribosomeCluster',     res:'energy',   icon:'⚡', color:'#60a5fa', label:'ATP' },
+  { from:'signalRelay',      to:'biofilmReactor',      res:'glucose',  icon:'🟢', color:'#60a5fa', label:'葡萄糖' },
+  { from:'signalRelay',      to:'biofilmReactor',      res:'nitrogen', icon:'🔵', color:'#60a5fa', label:'氮源' },
+  { from:'signalRelay',      to:'biofilmReactor',      res:'energy',   icon:'⚡', color:'#60a5fa', label:'ATP' },
+  { from:'signalRelay',      to:'sporeSower',          res:'biomass',  icon:'🧱', color:'#60a5fa', label:'生物质' },
+  { from:'signalRelay',      to:'sporeSower',          res:'energy',   icon:'⚡', color:'#60a5fa', label:'ATP' },
+  { from:'signalRelay',      to:'biomassConverter',    res:'protein',  icon:'🧪', color:'#60a5fa', label:'蛋白质' },
+  { from:'signalRelay',      to:'biomassConverter',    res:'energy',   icon:'⚡', color:'#60a5fa', label:'ATP' },
+  { from:'signalRelay',      to:'quantumExtractor',    res:'nitrogen', icon:'🔵', color:'#60a5fa', label:'氮源' },
+  { from:'signalRelay',      to:'quantumExtractor',    res:'energy',   icon:'⚡', color:'#60a5fa', label:'ATP' },
+  { from:'signalRelay',      to:'fermentVacuole',      res:'biomass',  icon:'🧱', color:'#60a5fa', label:'生物质' },
+  { from:'signalRelay',      to:'fermentVacuole',      res:'protein',  icon:'🧪', color:'#60a5fa', label:'蛋白质' },
+  { from:'signalRelay',      to:'qsController',        res:'energy',   icon:'⚡', color:'#60a5fa', label:'ATP' },
+  { from:'signalRelay',      to:'nanoAssembler',       res:'qs',       icon:'📡', color:'#60a5fa', label:'QS信号' },
+  { from:'signalRelay',      to:'nanoAssembler',       res:'energy',   icon:'⚡', color:'#60a5fa', label:'ATP' },
+  { from:'signalRelay',      to:'pheromoneStation',    res:'protein',  icon:'🧪', color:'#60a5fa', label:'蛋白质' },
+  { from:'signalRelay',      to:'pheromoneStation',    res:'energy',   icon:'⚡', color:'#60a5fa', label:'ATP' },
+  { from:'signalRelay',      to:'resonanceChamber',    res:'qs',       icon:'📡', color:'#60a5fa', label:'QS信号' },
+  { from:'signalRelay',      to:'resonanceChamber',    res:'energy',   icon:'⚡', color:'#60a5fa', label:'ATP' },
+  // 中继↔中继（中继链）
+  { from:'signalRelay',      to:'signalRelay',         res:'glucose',  icon:'🟢', color:'#60a5fa', label:'中继' },
 ];
 
 // ===== PETRI DISH EXPERIMENT RECIPES =====
@@ -1804,6 +1967,240 @@ const CHALLENGES = [
   { id:'ch_qs20', n:'📡 信号风暴', d:'90秒内QS信号达到20', phase:4, time:90, check: (s) => s.res.qs >= 20, reward:{ energy:200, dna:40 }, icon:'📡' },
   { id:'ch_build15', n:'🌆 都市扩张', d:'拥有15+建筑', phase:4, time:180, check: (s) => s.totalBuildings() >= 15, reward:{ biomass:30, protein:40 }, icon:'🌆' },
 ];
+
+// ===== v3.0 §2: EXPLORATION GOALS — 阶段探索度积分项 =====
+// 每个阶段transition (P1→P2, P2→P3, ...) 定义一组探索度目标
+// required = 需要达成的最低积分数（从列表中任选N个）
+const EXPLORATION_GOALS = {
+  // P1→P2: 需3分（任选3）
+  1: {
+    required: 3,
+    goals: [
+      { id:'p1_belt3',   n:'建立3条传送带',      icon:'🔗', type:'连线',
+        check: s => (s._activeBelts||[]).length >= 3, progress: s => Math.min((s._activeBelts||[]).length, 3), max: 3 },
+      { id:'p1_adj3',    n:'发现3条邻接规则',    icon:'🏗️', type:'布局',
+        check: s => Object.keys(s._discoveredAdj||{}).length >= 3, progress: s => Math.min(Object.keys(s._discoveredAdj||{}).length, 3), max: 3 },
+      { id:'p1_ch1',     n:'完成1个P1挑战',      icon:'🎯', type:'挑战',
+        check: s => CHALLENGES.filter(c => c.phase === 1 && s.completedChallenges[c.id]).length >= 1, progress: s => Math.min(CHALLENGES.filter(c => c.phase === 1 && s.completedChallenges[c.id]).length, 1), max: 1 },
+      { id:'p1_buffer',  n:'拥有能量缓冲池',     icon:'🔋', type:'建设',
+        check: s => s.bldCount('energyBuffer') >= 1, progress: s => Math.min(s.bldCount('energyBuffer'), 1), max: 1 },
+      { id:'p1_bld5',    n:'累计建造5个建筑',     icon:'🏗️', type:'建设',
+        check: s => s.totalBuildings() >= 5, progress: s => Math.min(s.totalBuildings(), 5), max: 5 },
+      { id:'p1_evo3',    n:'进化到Lv.3',         icon:'📈', type:'成长',
+        check: s => s.eL >= 3, progress: s => Math.min(s.eL, 3), max: 3 },
+    ],
+  },
+  // P2→P3: 需4分（任选4）
+  2: {
+    required: 4,
+    goals: [
+      { id:'p2_mbelt4',  n:'手动连接4条传送带',   icon:'🔗', type:'连线',
+        check: s => Object.keys(s.manualBelts||{}).length >= 4, progress: s => Math.min(Object.keys(s.manualBelts||{}).length, 4), max: 4 },
+      { id:'p2_dist2',   n:'建立1条2格+距离传送带', icon:'🔗', type:'远距',
+        check: s => (s.stats.maxBeltDist||0) >= 2, progress: s => Math.min(s.stats.maxBeltDist||0, 2) >= 2 ? 1 : 0, max: 1 },
+      { id:'p2_combo3',  n:'达成3连击传送带',     icon:'⚡', type:'技巧',
+        check: s => (s.stats.maxBeltCombo||0) >= 3, progress: s => Math.min(s.stats.maxBeltCombo||0, 3), max: 3 },
+      { id:'p2_adj6',    n:'发现6条邻接规则',     icon:'🏗️', type:'布局',
+        check: s => Object.keys(s._discoveredAdj||{}).length >= 6, progress: s => Math.min(Object.keys(s._discoveredAdj||{}).length, 6), max: 6 },
+      { id:'p2_petri2',  n:'完成2个培养皿实验',   icon:'🧫', type:'探索',
+        check: s => (s._petriCount||0) >= 2, progress: s => Math.min(s._petriCount||0, 2), max: 2 },
+      { id:'p2_branch',  n:'研究1个P2互斥科技',   icon:'🔬', type:'科技',
+        check: s => !!(s.techs.nitrogenCycle?.done || s.techs.proteinEngineering?.done), progress: s => (s.techs.nitrogenCycle?.done || s.techs.proteinEngineering?.done) ? 1 : 0, max: 1 },
+      { id:'p2_bld8',    n:'拥有8+建筑',          icon:'🏗️', type:'建设',
+        check: s => s.totalBuildings() >= 8, progress: s => Math.min(s.totalBuildings(), 8), max: 8 },
+    ],
+  },
+  // P3→P4: 需5分（任选5）
+  3: {
+    required: 5,
+    goals: [
+      { id:'p3_mbelt10', n:'手动连接10条传送带',   icon:'🔗', type:'连线',
+        check: s => Object.keys(s.manualBelts||{}).length >= 10, progress: s => Math.min(Object.keys(s.manualBelts||{}).length, 10), max: 10 },
+      { id:'p3_dist3',   n:'建立2条3格+距离传送带', icon:'🔗', type:'远距',
+        check: s => { const belts = Object.keys(s.manualBelts||{}); let c=0; for(const k of belts){if(s.getBeltDistance(k)>=3)c++;} return c>=2; },
+        progress: s => { const belts = Object.keys(s.manualBelts||{}); let c=0; for(const k of belts){if(s.getBeltDistance(k)>=3)c++;} return Math.min(c,2); }, max: 2 },
+      { id:'p3_sync1',   n:'达成1个供给同步加成',  icon:'⚡', type:'优化',
+        check: s => Object.values(s._syncBonuses||{}).some(sb => sb.sync >= 0.5), progress: s => Object.values(s._syncBonuses||{}).some(sb => sb.sync >= 0.5) ? 1 : 0, max: 1 },
+      { id:'p3_mut1',    n:'激活1个突变',          icon:'🧬', type:'突变',
+        check: s => (s._mutSlots||[]).length >= 1, progress: s => Math.min((s._mutSlots||[]).length, 1), max: 1 },
+      { id:'p3_adj12',   n:'发现12条邻接规则',     icon:'🏗️', type:'布局',
+        check: s => Object.keys(s._discoveredAdj||{}).length >= 12, progress: s => Math.min(Object.keys(s._discoveredAdj||{}).length, 12), max: 12 },
+      { id:'p3_petri3',  n:'完成3个培养皿实验',    icon:'🧫', type:'探索',
+        check: s => (s._petriCount||0) >= 3, progress: s => Math.min(s._petriCount||0, 3), max: 3 },
+      { id:'p3_p3bld3',  n:'拥有3种不同P3建筑',   icon:'🏗️', type:'建设',
+        check: s => { const p3b=['biofilmReactor','transport','sporeSower','metabolicLoop','nanoAssembler']; return p3b.filter(b=>s.bldCount(b)>0).length>=3; },
+        progress: s => { const p3b=['biofilmReactor','transport','sporeSower','metabolicLoop','nanoAssembler']; return Math.min(p3b.filter(b=>s.bldCount(b)>0).length,3); }, max: 3 },
+    ],
+  },
+  // P4→P5: 需4分（任选4）
+  4: {
+    required: 4,
+    goals: [
+      { id:'p4_belt15',  n:'传送带总数≥15',       icon:'🔗', type:'连线',
+        check: s => (s._activeBelts||[]).length >= 15, progress: s => Math.min((s._activeBelts||[]).length, 15), max: 15 },
+      { id:'p4_sync2',   n:'2个建筑达到供给同步',  icon:'⚡', type:'优化',
+        check: s => Object.values(s._syncBonuses||{}).filter(sb => sb.sync >= 0.5).length >= 2, progress: s => Math.min(Object.values(s._syncBonuses||{}).filter(sb => sb.sync >= 0.5).length, 2), max: 2 },
+      { id:'p4_mut3',    n:'激活3个突变',          icon:'🧬', type:'突变',
+        check: s => (s._mutSlots||[]).length >= 3, progress: s => Math.min((s._mutSlots||[]).length, 3), max: 3 },
+      { id:'p4_adj18',   n:'发现18条邻接规则',     icon:'🏗️', type:'布局',
+        check: s => Object.keys(s._discoveredAdj||{}).length >= 18, progress: s => Math.min(Object.keys(s._discoveredAdj||{}).length, 18), max: 18 },
+      { id:'p4_qs30',    n:'QS信号库存≥30',       icon:'📡', type:'经济',
+        check: s => (s.res.qs||0) >= 30, progress: s => Math.min(s.res.qs||0, 30), max: 30 },
+      { id:'p4_ch4',     n:'完成1个P4挑战',        icon:'🎯', type:'挑战',
+        check: s => CHALLENGES.filter(c => c.phase === 4 && s.completedChallenges[c.id]).length >= 1, progress: s => Math.min(CHALLENGES.filter(c => c.phase === 4 && s.completedChallenges[c.id]).length, 1), max: 1 },
+      { id:'p4_branch4', n:'研究1个P4互斥科技',    icon:'🔬', type:'科技',
+        check: s => !!(s.techs.signalAmplifier?.done || s.techs.evolutionCatalyst?.done), progress: s => (s.techs.signalAmplifier?.done || s.techs.evolutionCatalyst?.done) ? 1 : 0, max: 1 },
+    ],
+  },
+};
+
+// ===== v3.0 §6: P3子阶段 — P3b建筑集合 + P3a→P3b探索度 =====
+// P3a (物流基础): biofilmReactor, transport, sporeSower — 研究biofilmTech后解锁
+// P3b (物流进阶): metabolicLoop, signalRelay, fermentVacuole, biomassConverter, quantumExtractor — P3a探索度≥3
+const P3B_BUILDINGS = new Set(['metabolicLoop', 'signalRelay', 'fermentVacuole', 'biomassConverter', 'quantumExtractor']);
+
+const P3B_EXPLORATION_GOALS = {
+  required: 3,
+  goals: [
+    { id:'p3b_bld2',   n:'拥有2种P3a建筑',         icon:'🏗️', type:'建设',
+      check: s => ['biofilmReactor','transport','sporeSower'].filter(b => s.bldCount(b) > 0).length >= 2,
+      progress: s => Math.min(['biofilmReactor','transport','sporeSower'].filter(b => s.bldCount(b) > 0).length, 2), max: 2 },
+    { id:'p3b_petri1', n:'完成1个P3培养皿实验',     icon:'🧫', type:'探索',
+      check: s => (s._petriCount||0) >= 1 + (s._p3bPetriBase||0),
+      progress: s => Math.min((s._petriCount||0) - (s._p3bPetriBase||0), 1), max: 1 },
+    { id:'p3b_mut1',   n:'激活1个突变',             icon:'🧬', type:'突变',
+      check: s => (s._mutSlots||[]).length >= 1,
+      progress: s => Math.min((s._mutSlots||[]).length, 1), max: 1 },
+    { id:'p3b_belt8',  n:'手动连接8+传送带',        icon:'🔗', type:'连线',
+      check: s => Object.keys(s.manualBelts||{}).length >= 8,
+      progress: s => Math.min(Object.keys(s.manualBelts||{}).length, 8), max: 8 },
+    { id:'p3b_adj10',  n:'发现10条邻接规则',        icon:'🏗️', type:'布局',
+      check: s => Object.keys(s._discoveredAdj||{}).length >= 10,
+      progress: s => Math.min(Object.keys(s._discoveredAdj||{}).length, 10), max: 10 },
+    { id:'p3b_dist3',  n:'拥有1条3格+距离传送带',   icon:'🔗', type:'远距',
+      check: s => (s.stats.maxBeltDist||0) >= 3,
+      progress: s => (s.stats.maxBeltDist||0) >= 3 ? 1 : 0, max: 1 },
+  ],
+};
+
+// ===== v3.0 §9.2: 建筑Lv3特化 — 二选一路线 =====
+const SPECIALIZATIONS = {
+  transport: {
+    name: '菌丝运输网',
+    options: [
+      { id:'transport_range', name:'覆盖扩展', icon:'📡', color:'#14b8a6',
+        desc:'+1最大传送带连线距离（4→5格）',
+        effect: { type:'beltRange', value: 1 } },
+      { id:'transport_speed', name:'高速通道', icon:'⚡', color:'#eab308',
+        desc:'所有传送带效率+15%',
+        effect: { type:'beltEfficiency', value: 0.15 } },
+    ]
+  },
+  biofilmReactor: {
+    name: '生物膜反应器',
+    options: [
+      { id:'biofilm_adj', name:'膜基防护', icon:'🛡️', color:'#22c55e',
+        desc:'该建筑邻接加成+20%',
+        effect: { type:'adjBonus', value: 0.20 } },
+      { id:'biofilm_port', name:'膜基枢纽', icon:'🔗', color:'#f97316',
+        desc:'+1输出端口',
+        effect: { type:'extraOutPort', value: 1 } },
+    ]
+  },
+  signalRelay: {
+    name: '信号中继站',
+    options: [
+      { id:'relay_amp', name:'信号增幅', icon:'📶', color:'#60a5fa',
+        desc:'中继衰减降至0%（正常5%/跳）',
+        effect: { type:'relayDecay', value: 0 } },
+      { id:'relay_hub', name:'分流枢纽', icon:'🔀', color:'#c084fc',
+        desc:'+2端口（可实现1进5出的分流）',
+        effect: { type:'extraPorts', value: 2 } },
+    ]
+  },
+};
+
+// ===== v3.0 §1: EVOLUTION TASKS — 进化培养3选1任务 =====
+// 每个阶段transition定义3类任务(连线/布局/经济)，进化时随机抽1个/类
+const EVOLUTION_TASKS = {
+  // P1→P2 (简单教学)
+  1: [
+    { id:'et1_belt2', type:'连线', icon:'🔗', n:'建立2条传送带连接',
+      check: s => (s._activeBelts||[]).length >= 2 + (s._evoTaskBase?.belt||0),
+      progress: s => Math.min((s._activeBelts||[]).length - (s._evoTaskBase?.belt||0), 2),
+      max: 2, reward: { energy: 15 } },
+    { id:'et1_adj1', type:'布局', icon:'🏗️', n:'发现1条新邻接规则',
+      check: s => Object.keys(s._discoveredAdj||{}).length >= 1 + (s._evoTaskBase?.adj||0),
+      progress: s => Math.min(Object.keys(s._discoveredAdj||{}).length - (s._evoTaskBase?.adj||0), 1),
+      max: 1, reward: { glucose: 20 } },
+    { id:'et1_econ30', type:'经济', icon:'⏱️', n:'维持30秒葡萄糖正收益',
+      check: s => (s._evoEconTimer||0) >= 30,
+      progress: s => Math.min(s._evoEconTimer||0, 30),
+      max: 30, reward: { dna: 5 } },
+  ],
+  // P2→P3 (引入远距/效率)
+  2: [
+    { id:'et2_dist2', type:'连线', icon:'🔗', n:'建立1条2格+距离传送带',
+      check: s => (s.stats.maxBeltDist||0) >= 2,
+      progress: s => (s.stats.maxBeltDist||0) >= 2 ? 1 : 0,
+      max: 1, reward: { energy: 30 } },
+    { id:'et2_adj3', type:'布局', icon:'🏗️', n:'发现3条新邻接规则',
+      check: s => Object.keys(s._discoveredAdj||{}).length >= 3 + (s._evoTaskBase?.adj||0),
+      progress: s => Math.min(Object.keys(s._discoveredAdj||{}).length - (s._evoTaskBase?.adj||0), 3),
+      max: 3, reward: { nitrogen: 10 } },
+    { id:'et2_res4', type:'经济', icon:'⏱️', n:'同时拥有4种资源≥10',
+      check: s => ['glucose','energy','dna','nitrogen','protein','biomass','qs'].filter(r => (s.res[r]||0)>=10).length >= 4,
+      progress: s => Math.min(['glucose','energy','dna','nitrogen','protein','biomass','qs'].filter(r => (s.res[r]||0)>=10).length, 4),
+      max: 4, reward: { protein: 8 } },
+  ],
+  // P3→P4 (策略深度)
+  3: [
+    { id:'et3_combo3', type:'连线', icon:'🔗', n:'达成3连击传送带',
+      check: s => (s.stats.maxBeltCombo||0) >= 3,
+      progress: s => Math.min(s.stats.maxBeltCombo||0, 3),
+      max: 3, reward: { biomass: 15 } },
+    { id:'et3_adj20', type:'布局', icon:'🏗️', n:'使1建筑获≥20%邻接加成',
+      check: s => {
+        if (!s.grid) return false;
+        for (let i = 0; i < s.grid.length; i++) {
+          if (!s.grid[i]) continue;
+          const adj = s.getAdjacencyBonus(i, s.grid[i].type);
+          if (adj && adj.total >= 0.20) return true;
+        }
+        return false;
+      },
+      progress: s => {
+        let best = 0;
+        if (!s.grid) return 0;
+        for (let i = 0; i < s.grid.length; i++) {
+          if (!s.grid[i]) continue;
+          const adj = s.getAdjacencyBonus(i, s.grid[i].type);
+          if (adj) best = Math.max(best, adj.total);
+        }
+        return best >= 0.20 ? 1 : 0;
+      },
+      max: 1, reward: { protein: 12 } },
+    { id:'et3_sync1', type:'经济', icon:'⏱️', n:'让1个建筑达到供给同步',
+      check: s => Object.values(s._syncBonuses||{}).some(sb => sb.sync >= 0.5),
+      progress: s => Object.values(s._syncBonuses||{}).some(sb => sb.sync >= 0.5) ? 1 : 0,
+      max: 1, reward: { dna: 15 } },
+  ],
+  // P4→P5 (综合挑战)
+  4: [
+    { id:'et4_dist4', type:'连线', icon:'🔗', n:'建立1条4格距离传送带',
+      check: s => (s.stats.maxBeltDist||0) >= 4,
+      progress: s => (s.stats.maxBeltDist||0) >= 4 ? 1 : 0,
+      max: 1, reward: { qs: 5 } },
+    { id:'et4_bld12', type:'布局', icon:'🏗️', n:'拥有12+建筑',
+      check: s => s.totalBuildings() >= 12,
+      progress: s => Math.min(s.totalBuildings(), 12),
+      max: 12, reward: { biomass: 20 } },
+    { id:'et4_qs15', type:'经济', icon:'⏱️', n:'QS信号库存≥15',
+      check: s => (s.res.qs||0) >= 15,
+      progress: s => Math.min(Math.floor(s.res.qs||0), 15),
+      max: 15, reward: { dna: 20 } },
+  ],
+};
 
 // ===== MORE RANDOM EVENTS (with choice events) =====
 const EVENTS_EXTRA = [
@@ -2073,6 +2470,9 @@ const G = {
   _coreBonus: 0,
   _beltBonus: 0,
   _costDiscount: 0,
+  // v3.0 §9.2: 建筑特化
+  _specializations: {},    // { idx: { id, name, icon, color, desc, effect } }
+  _specCache: { extraBeltRange: 0, beltEffBonus: 0, relayDecayOverride: null, relayExtraPorts: 0, perBuilding: {} },
   // Power level system
   _foodPowerLevel: 1.0, // 1.0 = full power, 0.2 = minimum
   _powerWarningShown: false,
@@ -2093,6 +2493,15 @@ const G = {
   _beltCombo: 0,           // ★ 方案A：传送带连击计数
   _beltComboTimer: null,   // 传送带连击计时器
   _beltMaintCost: 0,       // v3.0 §4: 远距传送带维护费总计
+  _prevExplScore: 0,       // v3.0 §2: 上一次探索度得分（用于检测变化）
+  // v3.0 §1: 进化培养任务
+  _evoTask: null,          // 当前活跃的培养任务 { id, type, icon, n, check, progress, max, reward, startTime }
+  _evoTaskBase: null,      // 任务开始时的基线快照 { belt, adj }
+  _evoEconTimer: 0,        // 经济任务秒计时器（如"维持30秒正收益"）
+  _evoTaskStartTime: 0,    // 任务开始时间戳
+  // v3.0 §6: P3子阶段
+  _p3bUnlocked: false,     // P3b是否已解锁
+  _p3bExplScore: 0,        // P3a→P3b 探索度得分（缓存）
   // ★ 方案A+C：维护费与资源竞争
   _maintenanceCost: {},    // 当前帧总维护费 { energy: X, glucose: Y, ... }
   _maintenanceOverhead: 1, // 当前管理开销倍率
@@ -2815,6 +3224,8 @@ const G = {
     list.innerHTML = '';
     let _lastPhase = 0;      // 用于追踪阶段分隔
     let _p2bDividerShown = false; // P2b分隔符是否已插入
+    let _p3aDividerShown = false; // P3a分隔符
+    let _p3bDividerShown = false; // P3b分隔符
     for (let key in BLDS) {
       const b = BLDS[key];
       if (b.phase > this.phase) continue;
@@ -2840,9 +3251,39 @@ const G = {
           list.appendChild(p2bHeader);
         }
       }
+
+      // v3.0 §6: P3子阶段视觉分隔
+      if (this.phase >= 3 && b.phase === 3) {
+        // P3a标题（首次遇到P3建筑时插入）
+        if (_lastPhase < 3 && !_p3aDividerShown) {
+          _p3aDividerShown = true;
+          const p3aHeader = document.createElement('div');
+          p3aHeader.className = 'phase-sub-header';
+          p3aHeader.innerHTML = '<span class="phase-sub-icon">🧫</span> P3a · 物流基础';
+          p3aHeader.style.cssText = 'font-size:0.78em;color:var(--teal);padding:6px 8px 2px;opacity:0.85;font-weight:600;letter-spacing:0.5px;border-top:1px solid rgba(20,184,166,0.15);margin-top:4px';
+          list.appendChild(p3aHeader);
+        }
+        // P3b分隔符（在第一个P3b建筑前插入）
+        if (P3B_BUILDINGS.has(key) && !_p3bDividerShown) {
+          _p3bDividerShown = true;
+          const p3bHeader = document.createElement('div');
+          p3bHeader.className = 'phase-sub-header';
+          const p3bStatus = this._p3bUnlocked
+            ? '<span style="color:var(--green);font-size:0.85em">✓ 已解锁</span>'
+            : (() => {
+                const es = this.getP3bExplorationStatus();
+                return `<span style="color:var(--orange);font-size:0.85em">🔒 P3a探索度 ${es.score}/${es.required}</span>`;
+              })();
+          p3bHeader.innerHTML = `<span class="phase-sub-icon">📡</span> P3b · 物流进阶 ${p3bStatus}`;
+          p3bHeader.style.cssText = 'font-size:0.78em;color:#60a5fa;padding:6px 8px 2px;opacity:0.85;font-weight:600;letter-spacing:0.5px;border-top:1px dashed rgba(96,165,250,0.25);margin-top:6px';
+          list.appendChild(p3bHeader);
+        }
+      }
       _lastPhase = b.phase;
 
-      const locked = b.techReq && !this.techs[b.techReq]?.done;
+      // v3.0 §6: P3b门控 — 未解锁P3b时，P3b建筑显示锁定
+      const isP3bLocked = b.phase === 3 && P3B_BUILDINGS.has(key) && !this._p3bUnlocked;
+      const locked = isP3bLocked || (b.techReq && !this.techs[b.techReq]?.done);
 
       // 外层容器，包含建筑按钮 + 升级按钮
       const row = document.createElement('div');
@@ -2878,7 +3319,14 @@ const G = {
         </div>
         ${tagHTML}
       `;
-      btn.onclick = () => { if(!locked) this.selectBuilding(key); };
+      btn.onclick = () => {
+        if (isP3bLocked) {
+          const es = this.getP3bExplorationStatus();
+          this.showEvent('🔒 需要 P3b 物流进阶', `这个建筑需要完成P3a阶段的探索才能解锁。\n\n当前P3b探索度: ${es.score}/${es.required}\n\n继续在P3a阶段探索：建造P3a建筑、连接传送带、发现邻接规则...`, '#60a5fa');
+          return;
+        }
+        if(!locked) this.selectBuilding(key);
+      };
 
       // ===== 拖拽建造：从侧栏拖建筑到网格直接放置 =====
       if (!locked) {
@@ -3459,11 +3907,160 @@ const G = {
     this.updateRates();
     this.updateUI();
 
+    // v3.0 §9.2: 升级到Lv3时触发特化选择
+    if (lv === 3 && SPECIALIZATIONS[buildingKey] && !this._specializations?.[idx]) {
+      setTimeout(() => this._showSpecializationChoice(idx, buildingKey), 300);
+    }
+
     // 如果全部满级了，显示完成提示
     const allMax = instances.every(i => (this.buildingLevels[i] || 1) >= 5);
     if (allMax) {
       this.showGoldenFloat(`🌟 ${bd.n} 全部满级！`);
     }
+  },
+
+  // ===== v3.0 §9.2: 建筑Lv3特化系统 =====
+  _showSpecializationChoice(idx, bldType) {
+    const spec = SPECIALIZATIONS[bldType];
+    if (!spec) return;
+    if (!this._specializations) this._specializations = {};
+    if (this._specializations[idx]) return; // 已特化
+
+    const bd = BLDS[bldType];
+    const overlay = document.createElement('div');
+    overlay.id = 'specChoiceOverlay';
+    overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.88);z-index:9999;display:flex;align-items:center;justify-content:center;animation:fadeIn 0.3s';
+
+    let html = `<div style="background:#1a1a2e;border:1px solid #fbbf2440;border-radius:10px;padding:20px;max-width:360px;width:90%;box-shadow:0 0 30px rgba(251,191,36,0.15)">`;
+    html += `<div style="text-align:center;margin-bottom:12px">`;
+    html += `<div style="font-size:1.5em">${bd.emoji}</div>`;
+    html += `<div style="font-size:1em;font-weight:700;color:#fbbf24;margin-top:4px">${spec.name} — Lv.3 特化</div>`;
+    html += `<div style="font-size:0.75em;color:#94a3b8;margin-top:4px">选择一条永久特化路线（不可更改）</div>`;
+    html += `</div>`;
+
+    html += `<div style="display:flex;flex-direction:column;gap:8px">`;
+    for (let i = 0; i < spec.options.length; i++) {
+      const opt = spec.options[i];
+      html += `<button class="spec-choice-btn" data-idx="${i}" style="
+        background:linear-gradient(135deg, ${opt.color}15, ${opt.color}08);
+        border:1px solid ${opt.color}40;
+        border-radius:8px;
+        padding:12px;
+        cursor:pointer;
+        text-align:left;
+        transition:all 0.2s;
+        color:#e2e8f0;
+      " onmouseover="this.style.borderColor='${opt.color}';this.style.boxShadow='0 0 12px ${opt.color}30'"
+         onmouseout="this.style.borderColor='${opt.color}40';this.style.boxShadow='none'">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+          <span style="font-size:1.2em">${opt.icon}</span>
+          <span style="font-weight:700;color:${opt.color};font-size:0.9em">${opt.name}</span>
+        </div>
+        <div style="font-size:0.75em;color:#94a3b8;line-height:1.4">${opt.desc}</div>
+      </button>`;
+    }
+    html += `</div>`;
+    html += `</div>`;
+
+    overlay.innerHTML = html;
+    document.body.appendChild(overlay);
+
+    // 绑定选择事件
+    overlay.querySelectorAll('.spec-choice-btn').forEach(btn => {
+      btn.onclick = () => {
+        const optIdx = parseInt(btn.dataset.idx);
+        const chosen = spec.options[optIdx];
+        this._applySpecialization(idx, bldType, chosen);
+        overlay.remove();
+      };
+    });
+  },
+
+  _applySpecialization(idx, bldType, option) {
+    if (!this._specializations) this._specializations = {};
+    this._specializations[idx] = {
+      type: bldType,
+      id: option.id,
+      name: option.name,
+      icon: option.icon,
+      color: option.color,
+      desc: option.desc,
+      effect: option.effect,
+    };
+
+    // 即时反馈
+    const bd = BLDS[bldType];
+    this.log(`⭐ ${bd.n} 特化为 ${option.icon} ${option.name} — ${option.desc}`, 's');
+    this.showEvent(
+      `⭐ ${option.icon} ${option.name}`,
+      `${bd.emoji} ${bd.n} 已永久特化！\n\n${option.desc}\n\n💡 此选择不可更改，同类建筑可以选择不同特化。`,
+      option.color
+    );
+    SFX.milestone();
+    this.buildBurst(idx);
+    this.screenShake(5);
+
+    // 重新计算特化效果缓存
+    this._recalcSpecEffects();
+    this.renderGrid();
+    this.updateRates();
+    this.updateUI();
+  },
+
+  // 重新计算所有特化效果的聚合缓存
+  _recalcSpecEffects() {
+    const specs = this._specializations || {};
+    // 聚合效果
+    let extraBeltRange = 0;       // transport_range: +N格
+    let beltEffBonus = 0;         // transport_speed: +N%
+    let relayDecayOverride = null; // relay_amp: 衰减覆盖
+    let relayExtraPorts = 0;      // relay_hub: 额外端口
+    // 逐建筑效果存储在 _specPerBuilding
+    const perBuilding = {};
+
+    for (const idxStr in specs) {
+      const s = specs[idxStr];
+      const idx = parseInt(idxStr);
+      const eff = s.effect;
+      if (!eff) continue;
+
+      switch (eff.type) {
+        case 'beltRange':
+          extraBeltRange += eff.value;
+          break;
+        case 'beltEfficiency':
+          beltEffBonus += eff.value;
+          break;
+        case 'adjBonus':
+          if (!perBuilding[idx]) perBuilding[idx] = {};
+          perBuilding[idx].adjBonusMult = 1 + eff.value;
+          break;
+        case 'extraOutPort':
+          if (!perBuilding[idx]) perBuilding[idx] = {};
+          perBuilding[idx].extraOutPort = eff.value;
+          break;
+        case 'relayDecay':
+          relayDecayOverride = eff.value;
+          break;
+        case 'extraPorts':
+          if (!perBuilding[idx]) perBuilding[idx] = {};
+          perBuilding[idx].extraPorts = eff.value;
+          break;
+      }
+    }
+
+    this._specCache = {
+      extraBeltRange,
+      beltEffBonus,
+      relayDecayOverride,
+      relayExtraPorts,
+      perBuilding,
+    };
+  },
+
+  // 获取建筑的特化信息（用于tooltip等）
+  getSpecialization(idx) {
+    return this._specializations?.[idx] || null;
   },
 
   // 全部升到满级（逐级升，带动画序列）
@@ -3548,6 +4145,10 @@ const G = {
       const done = this.techs[key]?.done;
       const isResearching = this.rTech === key;
 
+      // v3.0 §3: 前置条件状态
+      const prereq = this.getTechPrereqStatus(key);
+      const prereqLocked = prereq.hasPrereq && !prereq.met && !done;
+
       let exclusiveLocked = false;
       let exclusiveBy = '';
       if (t.exclusive) {
@@ -3561,6 +4162,7 @@ const G = {
       if (done) cls += ' done';
       else if (exclusiveLocked) cls += ' exclusive-locked';
       else if (locked) cls += ' locked';
+      else if (prereqLocked) cls += ' prereq-locked';
       if (isResearching) cls += ' researching';
       node.className = cls;
       node.id = 'tech-' + key;
@@ -3576,6 +4178,20 @@ const G = {
         statusStr = `${costStr} · ${t.time}s`;
       }
 
+      // v3.0 §3: 前置条件显示行
+      let prereqHTML = '';
+      if (prereq.hasPrereq && !done && !exclusiveLocked) {
+        if (prereq.met) {
+          prereqHTML = `<div class="tt-prereq met">✅ ${prereq.icon} ${prereq.label}</div>`;
+        } else {
+          const pct = prereq.max > 0 ? Math.min(prereq.progress / prereq.max * 100, 100) : 0;
+          const reducedTag = prereq.reduced ? ' <span style="color:#14b8a6;font-size:0.8em">♻️-25%</span>' : '';
+          prereqHTML = `<div class="tt-prereq">🔒 ${prereq.icon} ${prereq.label} <span class="tt-prereq-prog">(${prereq.progress}/${prereq.max})</span>${reducedTag}
+            <div class="tt-prereq-bar"><div class="tt-prereq-fill" style="width:${pct}%"></div></div>
+          </div>`;
+        }
+      }
+
       let branchTag = '';
       if (t.exclusive && !done && !exclusiveLocked) {
         branchTag = '<span class="tt-exclusive-tag">⚡二选一</span>';
@@ -3584,12 +4200,21 @@ const G = {
       node.innerHTML = `
         <div class="tt-name">${done ? '<span class="done-mark">✓</span>' : ''}${t.n}${branchTag}</div>
         <div class="tt-desc">${t.d} — ${t.ef}</div>
+        ${prereqHTML}
         <div class="tt-cost">${statusStr}</div>
         ${isResearching ? `<div class="prog-wrap"><div class="prog-bar"><div class="prog-fill" id="techFill-${key}" style="width:0%;background:var(--cyan)"></div></div></div>` : ''}
       `;
 
-      if (!locked && !done && !exclusiveLocked) {
+      if (!locked && !done && !exclusiveLocked && !prereqLocked) {
         node.onclick = () => this.startResearch(key);
+      } else if (prereqLocked && !locked && !exclusiveLocked) {
+        // v3.0 §3: 点击前置条件锁定科技时弹出友好提示
+        node.style.cursor = 'pointer';
+        node.onclick = () => {
+          const pq = this.getTechPrereqStatus(key);
+          this.showEvent(`🔒 前置条件未满足`, `「${t.n}」需要先完成:\n\n${pq.icon} ${pq.label}\n当前: ${pq.progress}/${pq.max}\n\n${pq.reduced ? '♻️ 转生减免: 原始要求 ' + pq.baseMax + ' → ' + pq.max : '💡 满足条件后即可开始研究'}`, '#f97316');
+          SFX.buildFail();
+        };
       }
 
       return { node, done, exclusiveLocked };
@@ -4024,8 +4649,12 @@ const G = {
           const mutExtraOut = mpb ? mpb.extraOut : 0;
           const usedIn = getUsedPorts(i, 'in');
           const usedOut = getUsedPorts(i, 'out');
-          const totalMaxIn = portDef.maxIn + mutExtraIn;
-          const totalMaxOut = portDef.maxOut + techExtra + mutExtraOut;
+          // v3.0 §9.2: 特化端口加成
+          const specBld = this._specCache?.perBuilding?.[i];
+          const specExtraOut = (specBld?.extraOutPort || 0) + (specBld?.extraPorts || 0);
+          const specExtraIn = specBld?.extraPorts || 0;
+          const totalMaxIn = portDef.maxIn + mutExtraIn + specExtraIn;
+          const totalMaxOut = portDef.maxOut + techExtra + mutExtraOut + specExtraOut;
 
           // 输入端口（左侧半圆形）
           if (totalMaxIn > 0) {
@@ -4400,13 +5029,25 @@ const G = {
         const mpb = self._mutPortBonuses?.[gridType];
         const mutExtraIn = mpb ? mpb.extraIn : 0;
         const mutExtraOut = mpb ? mpb.extraOut : 0;
-        const maxInEff = portDef.maxIn + mutExtraIn;
-        const maxOutEff = portDef.maxOut + techExtra + mutExtraOut;
+        // v3.0 §9.2: 特化端口加成
+        const specBld2 = self._specCache?.perBuilding?.[idx];
+        const specExtraOut2 = (specBld2?.extraOutPort || 0) + (specBld2?.extraPorts || 0);
+        const specExtraIn2 = specBld2?.extraPorts || 0;
+        const maxInEff = portDef.maxIn + mutExtraIn + specExtraIn2;
+        const maxOutEff = portDef.maxOut + techExtra + mutExtraOut + specExtraOut2;
         const freeIn = maxInEff - usedIn;
         const freeOut = maxOutEff - usedOut;
         const portColor = (freeIn === 0 && freeOut === 0) ? '#facc15' : (freeIn > 0 || freeOut > 0) ? '#06d6a0' : '#888';
         portStr = `<br><span style="color:${portColor};font-size:0.9em">📥 输入: ${usedIn}/${maxInEff}${freeIn > 0 ? ` (空闲${freeIn})` : ''} 📤 输出: ${usedOut}/${maxOutEff}${freeOut > 0 ? ` (空闲${freeOut})` : ''}</span>`;
         if (freeIn === 0 && freeOut === 0) portStr += `<br><span style="color:#facc15;font-size:0.85em">✨ 端口满载！</span>`;
+      }
+      // v3.0 §9.2: 特化信息
+      const specInfo = self.getSpecialization(idx);
+      let specStr = '';
+      if (specInfo) {
+        specStr = `<br><span style="color:${specInfo.color};font-size:0.9em">⭐ 特化: ${specInfo.icon} ${specInfo.name} — ${specInfo.desc}</span>`;
+      } else if (SPECIALIZATIONS[self.grid[idx]?.type] && (self.buildingLevels[idx] || 1) >= 3) {
+        specStr = `<br><span style="color:#94a3b8;font-size:0.85em">⭐ 可特化（需升至Lv.3后选择）</span>`;
       }
       // 资源竞争影响
       if (self.phase >= 3) {
@@ -4422,7 +5063,7 @@ const G = {
         }
       }
       document.getElementById('ttName').innerHTML = `${bd.emoji||''} ${bd.n}${lvlStr} <span style="color:${bd.color};font-size:0.85em">[T${bd.tier||1}]</span>`;
-      document.getElementById('ttDesc').innerHTML = `${bd.d}${multStr}${rateStr}${beltStr}${adjStr}${syncStr}${portStr}${econStr}<br><span style="color:var(--color-info);font-family:'Share Tech Mono',monospace">${bd.ratio}</span><br><span style="color:var(--color-muted-dark);font-size:0.85em">拖拽移动 · 双击升级 · 右键回收 · 空白拖拽框选</span>`;
+      document.getElementById('ttDesc').innerHTML = `${bd.d}${multStr}${rateStr}${beltStr}${adjStr}${syncStr}${portStr}${specStr}${econStr}<br><span style="color:var(--color-info);font-family:'Share Tech Mono',monospace">${bd.ratio}</span><br><span style="color:var(--color-muted-dark);font-size:0.85em">拖拽移动 · 双击升级 · 右键回收 · 空白拖拽框选</span>`;
       tt.classList.add('show');
       tt.style.left = Math.min(e.clientX + 12, window.innerWidth - 240) + 'px';
       tt.style.top = Math.min(e.clientY + 12, window.innerHeight - 100) + 'px';
@@ -5703,6 +6344,11 @@ const G = {
     this.stats.totalRecycled++;
     // v2.1: 回收时清除休眠状态
     delete this._dormantCells[idx];
+    // v3.0 §9.2: 回收时清除特化
+    if (this._specializations?.[idx]) {
+      delete this._specializations[idx];
+      this._recalcSpecEffects();
+    }
     // 清理与该格子相关的传送带等级记录
     for (const key of Object.keys(this.beltLevels)) {
       const [a, b] = key.split('-').map(Number);
@@ -6828,6 +7474,33 @@ const G = {
       if (!this._discoveredAdj) this._discoveredAdj = {};
       if (!this._discoveredAdj[rIdx]) {
         this._discoveredAdj[rIdx] = true;
+        // v3.0 §9.1: 邻接发现奖励
+        const adjCount = Object.keys(this._discoveredAdj).length;
+        // 连续发现追踪（30秒窗口）
+        const now = Date.now();
+        if (!this._adjDiscoverTimes) this._adjDiscoverTimes = [];
+        this._adjDiscoverTimes.push(now);
+        // 清理30秒前的记录
+        this._adjDiscoverTimes = this._adjDiscoverTimes.filter(t => now - t < 30000);
+        const streak = this._adjDiscoverTimes.length;
+        // 基础奖励: +5⚡ +3🟢
+        let rewardMult = 1.0;
+        if (streak >= 2) rewardMult = 1.5; // 连续发现+50%
+        const eReward = Math.round(5 * rewardMult);
+        const gReward = Math.round(3 * rewardMult);
+        this.res.energy = (this.res.energy || 0) + eReward;
+        this.res.glucose = (this.res.glucose || 0) + gReward;
+        const streakStr = streak >= 2 ? ` 🔥×${streak}连续!` : '';
+        this.log(`🔗 发现邻接: ${rule.icon} ${rule.name} — +${eReward}⚡ +${gReward}🟢${streakStr} (${adjCount}条)`, 'ev');
+        this.showMilestone(rule.icon, rule.name);
+        // 每5条里程碑: 临时+5%产出60秒
+        if (adjCount > 0 && adjCount % 5 === 0) {
+          this._adjMilestoneBonus = (this._adjMilestoneBonus || 0) + 0.05;
+          this.log(`📊 邻接里程碑 ${adjCount}条! +5%产出加成(60秒)`, 's');
+          setTimeout(() => {
+            this._adjMilestoneBonus = Math.max(0, (this._adjMilestoneBonus || 0) - 0.05);
+          }, 60000);
+        }
       }
     }
 
@@ -6866,6 +7539,30 @@ const G = {
         const ruleBonus = rule.bonus * stacks * 0.5; // 虚拟邻接50%
         totalBonus += ruleBonus;
         details.push({ name: rule.name + '(管线)', icon: '🔗', bonus: ruleBonus, count: stacks });
+
+        // v3.0 §9.1: 虚拟邻接发现追踪 + 远距专属奖励
+        const vRIdx = ADJACENCY_RULES.indexOf(rule);
+        const vKey = 'v' + vRIdx; // 虚拟发现用 'v' 前缀区分
+        if (!this._discoveredAdj) this._discoveredAdj = {};
+        if (!this._discoveredAdj[vKey]) {
+          this._discoveredAdj[vKey] = true;
+          // 同时标记物理索引（使邻接图鉴也显示为已发现）
+          if (!this._discoveredAdj[vRIdx]) this._discoveredAdj[vRIdx] = true;
+          // 远距专属奖励: +8⚡ + "远程共振" badge
+          this.res.energy = (this.res.energy || 0) + 8;
+          this.log(`📡 远程共振! 发现管线邻接: ${rule.icon} ${rule.name}(管线) — +8⚡`, 'ev');
+          this.showMilestone('📡', '远程共振·' + rule.name);
+          if (typeof SFX !== 'undefined') SFX.milestone();
+          // 也纳入总邻接计数（影响里程碑等）
+          const totalAdj = Object.keys(this._discoveredAdj).length;
+          if (totalAdj > 0 && totalAdj % 5 === 0) {
+            this._adjMilestoneBonus = (this._adjMilestoneBonus || 0) + 0.05;
+            this.log(`📊 邻接里程碑 ${totalAdj}条! +5%产出加成(60秒)`, 's');
+            setTimeout(() => {
+              this._adjMilestoneBonus = Math.max(0, (this._adjMilestoneBonus || 0) - 0.05);
+            }, 60000);
+          }
+        }
       }
     }
 
@@ -6875,6 +7572,14 @@ const G = {
       const extra = totalBonus * mutAdjBonus;
       totalBonus += extra;
       details.push({ name: '突变增幅', icon: '🧬', bonus: extra, count: 1 });
+    }
+
+    // v3.0 §9.2: 建筑特化邻接加成（biofilm_adj）
+    const specPerBld = this._specCache?.perBuilding?.[idx];
+    if (specPerBld?.adjBonusMult && totalBonus > 0) {
+      const extra = totalBonus * (specPerBld.adjBonusMult - 1);
+      totalBonus += extra;
+      details.push({ name: '特化增幅', icon: '🛡️', bonus: extra, count: 1 });
     }
 
     return { bonus: totalBonus, details };
@@ -7308,7 +8013,9 @@ const G = {
       const globalProdMult = this._prodMult || 1; // 转生产出加成
       // ★ Q4：突变全局产出加成
       const mutGlobalBonus = 1 + (this._mutActiveEffects.globalProdBonus || 0);
-      const mult = this.gEff * popMult * bldMult * beltMult * techBonus * adjBonus * syncBonus * (this._foodPowerLevel || 1) * globalProdMult * mutGlobalBonus;
+      // v3.0 §9.1: 邻接里程碑临时加成
+      const adjMilestone = 1 + (this._adjMilestoneBonus || 0);
+      const mult = this.gEff * popMult * bldMult * beltMult * techBonus * adjBonus * syncBonus * (this._foodPowerLevel || 1) * globalProdMult * mutGlobalBonus * adjMilestone;
       for (let k in bd.prod) {
         // ★ Q4：突变单资源产出加成
         const mutResBonus = 1 + (this._mutActiveEffects.resProdBonus?.[k] || 0);
@@ -7509,6 +8216,13 @@ const G = {
     if (this.rTech) { this.log('已有研究进行中', 'w'); SFX.buildFail(); return; }
     const t = TECHS[key];
     if (t.phase > this.phase) { this.log('需要先进入阶段 ' + t.phase, 'e'); SFX.buildFail(); return; }
+    // v3.0 §3: 前置条件检查
+    const prereq = this.getTechPrereqStatus(key);
+    if (prereq.hasPrereq && !prereq.met) {
+      this.log(`🔒 「${t.n}」需要先满足: ${prereq.icon} ${prereq.label} (${prereq.progress}/${prereq.max})`, 'w');
+      SFX.buildFail();
+      return;
+    }
     // 互斥分支检查 — 如果对立分支已完成，则不能研究
     if (t.exclusive) {
       for (const exKey of t.exclusive) {
@@ -7620,6 +8334,241 @@ const G = {
     if (lv <= 2) return 0.10;  // Lv1-2: +10%
     if (lv <= 4) return 0.15;  // Lv3-4: +15%
     return 0.20;               // Lv5+:  +20%
+  },
+
+  // ===== v3.0 §1: 进化培养任务tick =====
+  _tickEvoTask() {
+    if (!this._evoTask) return;
+    const task = this._evoTask;
+
+    // 经济任务特殊处理：维持N秒正收益
+    if (task.id === 'et1_econ30') {
+      // 每tick检查葡萄糖净速率
+      if ((this.rates?.glucose || 0) > 0) {
+        this._evoEconTimer = (this._evoEconTimer || 0) + 1; // +1帧(约1秒)
+      } else {
+        this._evoEconTimer = Math.max(0, (this._evoEconTimer || 0) - 0.5); // 负收益时缓慢倒退
+      }
+    }
+
+    // 检测任务完成
+    if (task.check(this)) {
+      this.log(`🧬 培养任务完成! ${task.icon} ${task.n} ✓`, 's');
+      SFX.milestone();
+      this.showMilestone('🧬', '培养完成!');
+      // 自动触发升级
+      setTimeout(() => this._completeEvoTask(), 500);
+      return;
+    }
+
+    // 更新升级面板中的培养任务UI（每5帧一次）
+    if (this.animTick % 5 === 0) {
+      this._updateEvoTaskUI();
+    }
+  },
+
+  // 更新培养任务的实时UI（嵌入核心升级面板）
+  _updateEvoTaskUI() {
+    const task = this._evoTask;
+    if (!task) return;
+    const panel = document.getElementById('coreUpgradePanel');
+    if (!panel) return;
+
+    let evoDiv = panel.querySelector('.evo-task-active');
+    if (!evoDiv) {
+      evoDiv = document.createElement('div');
+      evoDiv.className = 'evo-task-active';
+      evoDiv.style.cssText = 'margin-top:8px;padding:8px 10px;border:1px solid rgba(168,85,247,0.3);border-radius:8px;background:rgba(168,85,247,0.05);';
+      const btn = panel.querySelector('.core-upgrade-btn');
+      if (btn) panel.insertBefore(evoDiv, btn);
+      else panel.appendChild(evoDiv);
+    }
+
+    const cur = task.progress(this);
+    const max = task.max;
+    const pct = max > 0 ? Math.min(cur / max * 100, 100) : 0;
+    const elapsed = (Date.now() - this._evoTaskStartTime) / 1000;
+    const canSkip = elapsed >= 120;
+    let skipCost = 20;
+    if (this.prestigeCount > 0) skipCost = Math.ceil(skipCost * 0.5);
+    const typeColors = { '连线':'#f97316', '布局':'#3b82f6', '经济':'#eab308' };
+    const tc = typeColors[task.type] || '#94a3b8';
+
+    evoDiv.innerHTML = `
+      <div style="display:flex;align-items:center;gap:5px;margin-bottom:4px">
+        <span style="font-size:0.85em">🧬</span>
+        <span style="font-size:0.75em;font-weight:700;color:#a855f7;font-family:'Orbitron',monospace">培养任务</span>
+        <span style="font-size:0.7em;color:var(--dim)">${Math.floor(elapsed)}s</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:5px;font-size:0.78em;margin-bottom:4px">
+        <span style="color:${tc};font-weight:700">${task.type}</span>
+        <span style="color:#e2e8f0">${task.icon} ${task.n}</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px">
+        <div style="flex:1;height:5px;background:rgba(255,255,255,0.06);border-radius:3px;overflow:hidden">
+          <div style="width:${pct}%;height:100%;background:${tc};border-radius:3px;transition:width 0.3s"></div>
+        </div>
+        <span style="font-size:0.72em;font-weight:700;color:${tc}">${cur}/${max}</span>
+      </div>
+      ${canSkip ? `<div style="text-align:right;margin-top:4px">
+        <button onclick="G._skipEvoTask()" style="
+          font-size:0.68em;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);
+          color:#ef4444;padding:2px 10px;border-radius:3px;cursor:pointer">
+          跳过 (-${skipCost}🧬)
+        </button>
+      </div>` : `<div style="font-size:0.65em;color:var(--dim);margin-top:3px;text-align:right">
+        ${Math.ceil(120 - elapsed)}s后可跳过
+      </div>`}
+    `;
+  },
+
+  // ===== v3.0 §3: 科技研究前置条件 =====
+  // 获取前置条件的实际目标值（考虑转生减免-25%）
+  _prereqMax(techKey) {
+    const prereq = TECH_PREREQS[techKey];
+    if (!prereq) return 0;
+    const base = prereq.max;
+    // 转生减免: 如果拥有"科研捷径"转生加成（_techTimeMult < 1），前置条件-25%（向下取整，最低1）
+    if (this.prestigeCount > 0 && this._techTimeMult < 1) {
+      return Math.max(Math.floor(base * 0.75), 1);
+    }
+    return base;
+  },
+
+  // 检查科技前置条件状态
+  getTechPrereqStatus(techKey) {
+    const prereq = TECH_PREREQS[techKey];
+    if (!prereq) return { met: true, label: '', progress: 0, max: 0, hasPrereq: false };
+    const max = this._prereqMax(techKey);
+    const cur = prereq.progress(this);
+    const met = prereq.check(this);
+    const reduced = max < prereq.max; // 是否有转生减免
+    return {
+      hasPrereq: true,
+      met,
+      label: prereq.label,
+      icon: prereq.icon,
+      progress: cur,
+      max,
+      baseMax: prereq.max,
+      reduced,
+    };
+  },
+
+  // 检查前置条件变化并触发反馈
+  _checkTechPrereqProgress() {
+    for (const key in TECH_PREREQS) {
+      const t = TECHS[key];
+      if (!t || t.phase > this.phase) continue; // 只检查当前阶段可见的科技
+      if (this.techs[key]?.done) continue; // 已完成不检查
+      const status = this.getTechPrereqStatus(key);
+      if (!status.hasPrereq) continue;
+      const prevKey = '_prereqDone_' + key;
+      const wasMet = this[prevKey] || false;
+      if (status.met && !wasMet) {
+        this[prevKey] = true;
+        this.log(`🔓 「${t.n}」前置条件达标 — ${status.icon} ${status.label} ✓`, 'ev');
+        SFX.milestone();
+        this.renderTechs(); // 刷新科技面板
+      } else if (!status.met && wasMet) {
+        this[prevKey] = false; // 罕见：条件回退
+      }
+    }
+  },
+
+  // ===== v3.0 §2: 探索度系统 =====
+  // 获取当前阶段的探索度状态
+  getExplorationStatus() {
+    const phase = this.phase;
+    const goals = EXPLORATION_GOALS[phase];
+    if (!goals) return { score: 0, required: 0, met: true, items: [] }; // P5没有探索度
+    const items = goals.goals.map(g => ({
+      ...g,
+      done: g.check(this),
+      current: g.progress(this),
+    }));
+    const score = items.filter(i => i.done).length;
+    return {
+      score,
+      required: goals.required,
+      met: score >= goals.required,
+      items,
+    };
+  },
+
+  // 检查探索度变化，触发反馈
+  _checkExplorationProgress() {
+    const status = this.getExplorationStatus();
+    if (!status.items.length) return;
+    const prev = this._prevExplScore || 0;
+    if (status.score > prev) {
+      // 新完成了一个探索度目标
+      const newDone = status.items.filter(i => i.done);
+      const newItem = newDone[newDone.length - 1]; // 最近完成的
+      if (newItem) {
+        this.log(`📊 探索度 +1 — ${newItem.icon} ${newItem.n} ✓ (${status.score}/${status.required})`, 'ev');
+        this.showMilestone('📊', `探索度 ${status.score}/${status.required}`);
+        SFX.milestone();
+      }
+      if (status.met && prev < status.required) {
+        // 刚好达标
+        this.showEvent('📊 探索度达标！', `P${this.phase} 探索度已满足 ${status.score}/${status.required}\n\n满足所有升级条件后，可以推进到下一阶段！`, '#14b8a6');
+        this.log(`📊 P${this.phase} 探索度达标！可以考虑升级核心了`, 's');
+      }
+    }
+    this._prevExplScore = status.score;
+  },
+
+  // ===== v3.0 §6: P3b子阶段探索度 =====
+  getP3bExplorationStatus() {
+    if (this.phase !== 3 || this._p3bUnlocked) return { score: 0, required: 0, met: true, items: [] };
+    const goals = P3B_EXPLORATION_GOALS;
+    const items = goals.goals.map(g => ({
+      ...g,
+      done: g.check(this),
+      current: g.progress(this),
+    }));
+    const score = items.filter(i => i.done).length;
+    return {
+      score,
+      required: goals.required,
+      met: score >= goals.required,
+      items,
+    };
+  },
+
+  _checkP3bUnlock() {
+    if (this.phase !== 3 || this._p3bUnlocked) return;
+    const status = this.getP3bExplorationStatus();
+    const prev = this._p3bExplScore || 0;
+    // 探索度进度变化反馈
+    if (status.score > prev) {
+      const newItem = status.items.filter(i => i.done)[status.items.filter(i => i.done).length - 1];
+      if (newItem) {
+        this.log(`📊 P3b探索度 +1 — ${newItem.icon} ${newItem.n} ✓ (${status.score}/${status.required})`, 'ev');
+        this.showMilestone('📊', `P3b探索度 ${status.score}/${status.required}`);
+        SFX.milestone();
+      }
+    }
+    this._p3bExplScore = status.score;
+    // 达标时解锁P3b
+    if (status.met) {
+      this._p3bUnlocked = true;
+      this.showEvent(
+        '🔓 P3b · 物流进阶 已解锁！',
+        '完成了P3a阶段的探索，解锁了物流进阶建筑：\n\n' +
+        '♻️ 代谢回路 — 循环再利用\n' +
+        '📡 信号中继站 — 远距中继传输\n' +
+        '🫧 发酵液泡 — ATP替代路线\n' +
+        '🔥 生物质转化炉 — 蛋白质→生物质\n' +
+        '💎 噬菌体裂解器 — 高纯DNA提取\n\n' +
+        '这些新工具将大幅提升你的物流能力！',
+        '#60a5fa'
+      );
+      this.log('🔓 P3b 物流进阶阶段已解锁！新建筑可用', 's');
+      SFX.milestone();
+      this.renderBuildings(); // 刷新建筑面板
+    }
   },
 
   canEvolve() {
@@ -8339,24 +9288,44 @@ const G = {
       };
     }
 
+    // ---- v3.0 §2: 辅助：生成探索度条件 + tooltip ----
+    function explReq() {
+      const es = self.getExplorationStatus();
+      if (!es.items.length) return null; // P5无探索度
+      const met = es.met;
+      const doneList = es.items.filter(i => i.done).map(i => `✓ ${i.icon} ${i.n}`).join('\n');
+      const todoList = es.items.filter(i => !i.done).map(i => `✗ ${i.icon} ${i.n} (${i.current}/${i.max})`).join('\n');
+      const detail = `已完成:\n${doneList || '(无)'}\n\n待完成:\n${todoList || '(全部完成!)'}`;
+      return {
+        label: `📊 探索度 ${es.score}/${es.required}`, met,
+        tipTitle: `📊 P${self.phase} 探索度`, tipTag: '探索度',
+        tipDesc: met ? `已达标 — ${es.score}/${es.required} (任选${es.required})` : `${es.score}/${es.required} — 还需完成 ${es.required - es.score} 项`,
+        tipDetail: detail, tipColor: '#14b8a6'
+      };
+    }
+
     if (this.phase === 1) {
       reqs.push(evoReq(2));
       reqs.push(bldReq('glucoseCollector'));
       reqs.push(bldReq('energyStation'));
       reqs.push(bldReq('simpleExtractor'));
       reqs.push(techReq('pureCulture'));
+      const er = explReq(); if (er) reqs.push(er);
     } else if (this.phase === 2) {
       reqs.push(evoReq(3));
       reqs.push(bldReq('proteinFactory'));
       reqs.push(bldReq('geneExtractor'));
+      const er = explReq(); if (er) reqs.push(er);
     } else if (this.phase === 3) {
       reqs.push(evoReq(4));
       reqs.push(bldReq('biofilmReactor'));
       reqs.push(bldReq('transport'));
+      const er = explReq(); if (er) reqs.push(er);
     } else if (this.phase === 4) {
       reqs.push(evoReq(5));
       reqs.push(bldReq('qsController'));
       reqs.push(techReq('quorumSensing'));
+      const er = explReq(); if (er) reqs.push(er);
     }
     return reqs;
   },
@@ -8372,6 +9341,201 @@ const G = {
   manualCoreUpgrade() {
     if (!this.canPhaseUp()) return;
 
+    // v3.0 §1: 如果当前已有活跃培养任务且已完成 → 执行升级
+    if (this._evoTask && this._evoTask.check(this)) {
+      this._completeEvoTask();
+      return;
+    }
+    // v3.0 §1: 如果有活跃任务但未完成 → 提示
+    if (this._evoTask) {
+      const t = this._evoTask;
+      this.log(`🧬 培养任务进行中: ${t.icon} ${t.n} (${t.progress(this)}/${t.max})`, 'w');
+      SFX.buildFail();
+      return;
+    }
+    // v3.0 §1: 弹出培养任务选择面板
+    const tasks = EVOLUTION_TASKS[this.phase];
+    if (tasks && tasks.length > 0) {
+      this._showEvoTaskSelection(tasks);
+      return;
+    }
+    // 没有培养任务（兜底：直接升级）
+    this._doPhaseUpgrade();
+  },
+
+  // v3.0 §1: 显示培养任务3选1面板
+  _showEvoTaskSelection(tasks) {
+    // 记录当前基线
+    const base = {
+      belt: (this._activeBelts||[]).length,
+      adj: Object.keys(this._discoveredAdj||{}).length,
+    };
+    const self = this;
+
+    // 检查哪些任务已经满足（秒过）
+    const taskStatuses = tasks.map(t => ({
+      ...t,
+      alreadyMet: t.check(this),
+    }));
+
+    let html = `<div style="text-align:center;margin-bottom:10px">
+      <div style="font-size:1.1em;font-weight:700;color:#a855f7;font-family:'Orbitron',monospace">🧬 进化培养</div>
+      <div style="font-size:0.78em;color:var(--dim);margin-top:3px">选择一个培养条件完成后即可进化</div>
+    </div>`;
+    html += '<div style="display:flex;flex-direction:column;gap:8px">';
+
+    for (let i = 0; i < tasks.length; i++) {
+      const t = tasks[i];
+      const met = taskStatuses[i].alreadyMet;
+      const cur = t.progress(this);
+      const rewardStr = Object.entries(t.reward).map(([k, v]) => `+${v}${RES[k]?.icon||k}`).join(' ');
+      const typeColors = { '连线':'#f97316', '布局':'#3b82f6', '经济':'#eab308' };
+      const tc = typeColors[t.type] || '#94a3b8';
+
+      html += `<div class="evo-task-option${met?' met':''}" data-evo-idx="${i}" style="
+        padding:10px 12px;border:1px solid ${met?'#14b8a6':'rgba(255,255,255,0.08)'};
+        border-radius:8px;cursor:pointer;transition:all 0.2s;
+        background:${met?'rgba(20,184,166,0.08)':'rgba(255,255,255,0.02)'};
+        ">
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
+          <span style="font-size:1.1em">${t.icon}</span>
+          <span style="color:${tc};font-weight:700;font-size:0.78em">${t.type}</span>
+          <span style="font-size:0.82em;color:#e2e8f0;font-weight:600">${t.n}</span>
+          ${met?'<span style="color:#14b8a6;font-weight:700;margin-left:auto">✅ 已满足</span>':''}
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:0.72em;color:var(--dim)">
+          <span>进度: ${cur}/${t.max}</span>
+          <span style="color:#14b8a6">${rewardStr} 奖励</span>
+        </div>
+        ${!met?`<div style="height:3px;background:rgba(255,255,255,0.06);border-radius:2px;margin-top:4px;overflow:hidden">
+          <div style="width:${t.max>0?Math.min(cur/t.max*100,100):0}%;height:100%;background:${tc};border-radius:2px"></div>
+        </div>`:''}
+      </div>`;
+    }
+    html += '</div>';
+
+    // 使用 choicePopup 展示
+    const popup = document.getElementById('choicePopup');
+    if (popup) {
+      popup.innerHTML = `<div class="event-popup-inner" style="max-width:380px">
+        ${html}
+        <div style="text-align:center;margin-top:10px">
+          <button onclick="G._cancelEvoTaskSelection()" style="
+            background:transparent;border:1px solid rgba(255,255,255,0.1);
+            color:var(--dim);padding:4px 16px;border-radius:4px;cursor:pointer;font-size:0.75em">
+            返回
+          </button>
+        </div>
+      </div>`;
+      popup.style.display = 'flex';
+
+      // 绑定任务选择点击
+      popup.querySelectorAll('.evo-task-option').forEach(el => {
+        el.addEventListener('click', () => {
+          const idx = +el.dataset.evoIdx;
+          self._selectEvoTask(tasks[idx], base);
+          popup.style.display = 'none';
+        });
+        el.addEventListener('mouseenter', () => {
+          el.style.borderColor = '#a855f7';
+          el.style.background = 'rgba(168,85,247,0.06)';
+        });
+        el.addEventListener('mouseleave', () => {
+          const met = taskStatuses[+el.dataset.evoIdx].alreadyMet;
+          el.style.borderColor = met ? '#14b8a6' : 'rgba(255,255,255,0.08)';
+          el.style.background = met ? 'rgba(20,184,166,0.08)' : 'rgba(255,255,255,0.02)';
+        });
+      });
+    }
+  },
+
+  _cancelEvoTaskSelection() {
+    const popup = document.getElementById('choicePopup');
+    if (popup) popup.style.display = 'none';
+  },
+
+  // 选择一个培养任务
+  _selectEvoTask(task, base) {
+    this._evoTask = task;
+    this._evoTaskBase = base;
+    this._evoEconTimer = 0;
+    this._evoTaskStartTime = Date.now();
+
+    // 如果任务已经满足 → 直接完成
+    if (task.check(this)) {
+      this.log(`🧬 培养任务已满足: ${task.icon} ${task.n} — 直接完成！`, 's');
+      SFX.milestone();
+      this._completeEvoTask();
+      return;
+    }
+
+    this.log(`🧬 培养任务开始: ${task.icon} ${task.n} (${task.progress(this)}/${task.max})`, 'ev');
+    SFX.researchStart();
+    this.showMilestone('🧬', `培养任务: ${task.n}`);
+    this.updateCoreUpgradeUI();
+  },
+
+  // 完成培养任务 → 执行升级
+  _completeEvoTask() {
+    const task = this._evoTask;
+    if (!task) { this._doPhaseUpgrade(); return; }
+
+    const elapsed = (Date.now() - this._evoTaskStartTime) / 1000;
+    const hasBonus = elapsed <= 60;
+
+    // 给予任务奖励
+    if (task.reward) {
+      for (const [k, v] of Object.entries(task.reward)) {
+        this.res[k] = (this.res[k] || 0) + v;
+      }
+      const rewardStr = Object.entries(task.reward).map(([k, v]) => `+${v}${RES[k]?.icon||k}`).join(' ');
+      this.log(`🎁 培养奖励: ${rewardStr}${hasBonus?' (60秒内完成!)':''}`, 's');
+    }
+    if (hasBonus) {
+      // 额外奖励
+      this.res.energy = (this.res.energy || 0) + 10;
+      this.log('🎉 快速培养奖励: +10⚡', 's');
+    }
+
+    // 清除任务状态
+    this._evoTask = null;
+    this._evoTaskBase = null;
+    this._evoEconTimer = 0;
+    this._evoTaskStartTime = 0;
+
+    // 执行升级
+    this._doPhaseUpgrade();
+  },
+
+  // 跳过培养任务（消耗资源）
+  _skipEvoTask() {
+    const task = this._evoTask;
+    if (!task) return;
+    const elapsed = (Date.now() - this._evoTaskStartTime) / 1000;
+    if (elapsed < 120) {
+      this.log(`🧬 还需等待 ${Math.ceil(120 - elapsed)} 秒才能跳过`, 'w');
+      SFX.buildFail();
+      return;
+    }
+    // 跳过成本: 20 DNA（转生减免50%）
+    let skipCost = 20;
+    if (this.prestigeCount > 0) skipCost = Math.ceil(skipCost * 0.5);
+    if ((this.res.dna || 0) < skipCost) {
+      this.log(`🧬 跳过需要 ${skipCost}🧬，DNA不足`, 'e');
+      SFX.buildFail();
+      return;
+    }
+    this.res.dna -= skipCost;
+    this.log(`🧬 跳过培养任务 — 消耗 ${skipCost}🧬`, 'w');
+    this._evoTask = null;
+    this._evoTaskBase = null;
+    this._evoEconTimer = 0;
+    this._evoTaskStartTime = 0;
+    this._doPhaseUpgrade();
+  },
+
+  // 实际执行阶段升级（原manualCoreUpgrade核心逻辑）
+  _doPhaseUpgrade() {
     // 阶段1→2时: 将自动传送带转化为手动传送带（保留已有连接）
     if (this.phase === 1 && this._computeBelts) {
       const { belts } = this._computeBelts();
@@ -8389,6 +9553,11 @@ const G = {
     }
 
     this.phase++;
+    // v3.0 §2: 重置探索度追踪（新阶段从0开始计）
+    this._prevExplScore = 0;
+    // v3.0 §1: 清除培养任务UI
+    const evoPanel = document.querySelector('.evo-task-active');
+    if (evoPanel) evoPanel.remove();
     // v2.0: 记录P3进入时间（用于资源竞争缓冲期）
     if (this.phase === 3) this._p3EntryTime = Date.now();
 
@@ -8492,8 +9661,25 @@ const G = {
       el.addEventListener('mouseleave', () => GameTooltip.hide());
     });
 
+    // v3.0 §2: 探索度详细面板
+    this._renderExplorationPanel(panel);
+    // v3.0 §6: P3b子阶段探索度面板
+    this._renderP3bExplorationPanel(panel);
+
     // 按钮状态
-    if (allMet) {
+    if (this._evoTask) {
+      // v3.0 §1: 培养任务进行中
+      const task = this._evoTask;
+      if (task.check(this)) {
+        btn.textContent = `🧬 培养完成! 点击升级 ▸ P${nextPhase}`;
+        btn.className = 'core-upgrade-btn ready';
+        btn.disabled = false;
+      } else {
+        btn.textContent = `🧬 培养中: ${task.icon} ${task.progress(this)}/${task.max}`;
+        btn.className = 'core-upgrade-btn';
+        btn.disabled = true;
+      }
+    } else if (allMet) {
       btn.textContent = `升级核心 ▸ P${nextPhase} · ${nextCC ? nextCC.name : ''}`;
       btn.className = 'core-upgrade-btn ready';
       btn.disabled = false;
@@ -8503,6 +9689,112 @@ const G = {
       btn.className = 'core-upgrade-btn locked';
       btn.disabled = true;
     }
+  },
+
+  // v3.0 §2: 渲染探索度详细面板（嵌入核心升级面板底部）
+  _renderExplorationPanel(container) {
+    const es = this.getExplorationStatus();
+    if (!es.items.length) {
+      const old = container.querySelector('.expl-panel');
+      if (old) old.remove();
+      return;
+    }
+    let panel = container.querySelector('.expl-panel');
+    if (!panel) {
+      panel = document.createElement('div');
+      panel.className = 'expl-panel';
+      panel.style.cssText = 'margin-top:8px;border-top:1px solid rgba(255,255,255,0.06);padding-top:6px;';
+      const btn = container.querySelector('.core-upgrade-btn');
+      if (btn) container.insertBefore(panel, btn);
+      else container.appendChild(panel);
+    }
+
+    const pct = es.required > 0 ? Math.min(es.score / es.required * 100, 100) : 100;
+    const barColor = es.met ? '#14b8a6' : '#f59e0b';
+    const headerColor = es.met ? '#14b8a6' : '#94a3b8';
+
+    let html = `<div style="display:flex;align-items:center;gap:6px;margin-bottom:5px;cursor:pointer" onclick="this.parentElement.querySelector('.expl-items').classList.toggle('expl-collapsed')">
+      <span style="font-size:0.72em;font-weight:700;color:${headerColor};font-family:'Orbitron',monospace">📊 P${this.phase} 探索度</span>
+      <div style="flex:1;height:5px;background:rgba(255,255,255,0.06);border-radius:3px;overflow:hidden">
+        <div style="width:${pct}%;height:100%;background:${barColor};border-radius:3px;transition:width 0.5s"></div>
+      </div>
+      <span style="font-size:0.68em;font-weight:700;color:${headerColor}">${es.score}/${es.required}</span>
+      <span style="font-size:0.6em;color:var(--dim)">▾</span>
+    </div>`;
+
+    html += '<div class="expl-items" style="display:flex;flex-direction:column;gap:3px">';
+    for (const item of es.items) {
+      const done = item.done;
+      const cur = item.current;
+      const max = item.max;
+      const color = done ? '#14b8a6' : '#64748b';
+      const textColor = done ? '#14b8a6' : '#94a3b8';
+      const typeColors = { '连线':'#f97316', '远距':'#06d6a0', '技巧':'#a855f7', '布局':'#3b82f6', '建设':'#22c55e', '成长':'#eab308', '挑战':'#ef4444', '探索':'#ec4899', '科技':'#60a5fa', '优化':'#14b8a6', '突变':'#c084fc', '经济':'#fbbf24' };
+      const tc = typeColors[item.type] || '#94a3b8';
+      html += `<div style="display:flex;align-items:center;gap:5px;font-size:0.68em;padding:2px 0;opacity:${done?1:0.85}">
+        <span style="font-size:0.9em;width:14px;text-align:center">${done ? '✅' : '⬜'}</span>
+        <span style="color:${tc};font-size:0.85em;font-weight:700;min-width:28px">${item.type}</span>
+        <span style="color:${textColor};flex:1">${item.icon} ${item.n}</span>
+        ${!done && max > 1 ? `<span style="color:var(--dim);font-size:0.9em">${cur}/${max}</span>` : ''}
+        ${done ? '<span style="color:#14b8a6;font-weight:700">+1</span>' : ''}
+      </div>`;
+    }
+    html += '</div>';
+    panel.innerHTML = html;
+  },
+
+  // v3.0 §6: 渲染P3b子阶段探索度面板
+  _renderP3bExplorationPanel(container) {
+    const panelId = 'p3b-expl-panel';
+    let panel = container.querySelector('.' + panelId);
+    // 只在P3阶段且未解锁P3b时显示
+    if (this.phase !== 3 || this._p3bUnlocked) {
+      if (panel) panel.remove();
+      return;
+    }
+    const es = this.getP3bExplorationStatus();
+    if (!es.items.length) { if (panel) panel.remove(); return; }
+
+    if (!panel) {
+      panel = document.createElement('div');
+      panel.className = panelId;
+      panel.style.cssText = 'margin-top:6px;border-top:1px dashed rgba(96,165,250,0.2);padding-top:6px;';
+      const btn = container.querySelector('.core-upgrade-btn');
+      if (btn) container.insertBefore(panel, btn);
+      else container.appendChild(panel);
+    }
+
+    const pct = es.required > 0 ? Math.min(es.score / es.required * 100, 100) : 100;
+    const barColor = es.met ? '#14b8a6' : '#60a5fa';
+    const headerColor = es.met ? '#14b8a6' : '#60a5fa';
+
+    let html = `<div style="display:flex;align-items:center;gap:6px;margin-bottom:5px;cursor:pointer" onclick="this.parentElement.querySelector('.p3b-items').classList.toggle('expl-collapsed')">
+      <span style="font-size:0.72em;font-weight:700;color:${headerColor};font-family:'Orbitron',monospace">📡 P3b 物流进阶</span>
+      <div style="flex:1;height:5px;background:rgba(255,255,255,0.06);border-radius:3px;overflow:hidden">
+        <div style="width:${pct}%;height:100%;background:${barColor};border-radius:3px;transition:width 0.5s"></div>
+      </div>
+      <span style="font-size:0.68em;font-weight:700;color:${headerColor}">${es.score}/${es.required}</span>
+      <span style="font-size:0.6em;color:var(--dim)">▾</span>
+    </div>`;
+
+    html += '<div class="p3b-items" style="display:flex;flex-direction:column;gap:3px">';
+    const typeColors = { '建设':'#22c55e', '探索':'#ec4899', '突变':'#c084fc', '连线':'#f97316', '布局':'#3b82f6', '远距':'#06d6a0' };
+    for (const item of es.items) {
+      const done = item.done;
+      const cur = item.current;
+      const max = item.max;
+      const textColor = done ? '#14b8a6' : '#94a3b8';
+      const tc = typeColors[item.type] || '#94a3b8';
+      html += `<div style="display:flex;align-items:center;gap:5px;font-size:0.68em;padding:2px 0;opacity:${done?1:0.85}">
+        <span style="font-size:0.9em;width:14px;text-align:center">${done ? '✅' : '⬜'}</span>
+        <span style="color:${tc};font-size:0.85em;font-weight:700;min-width:28px">${item.type}</span>
+        <span style="color:${textColor};flex:1">${item.icon} ${item.n}</span>
+        ${!done && max > 1 ? `<span style="color:var(--dim);font-size:0.9em">${cur}/${max}</span>` : ''}
+        ${done ? '<span style="color:#14b8a6;font-weight:700">+1</span>' : ''}
+      </div>`;
+    }
+    html += '</div>';
+    panel.innerHTML = html;
   },
 
   updatePhase() {
@@ -8801,6 +10093,14 @@ const G = {
       if (this.animTick % 3 === 0) this.updateCellRates();
       // ★ 方案F：供给同步加成每3帧计算一次
       if (this.animTick % 3 === 0) this.computeSyncBonuses();
+      // v3.0 §2: 探索度检查（每10帧一次）
+      if (this.animTick % 10 === 0) this._checkExplorationProgress();
+      // v3.0 §3: 科技前置条件检查（每15帧一次）
+      if (this.animTick % 15 === 0) this._checkTechPrereqProgress();
+      // v3.0 §6: P3b子阶段解锁检查（每12帧一次）
+      if (this.animTick % 12 === 0) this._checkP3bUnlock();
+      // v3.0 §1: 进化培养任务检测
+      this._tickEvoTask();
 
       // Evolution button
       document.getElementById('evoBtn').disabled = !this.canEvolve();
@@ -9193,16 +10493,26 @@ const G = {
                 (bonusPct > 0 ? ` <span style="color:#22c55e">+${bonusPct}%产出</span>` : ' <span style="color:var(--dim)">需≥50%触发加成</span>');
             }
           }
-          // v3.0 §4: 距离衰减信息
-          const distEffFactor = this._distanceEfficiency(cellDist);
+          // v3.0 §4+§5: 距离衰减信息（含中继减半）
+          const isRelayBelt = this._isBeltViaRelay(newKey);
+          const distEffFactor = this._distanceEfficiency(cellDist, isRelayBelt);
           const distEffPct = Math.round(distEffFactor * 100);
+          const relayHops = this._countRelayHops(newKey);
+          const relayStr = isRelayBelt ? ` <span style="color:#60a5fa">📡 中继·衰减减半</span>` : '';
+          const relayHopStr = relayHops > 0 ? `<br><span style="color:#60a5fa">📡 中继跳数: ${relayHops} (-${relayHops*5}%固定损耗)</span>` : '';
           const distEffStr = distEffFactor < 1 ? ` <span style="color:var(--orange)">📉 距离衰减: ${distEffPct}%</span>` : '';
           const beltMaintStr = cellDist >= 3 ? `<br><span style="color:var(--orange)">🔧 远距维护: -${(0.3 * (cellDist - 2)).toFixed(1)}⚡/s</span>` : '';
+          // v3.0 §7: 传输量/负载信息
+          const loadData = this._beltLoadCache?.[newKey];
+          const flowTotal = loadData?.totalFlow || 0;
+          const loadLabel = flowTotal <= 0.01 ? '空闲' : flowTotal < 0.5 ? '低载' : flowTotal < 2.0 ? '正常' : '满载';
+          const loadColor = flowTotal <= 0.01 ? '#64748b' : flowTotal < 0.5 ? '#eab308' : flowTotal < 2.0 ? '#22c55e' : '#f97316';
+          const loadStr = `<br><span style="color:${loadColor}">📊 传输量: ${flowTotal.toFixed(1)}/s (${loadLabel})</span>`;
           document.getElementById('ttDesc').innerHTML =
             `${fromName} → ${toName}` +
             `<br><span style="color:${effColor}">⚡ 传输效率: ${effPct}%</span> · <span style="color:var(--color-info)">📦 容量: ${cap}/s</span>` +
-            `<br><span style="color:${distColor}">${distLabel} (距离${cellDist}格)</span>${distEffStr}` +
-            beltMaintStr +
+            `<br><span style="color:${distColor}">${distLabel} (距离${cellDist}格)</span>${distEffStr}${relayStr}` +
+            beltMaintStr + relayHopStr + loadStr +
             syncLine +
             `<br><span style="color:#7a9aba;font-size:0.9em">💡 距离越近效率越高；远距连线可获取额外邻接加成</span>` +
             `<br><span style="color:var(--dim);font-size:0.85em">点击可升级/撤销传送带</span>`;
@@ -9461,13 +10771,19 @@ const G = {
               const techExtra = this._extraOutPorts || 0;
               const mpbF = this._mutPortBonuses?.[fromType];
               const mutExtraOut = mpbF ? mpbF.extraOut : 0;
-              if (usage.out >= fromPort.maxOut + techExtra + mutExtraOut) continue; // 输出端口已满
+              // v3.0 §9.2: 特化端口加成
+              const specF = this._specCache?.perBuilding?.[link.fi];
+              const specExtraOutF = (specF?.extraOutPort || 0) + (specF?.extraPorts || 0);
+              if (usage.out >= fromPort.maxOut + techExtra + mutExtraOut + specExtraOutF) continue; // 输出端口已满
             }
             if (toPort) {
               const usage = getPortUsage(link.ti);
               const mpbT = this._mutPortBonuses?.[toType];
               const mutExtraIn = mpbT ? mpbT.extraIn : 0;
-              if (usage.in >= toPort.maxIn + mutExtraIn) continue; // 输入端口已满
+              // v3.0 §9.2: 特化端口加成
+              const specT = this._specCache?.perBuilding?.[link.ti];
+              const specExtraInT = specT?.extraPorts || 0;
+              if (usage.in >= toPort.maxIn + mutExtraIn + specExtraInT) continue; // 输入端口已满
             }
           }
 
@@ -9555,6 +10871,8 @@ const G = {
       // 缓存usedEdges给proximity使用
       this._beltEdges = usedEdges;
       this._activeBelts = belts;
+      // v3.0 §7: 传送带负载缓存 — 预计算每条传送带的总流量和需求
+      const _beltLoadCache = {};  // beltKey → { totalFlow, totalDemand, loadRatio }
 
       for (const belt of belts) {
         const c1 = getCellCenter(belt.fi, gridEl, gRect);
@@ -9597,10 +10915,18 @@ const G = {
         const beltEff = this.getBeltEfficiency(beltKey);
         // v3.0 §4: 距离影响线条粗细
         const beltDist = this.getBeltDistance(beltKey);
+        // v3.0 §5: 中继连线标识
+        const isRelayBelt = this._isBeltViaRelay(beltKey);
         const distScale = beltDist <= 1 ? 1.0 : beltDist <= 2 ? 0.92 : beltDist <= 3 ? 0.8 : 0.65;
         const lvScale = (0.7 + beltLv * 0.15) * distScale;
         const trackW = (isMulti ? 10 : 8) * lvScale;  // 轨道宽度随等级增长（加粗），远距变细
         const innerW = (isMulti ? 7 : 5) * lvScale;
+
+        // v3.0 §7.1: 传输量影响线条粗细
+        const loadInfo = this._beltLoadCache?.[beltKey];
+        const totalFlow = loadInfo?.totalFlow || 0;
+        // 负载级别: 0=空闲, 1=低载, 2=正常, 3=满载
+        const loadLevel = totalFlow <= 0.01 ? 0 : totalFlow < 0.5 ? 1 : totalFlow < 2.0 ? 2 : 3;
 
         // 判断是否需要 L 形拐弯（非直线方向）
         const adx = Math.abs(dx), ady = Math.abs(dy);
@@ -9943,6 +11269,27 @@ const G = {
           ctx.restore();
         }
 
+        // -- v3.0 §5: 中继连线蓝色脉冲光晕 --
+        if (isRelayBelt) {
+          ctx.save();
+          const relayPulse = 0.15 + Math.sin(t / 400) * 0.08;
+          ctx.lineWidth = trackW + 4;
+          ctx.strokeStyle = `rgba(96,165,250,${relayPulse})`;
+          ctx.lineCap = 'round';
+          ctx.lineJoin = 'round';
+          ctx.setLineDash([]);
+          drawLPath(); ctx.stroke();
+          // 中继标识小圆点在中点
+          const midSeg = segments[Math.floor(segments.length / 2)];
+          const rmx = (midSeg[0] + midSeg[2]) / 2;
+          const rmy = (midSeg[1] + midSeg[3]) / 2;
+          ctx.fillStyle = `rgba(96,165,250,${0.4 + Math.sin(t / 300) * 0.2})`;
+          ctx.beginPath();
+          ctx.arc(rmx, rmy, 3, 0, Math.PI*2);
+          ctx.fill();
+          ctx.restore();
+        }
+
         // -- 11) 悬停高亮光晕（鼠标靠近时发光提示可点击） --
         if (this._hoverBeltKey === beltKey) {
           ctx.save();
@@ -10013,6 +11360,52 @@ const G = {
           ctx.textBaseline = 'middle';
           ctx.fillStyle = '#fff';
           ctx.fillText(belt.icons.join(''), midX, midY - (trackW/2 + 6));
+          ctx.globalAlpha = 1;
+        }
+
+        // v3.0 §7.2: 瓶颈高亮 — 当传送带上次流量极低但需求端需要时
+        if (loadLevel === 0 && !belt.invalid) {
+          // 空闲传送带：渲染虚线叠加提示
+          const idlePulse = 0.08 + Math.sin(t / 600) * 0.04;
+          ctx.save();
+          ctx.lineWidth = trackW * 0.5;
+          ctx.strokeStyle = `rgba(100,116,139,${idlePulse})`;
+          ctx.setLineDash([3, 5]);
+          ctx.lineDashOffset = -(t / 200) % 8;
+          drawLPath(); ctx.stroke();
+          ctx.setLineDash([]);
+          ctx.restore();
+        }
+
+        // v3.0 §7.3: 距离标识 — 远距传送带中点显示距离数字
+        if (beltDist >= 2 && !belt.invalid) {
+          const distMidX = isOrthogonal ? (sx+ex)/2 : mx;
+          const distMidY = isOrthogonal ? (sy+ey)/2 : my;
+          // 距离圆形标签（在传送带法线方向偏移）
+          const dSeg = segments[Math.floor(segments.length / 2)];
+          const dsdx = dSeg[2] - dSeg[0], dsdy = dSeg[3] - dSeg[1];
+          const dsLen = Math.sqrt(dsdx*dsdx + dsdy*dsdy);
+          const dnx = dsLen > 1 ? -dsdy/dsLen : 0;
+          const dny = dsLen > 1 ? dsdx/dsLen : -1;
+          const dLabelX = distMidX + dnx * (trackW/2 + 8);
+          const dLabelY = distMidY + dny * (trackW/2 + 8);
+          // 背景圆
+          const distColor = isRelayBelt ? '#60a5fa' : beltDist >= 3 ? '#f97316' : '#14b8a6';
+          const distAlpha = 0.6 + Math.sin(t / 500) * 0.15;
+          ctx.globalAlpha = distAlpha;
+          ctx.fillStyle = 'rgba(8,14,24,0.85)';
+          ctx.beginPath();
+          ctx.arc(dLabelX, dLabelY, 6, 0, Math.PI*2);
+          ctx.fill();
+          ctx.strokeStyle = distColor + '80';
+          ctx.lineWidth = 0.8;
+          ctx.stroke();
+          // 距离数字
+          ctx.font = 'bold 7px "Share Tech Mono", monospace';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillStyle = distColor;
+          ctx.fillText(beltDist + '', dLabelX, dLabelY);
           ctx.globalAlpha = 1;
         }
 
@@ -10109,6 +11502,16 @@ const G = {
           });
         }
       }
+
+      // v3.0 §7: 计算每条传送带的负载比率
+      for (const f of activeFlows) {
+        const k = f.beltKey;
+        if (!k) continue;
+        if (!_beltLoadCache[k]) _beltLoadCache[k] = { totalFlow: 0 };
+        _beltLoadCache[k].totalFlow += (f.flowRate || 0);
+      }
+      // 缓存到实例变量给tooltip等使用
+      this._beltLoadCache = _beltLoadCache;
 
       return activeFlows;
     };
@@ -11974,6 +13377,13 @@ const G = {
         _firstDist2Shown: this._firstDist2Shown,
         _firstDist3Shown: this._firstDist3Shown,
         _firstDist4Shown: this._firstDist4Shown,
+        // v3.0 §2: 探索度
+        _prevExplScore: this._prevExplScore || 0,
+        // v3.0 §1: 培养任务
+        _evoTaskId: this._evoTask?.id || null,
+        _evoTaskBase: this._evoTaskBase,
+        _evoEconTimer: this._evoEconTimer || 0,
+        _evoTaskStartTime: this._evoTaskStartTime || 0,
         _nitrogenBonus: this._nitrogenBonus,
         _proteinBonus: this._proteinBonus,
         _transportBonus: this._transportBonus,
@@ -12005,6 +13415,9 @@ const G = {
         _presPortTargets: this._presPortTargets || [], // v2.1 §9.3
         _discoveredAdj: this._discoveredAdj || {},     // v2.1 §10.4
         _dormantCells: this._dormantCells || {},       // v2.1 建筑休眠
+        _p3bUnlocked: this._p3bUnlocked || false,     // v3.0 §6 P3b子阶段
+        _p3bExplScore: this._p3bExplScore || 0,        // v3.0 §6
+        _specializations: this._specializations || {},  // v3.0 §9.2 建筑特化
         _mutCategoryLock: this._mutCategoryLock || null,
         _mutBrewCount: this._mutBrewCount || 0,
         // ★ 终局高潮系统
@@ -12116,6 +13529,21 @@ const G = {
       if (s._firstDist2Shown) this._firstDist2Shown = s._firstDist2Shown;
       if (s._firstDist3Shown) this._firstDist3Shown = s._firstDist3Shown;
       if (s._firstDist4Shown) this._firstDist4Shown = s._firstDist4Shown;
+      // v3.0 §2: 探索度
+      if (s._prevExplScore) this._prevExplScore = s._prevExplScore;
+      // v3.0 §1: 培养任务恢复
+      if (s._evoTaskId) {
+        const tasks = EVOLUTION_TASKS[this.phase];
+        if (tasks) {
+          const found = tasks.find(t => t.id === s._evoTaskId);
+          if (found) {
+            this._evoTask = found;
+            this._evoTaskBase = s._evoTaskBase || {};
+            this._evoEconTimer = s._evoEconTimer || 0;
+            this._evoTaskStartTime = s._evoTaskStartTime || Date.now();
+          }
+        }
+      }
       if (s._nitrogenBonus) this._nitrogenBonus = s._nitrogenBonus;
       if (s._proteinBonus) this._proteinBonus = s._proteinBonus;
       if (s._transportBonus) this._transportBonus = s._transportBonus;
@@ -12147,6 +13575,9 @@ const G = {
       this._presPortTargets = s._presPortTargets || []; // v2.1 §9.3
       this._discoveredAdj = s._discoveredAdj || {};     // v2.1 §10.4
       this._dormantCells = s._dormantCells || {};       // v2.1 建筑休眠
+      this._p3bUnlocked = s._p3bUnlocked || false;     // v3.0 §6
+      this._p3bExplScore = s._p3bExplScore || 0;        // v3.0 §6
+      this._specializations = s._specializations || {};  // v3.0 §9.2
       this._mutCategoryLock = s._mutCategoryLock || null;
       this._mutBrewCount = s._mutBrewCount || 0;
       // ★ 终局高潮系统状态恢复
@@ -12163,7 +13594,18 @@ const G = {
       this._updateEmpireTitle(achieveCount);
       // ★ Q4：恢复突变效果缓存
       this._recalcMutEffects();
+      // v3.0 §9.2: 恢复特化效果缓存
+      this._recalcSpecEffects();
       if (this._mutLabUnlocked) this._renderMutLabPanel();
+      // v3.0 §6: 旧存档兼容 — 如果已拥有P3b建筑则自动解锁P3b
+      if (this.phase >= 3 && !this._p3bUnlocked) {
+        for (let i = 0; i < this.grid.length; i++) {
+          if (this.grid[i] && P3B_BUILDINGS.has(this.grid[i].type)) {
+            this._p3bUnlocked = true;
+            break;
+          }
+        }
+      }
       // 旧存档迁移：如果网格尺寸发生变化，传送带key中的索引也需要更新
       if (savedGrid.length !== savedLen && savedGrid.length > 0) {
         const migOldCols = s.gridCols || Math.round(Math.sqrt(savedGrid.length));
@@ -12435,6 +13877,12 @@ const G = {
     this.renderBuildings(); // 刷新建造列表中的升级按钮状态
     this.updateRates();
     this.updateUI();
+
+    // v3.0 §9.2: 升级到Lv3时触发特化选择
+    const bldType = this.grid[idx]?.type;
+    if (lv === 3 && bldType && SPECIALIZATIONS[bldType] && !this._specializations?.[idx]) {
+      setTimeout(() => this._showSpecializationChoice(idx, bldType), 300);
+    }
   },
 
   cancelUpgrade() {
@@ -12531,10 +13979,16 @@ const G = {
 
   // v3.0 §4: 距离效率衰减因子
   // dist=1: 100%, dist=2: 92%, dist=3: 80%, dist=4: 65%
-  _distanceEfficiency(dist) {
+  _distanceEfficiency(dist, viaRelay) {
     if (dist <= 1) return 1.0;
     const map = { 2: 0.92, 3: 0.80, 4: 0.65 };
-    return map[dist] || Math.max(0.1, 1.0 - 0.12 * (dist - 1));
+    const base = map[dist] || Math.max(0.1, 1.0 - 0.12 * (dist - 1));
+    // v3.0 §5: 中继衰减减半 — 经过中继的传送带距离惩罚减半
+    if (viaRelay) {
+      const penalty = 1.0 - base; // 衰减量
+      return 1.0 - penalty * 0.5; // 衰减减半
+    }
+    return base;
   },
 
   // 传送带效率（产出乘数）— v3.0: 包含距离衰减
@@ -12544,8 +13998,38 @@ const G = {
     const baseEff = effMap[lv] || 0.75;
     // v3.0 §4: 距离衰减
     const dist = this.getBeltDistance(beltKey);
-    const distFactor = this._distanceEfficiency(dist);
-    return baseEff * distFactor;
+    // v3.0 §5: 检查是否经过中继
+    const viaRelay = this._isBeltViaRelay(beltKey);
+    const distFactor = this._distanceEfficiency(dist, viaRelay);
+    // v3.0 §5: 中继链固定损耗（5%每跳）
+    const relayHops = this._countRelayHops(beltKey);
+    // v3.0 §9.2: relay_amp 特化 — 中继衰减可降至0%
+    const relayDecayRate = this._specCache?.relayDecayOverride !== null && this._specCache?.relayDecayOverride !== undefined
+      ? (1 - this._specCache.relayDecayOverride) // 0%衰减 → 乘数1.0
+      : 0.95; // 默认5%衰减
+    const relayPenalty = relayHops > 0 ? Math.pow(relayDecayRate, relayHops) : 1.0;
+    // v3.0 §9.2: transport_speed 特化 — 全局传送带效率加成
+    const specEffBonus = 1 + (this._specCache?.beltEffBonus || 0);
+    return baseEff * distFactor * relayPenalty * specEffBonus;
+  },
+
+  // v3.0 §5: 检查传送带是否涉及中继站
+  _isBeltViaRelay(beltKey) {
+    const parts = beltKey.split('-');
+    const a = +parts[0], b = +parts[1];
+    const ga = this.grid[a], gb = this.grid[b];
+    return (ga && BLDS[ga.type]?.isRelay) || (gb && BLDS[gb.type]?.isRelay);
+  },
+
+  // v3.0 §5: 计算经过的中继跳数（0=不经过中继，1=一端是中继，2=双端都是中继）
+  _countRelayHops(beltKey) {
+    const parts = beltKey.split('-');
+    const a = +parts[0], b = +parts[1];
+    const ga = this.grid[a], gb = this.grid[b];
+    let hops = 0;
+    if (ga && BLDS[ga.type]?.isRelay) hops++;
+    if (gb && BLDS[gb.type]?.isRelay) hops++;
+    return hops;
   },
 
   // 传送带容量上限（每秒资源吞吐量）
@@ -12905,8 +14389,10 @@ const G = {
       const fr = Math.floor(fromIdx / SZ), fc = fromIdx % SZ;
       const tr = Math.floor(idx / SZ), tc = idx % SZ;
       const dist = Math.abs(fr - tr) + Math.abs(fc - tc);
-      if (dist > 4) {
-        this.log('📏 距离太远！最多4格', 'w');
+      // v3.0 §9.2: 特化距离加成
+      const maxBeltDist = 4 + (this._specCache?.extraBeltRange || 0);
+      if (dist > maxBeltDist) {
+        this.log(`📏 距离太远！最多${maxBeltDist}格`, 'w');
         return true;
       }
       // 检查是否已存在（先刷新缓存确保数据最新）
@@ -12996,9 +14482,11 @@ const G = {
           '#f97316');
         SFX.buildFail();
       } else {
-        // v3.0 §4: 计算距离并记录stats
-        const distEffPct = Math.round(this._distanceEfficiency(dist) * 100);
-        const distInfo = dist >= 2 ? ` (距离${dist}格·${distEffPct}%效率)` : '';
+        // v3.0 §4+§5: 计算距离和中继效率
+        const isRelay = BLDS[this.grid[fromIdx].type]?.isRelay || BLDS[this.grid[idx].type]?.isRelay;
+        const distEffPct = Math.round(this._distanceEfficiency(dist, isRelay) * 100);
+        const relayTag = isRelay ? ' 📡中继' : '';
+        const distInfo = dist >= 2 ? ` (距离${dist}格·${distEffPct}%效率${relayTag})` : (isRelay ? ' (📡中继·衰减减半)' : '');
         this.log(`✅ 已连接: ${fromBld?.emoji||''}${fromBld?.n||''} → ${toBld?.emoji||''}${toBld?.n||''}${distInfo}`, 's');
         this.showCursorTooltip(`✅ 已连接！${distInfo}`, 's');
         SFX.build();
@@ -13053,8 +14541,10 @@ const G = {
           if (!def) return false;
           const techExtra = this._extraOutPorts || 0;
           const mpb = this._mutPortBonuses?.[type];
-          const totalOut = def.maxOut + techExtra + (mpb?.extraOut || 0);
-          const totalIn = def.maxIn + (mpb?.extraIn || 0);
+          // v3.0 §9.2: 特化端口加成
+          const specB = this._specCache?.perBuilding?.[idx];
+          const totalOut = def.maxOut + techExtra + (mpb?.extraOut || 0) + (specB?.extraOutPort || 0) + (specB?.extraPorts || 0);
+          const totalIn = def.maxIn + (mpb?.extraIn || 0) + (specB?.extraPorts || 0);
           return (getUsedPorts(idx, 'in') >= totalIn && getUsedPorts(idx, 'out') >= totalOut);
         };
         if (checkPortFull(fromIdx, fromType) || checkPortFull(toIdx, toType)) {
@@ -13089,19 +14579,20 @@ const G = {
         );
         if (hasValidFlow) {
           cell.classList.add('belt-connect-target', 'belt-target-valid');
-          // v3.0 §4: 显示距离效率标签
-          if (dist >= 2) {
-            const distEff = Math.round(this._distanceEfficiency(dist) * 100);
+          // v3.0 §4+§5: 显示距离效率标签（中继衰减减半）
+          const isRelay = BLDS[fromType]?.isRelay || BLDS[toType]?.isRelay;
+          if (dist >= 2 || isRelay) {
+            const distEff = Math.round(this._distanceEfficiency(dist, isRelay) * 100);
             let badge = cell.querySelector('.belt-dist-badge');
             if (!badge) {
               badge = document.createElement('div');
               badge.className = 'belt-dist-badge';
               badge.style.cssText = 'position:absolute;top:1px;right:1px;font-size:9px;z-index:20;pointer-events:none;padding:1px 3px;border-radius:3px;' +
-                (dist >= 3 ? 'background:rgba(249,115,22,0.8);color:#fff' : 'background:rgba(20,184,166,0.8);color:#fff');
+                (isRelay ? 'background:rgba(96,165,250,0.8);color:#fff' : dist >= 3 ? 'background:rgba(249,115,22,0.8);color:#fff' : 'background:rgba(20,184,166,0.8);color:#fff');
               cell.style.position = 'relative';
               cell.appendChild(badge);
             }
-            badge.textContent = `${dist}格·${distEff}%`;
+            badge.textContent = isRelay ? `📡${dist}格·${distEff}%` : `${dist}格·${distEff}%`;
           }
         } else {
           cell.classList.add('belt-connect-target', 'belt-target-invalid');
