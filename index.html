@@ -2585,7 +2585,7 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
   box-shadow:0 0 30px rgba(6,214,160,0.2);transform:scale(1.03);
 }
 
-/* ===== OFFLINE POPUP ===== */
+/* ===== OFFLINE / WELCOME BACK POPUP ===== */
 .offline-popup{
   position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:10002;
   background:rgba(8,12,22,0.98);border:1.5px solid var(--cyan);border-radius:10px;
@@ -2597,6 +2597,28 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
   position:absolute;inset:-50%;pointer-events:none;
   background:conic-gradient(from 0deg,transparent,rgba(6,214,160,0.06),transparent,rgba(6,214,160,0.03),transparent);
   animation:achieveGlow 4s linear infinite;
+}
+.wb-status-grid{
+  display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;
+  font-size:0.72em;color:#8aa0c0;
+  background:rgba(6,214,160,0.04);border:1px solid rgba(6,214,160,0.1);
+  border-radius:6px;padding:8px 12px;text-align:left;
+}
+.wb-status-grid span{white-space:nowrap}
+.wb-earning-row{
+  display:flex;justify-content:space-between;padding:3px 0;
+  border-bottom:1px solid rgba(255,255,255,0.03);
+}
+.wb-continue-btn{
+  position:relative;z-index:1;padding:8px 28px;
+  background:linear-gradient(135deg,rgba(6,214,160,0.15),rgba(6,214,160,0.08));
+  border:1px solid var(--cyan);color:var(--cyan);border-radius:5px;
+  cursor:pointer;font-family:'Rajdhani',sans-serif;font-weight:700;font-size:0.85em;
+  letter-spacing:1px;transition:all 0.2s;
+}
+.wb-continue-btn:hover{
+  background:linear-gradient(135deg,rgba(6,214,160,0.25),rgba(6,214,160,0.15));
+  box-shadow:0 0 20px rgba(6,214,160,0.15);transform:scale(1.03);
 }
 
 /* ===== UPGRADE POPUP ===== */
@@ -3776,15 +3798,19 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
   <button class="challenge-skip" onclick="G.skipChallenge()">跳过</button>
 </div>
 
-<!-- Offline Earnings Popup -->
-<div class="offline-popup" id="offlinePopup" role="dialog" aria-modal="true" aria-label="离线收益" aria-hidden="true">
+<!-- Welcome Back / Offline Earnings Popup -->
+<div class="offline-popup" id="offlinePopup" role="dialog" aria-modal="true" aria-label="欢迎回来" aria-hidden="true">
   <div class="offline-glow"></div>
-  <div style="font-size:1.5em;margin-bottom:4px">🌙</div>
-  <div style="font-family:'Orbitron',monospace;font-size:0.85em;color:var(--cyan);letter-spacing:2px;margin-bottom:6px">欢迎回来！</div>
-  <div style="font-size:0.8em;color:var(--dim);margin-bottom:8px" id="offlineTime"></div>
-  <div style="font-size:0.7em;color:#4a6a8a;margin-bottom:4px">你离开期间的收益：</div>
-  <div id="offlineDetail" style="margin-bottom:12px"></div>
-  <button onclick="G.closeOffline()" style="position:relative;z-index:1;padding:6px 24px;background:rgba(6,214,160,0.12);border:1px solid var(--cyan);color:var(--cyan);border-radius:4px;cursor:pointer;font-family:'Rajdhani',sans-serif;font-weight:700;font-size:0.85em;transition:all 0.2s">太棒了！</button>
+  <div style="font-size:1.6em;margin-bottom:2px">🧫</div>
+  <div id="welcomeTitle" style="font-family:'Orbitron',monospace;font-size:0.9em;color:var(--cyan);letter-spacing:2px;margin-bottom:4px;font-weight:700">欢迎菌主回来！</div>
+  <div id="welcomeFlavor" style="font-size:0.72em;color:#7a99b8;margin-bottom:8px;font-style:italic"></div>
+  <div style="font-size:0.78em;color:var(--dim);margin-bottom:10px" id="offlineTime"></div>
+  <div id="welcomeStatus" style="margin-bottom:10px"></div>
+  <div id="welcomeEarningsSection">
+    <div style="font-size:0.68em;color:#4a6a8a;margin-bottom:4px;letter-spacing:1px">— 离线收益 —</div>
+    <div id="offlineDetail" style="margin-bottom:12px"></div>
+  </div>
+  <button onclick="G.closeOffline()" class="wb-continue-btn">🔬 继续研究</button>
 </div>
 
 <!-- Upgrade Popup -->
