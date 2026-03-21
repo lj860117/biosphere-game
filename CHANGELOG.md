@@ -4,6 +4,41 @@
 
 ---
 
+## v1.1.0 — 2026-03-21 · 视觉叙事增强 Phase A-E
+
+> **Visual Narrative Enhancement — 5 Phase Implementation**
+> 完整实施视觉叙事方案5大提案，从"能用"升级为"有感觉"。
+> 代码变更：game.js +1574/-44 行，index.html 多处增强，新增 VISUAL_NARRATIVE_PLAN.md
+
+### Phase A: 阶段色彩演变系统
+- [office] `PHASE_COLORS` 常量 — 5阶段色彩映射（primary/glow/border/bg-tint）
+- [office] `setPhaseColors(phase)` 全局函数 — 动态设置CSS变量 + transition过渡
+- [office] topbar/sidebar/center 边框使用阶段动态色彩
+
+### Phase B: 传送带资源流动可视化
+- [office] 传送带负载级别视觉反馈：空闲虚线 / 低载稀疏流动 / 满载金黄光晕+脉冲光点
+- [office] 货物粒子增强：满载时放大1.3x + 金色光晕，低载时缩小0.85x
+
+### Phase D: 阶段升级视觉仪式
+- [office] 3秒异步仪式序列：遮罩→核心进化→色彩切换→24光粒子爆发→阶段名称→屏震→闪烁→恢复
+- [office] CSS: `.phase-ceremony-overlay` / `.core-evolving` / `.ceremony-particle` / `.ceremony-flash`
+- [office] HTML: 仪式遮罩DOM结构
+
+### Phase C: 培养基生命感
+- [office] bgCanvas营养粒子漂浮系统：布朗运动 + 阶段色彩 + 密度递增(20→150)
+- [office] 空格子培养基纹理CSS：radial-gradient微光暗示"这里是活的培养基"
+
+### Phase E: 成就视觉仪式
+- [office] 三级成就规格：bronze轻闪光 / gold金色粒子+全屏微闪 / diamond全屏史诗仪式
+- [office] `_showEpicAchievement()` — 全屏暗化 + 中央💎图标 + 双波光环扩散 + 4秒淡出
+- [office] gold/diamond粒子爆发(12/20颗)，diamond紫色粒子+震屏12+二次震屏
+- [office] CSS: `.achievement-epic-overlay` / `.achievement-epic-ring` / `.achv-particle`
+
+### 📄 新增文档
+- [office] `VISUAL_NARRATIVE_PLAN.md` — 视觉叙事评估(7.4/10)与增强方案(5提案)完整文档
+
+---
+
 ## v0.9.3 — 2026-03-21 · 建筑系统2.0完善 + 距离-效率衰减
 
 > **Building System 2.0 Polish + Distance-Efficiency Decay (INTEGRATED_DESIGN §4)**
