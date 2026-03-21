@@ -3191,6 +3191,10 @@ const G = {
       const empireEl = document.getElementById('empireOverview');
       if (empireEl) {
         this._empireAutoCollapsed = false;   // 自动折叠标记
+        this._empireAlertExpanded = false;   // 告警自动展开标记
+        this._lastGuideKey = null;           // 卡住检测：上次引导步骤
+        this._guideStuckTs = Date.now();     // 卡住检测：步骤开始时间
+        this._guideStuckNotified = false;    // 卡住检测：是否已提醒
         this._empireUserCollapsed = empireEl.classList.contains('collapsed'); // 用户手动折叠
         const SCROLL_THRESHOLD = 30; // 向下滚动超过此值则折叠
 
@@ -10883,7 +10887,9 @@ const G = {
       <span style="font-size:0.6em;color:var(--dim)">▾</span>
     </div>`;
 
-    html += '<div class="expl-items" style="display:flex;flex-direction:column;gap:3px">';
+    // 保存折叠状态，重建后恢复
+    const wasCollapsed = panel.querySelector('.expl-items.expl-collapsed') !== null;
+    html += `<div class="expl-items${wasCollapsed ? ' expl-collapsed' : ''}" style="display:flex;flex-direction:column;gap:3px">`;
     for (const item of es.items) {
       const done = item.done;
       const cur = item.current;
@@ -10938,7 +10944,9 @@ const G = {
       <span style="font-size:0.6em;color:var(--dim)">▾</span>
     </div>`;
 
-    html += '<div class="p3b-items" style="display:flex;flex-direction:column;gap:3px">';
+    // 保存折叠状态，重建后恢复
+    const wasCollapsed = panel.querySelector('.p3b-items.expl-collapsed') !== null;
+    html += `<div class="p3b-items${wasCollapsed ? ' expl-collapsed' : ''}" style="display:flex;flex-direction:column;gap:3px">`;
     const typeColors = { '建设':'#22c55e', '探索':'#ec4899', '突变':'#c084fc', '连线':'#f97316', '布局':'#3b82f6', '远距':'#06d6a0' };
     for (const item of es.items) {
       const done = item.done;
@@ -11027,6 +11035,36 @@ const G = {
 
     document.getElementById('guideText').textContent = guideText;
 
+    // ── 同步培养皿内引导提示条 ──
+    const dishGuideBar = document.getElementById('dishGuideBar');
+    const dishGuideText = document.getElementById('dishGuideText');
+    const dishGuideIconEl = document.getElementById('dishGuideIcon');
+    if (dishGuideBar && dishGuideText) {
+      // 提取简短文字（去掉破折号后面的补充说明）
+      const shortGuide = guideText.replace(/[—(（].*$/, '').trim();
+      if (dishGuideText.textContent !== shortGuide) {
+        dishGuideText.textContent = shortGuide;
+        if (dishGuideIconEl) dishGuideIconEl.textContent = guideIcon;
+        // 闪烁动画
+        dishGuideBar.classList.remove('flash');
+        void dishGuideBar.offsetWidth; // force reflow
+        dishGuideBar.classList.add('flash');
+      }
+      // 点击提示条 → 展开右侧目标面板
+      if (!dishGuideBar._bound) {
+        dishGuideBar._bound = true;
+        dishGuideBar.onclick = () => {
+          const sec = document.getElementById('secGoal');
+          if (sec && sec.classList.contains('collapsed')) G.toggleSection('secGoal');
+          // 滚动到目标面板
+          sec && sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        };
+      }
+      // 通关后隐藏
+      if (this.wonderComplete) dishGuideBar.classList.add('hidden');
+      else dishGuideBar.classList.remove('hidden');
+    }
+
     // === 渲染步骤列表：已完成 / 当前 / 后续 ===
     const stepsEl = document.getElementById('guideSteps');
     stepsEl.innerHTML = '';
@@ -11075,6 +11113,56 @@ const G = {
 
     // 更新新手小手引导（仅阶段1）
     this._updateGuideHand();
+
+    // ── 卡住检测 + 步骤变化高亮 ──
+    const guideKey = this.phase + ':' + currentIdx;
+    const guideBox = document.getElementById('secGoal');
+    if (guideKey !== this._lastGuideKey) {
+      // 步骤变化 → 面板闪烁吸引注意
+      this._lastGuideKey = guideKey;
+      this._guideStuckTs = Date.now();
+      this._guideStuckNotified = false;
+      if (guideBox) {
+        guideBox.style.transition = 'box-shadow 0.3s';
+        guideBox.style.boxShadow = '0 0 12px rgba(6,214,160,0.5), inset 0 0 6px rgba(6,214,160,0.15)';
+        setTimeout(() => { guideBox.style.boxShadow = ''; }, 1800);
+      }
+    }
+    // 同一步骤停留超过45s → 显示卡住提醒浮条
+    if (!this._guideStuckNotified && this._guideStuckTs && Date.now() - this._guideStuckTs > 45000 && this.phase < 5 && currentIdx >= 0) {
+      this._guideStuckNotified = true;
+      const hint = steps[currentIdx];
+      // 提取核心行动关键词
+      const shortAction = (hint.text || guideText).replace(/[—(（｜|].*/g, '').replace(/▸\s*P\d[a-z]?\s*·\s*\S+\s*[｜|]/g, '').trim();
+      this._showStuckReminder(shortAction);
+    }
+  },
+
+  // 卡住提醒浮条（培养皿上方，醒目但不遮挡）
+  _showStuckReminder(action) {
+    // 避免重复
+    const old = document.getElementById('stuckReminder');
+    if (old) old.remove();
+    const el = document.createElement('div');
+    el.id = 'stuckReminder';
+    el.style.cssText = 'position:fixed;top:60px;left:50%;transform:translateX(-50%);z-index:9999;' +
+      'background:linear-gradient(135deg,rgba(249,115,22,0.92),rgba(234,88,12,0.92));' +
+      'color:#fff;padding:8px 18px;border-radius:8px;font-size:0.82em;font-weight:600;' +
+      'box-shadow:0 4px 20px rgba(249,115,22,0.4);cursor:pointer;max-width:480px;text-align:center;' +
+      'animation:stuckSlideIn 0.4s ease-out;white-space:nowrap;overflow:hidden;text-overflow:ellipsis';
+    el.innerHTML = `💡 看起来卡住了？→ <span style="text-decoration:underline">${action}</span>`;
+    el.onclick = () => {
+      el.style.opacity = '0';
+      el.style.transform = 'translateX(-50%) translateY(-20px)';
+      el.style.transition = 'all 0.3s';
+      setTimeout(() => el.remove(), 300);
+      // 展开目标面板（如果折叠了）
+      const sec = document.getElementById('secGoal');
+      if (sec && sec.classList.contains('collapsed')) G.toggleSection('secGoal');
+    };
+    document.body.appendChild(el);
+    // 12秒后自动消失
+    setTimeout(() => { if (el.parentNode) { el.style.opacity = '0'; el.style.transition = 'opacity 0.5s'; setTimeout(() => el.remove(), 500); } }, 12000);
   },
 
   // ===== MAIN LOOP =====
@@ -13839,6 +13927,24 @@ const G = {
     if (iconEl) iconEl.textContent = maxSev === 'danger' ? '🚨' : maxSev === 'warn' ? '⚠️' : 'ℹ️';
     if (textEl) textEl.textContent = summary;
     if (countEl) countEl.textContent = alerts.length > 2 ? `+${alerts.length - 2}` : '';
+
+    // ── 7. 告警级别 warn/danger → 自动展开帝国总览 ──
+    if (maxSev === 'warn' || maxSev === 'danger') {
+      const empire = document.getElementById('empireOverview');
+      if (empire && empire.classList.contains('collapsed')) {
+        empire.classList.remove('collapsed');
+        this._empireAutoCollapsed = false;
+        // 标记为告警自动展开，恢复正常后自动收回
+        this._empireAlertExpanded = true;
+      }
+    } else if (this._empireAlertExpanded) {
+      // 告警降为 info → 自动收回（除非用户主动操作过）
+      const empire = document.getElementById('empireOverview');
+      if (empire && !empire.classList.contains('collapsed') && !this._empireUserCollapsed) {
+        empire.classList.add('collapsed');
+      }
+      this._empireAlertExpanded = false;
+    }
   },
 
   // ===== G3: 帝国总览折叠摘要 =====
@@ -14061,6 +14167,7 @@ const G = {
     if (secId === 'empireOverview') {
       this._empireUserCollapsed = sec.classList.contains('collapsed');
       this._empireAutoCollapsed = false; // 手动操作后清除自动标记
+      this._empireAlertExpanded = false; // 手动操作后清除告警展开标记
     }
     // 记住折叠状态
     try {
@@ -14556,46 +14663,58 @@ const G = {
     list.innerHTML = '';
     let hasActive = false;
 
-    // --- ★ v0.9.3：邻接加成统计行 ---
+    // --- ★ 邻接加成：紧凑进度条样式 ---
     const adjStats = this._getAdjStats();
     if (adjStats.adjCount > 0) {
       hasActive = true;
-      const adjRow = document.createElement('div');
-      adjRow.style.cssText = 'padding:5px 0;border-bottom:1px solid rgba(6,214,160,0.08);display:flex;justify-content:space-between;align-items:center';
-      const bestName = adjStats.bestIdx >= 0 && this.grid[adjStats.bestIdx] ? (BLDS[this.grid[adjStats.bestIdx].type]?.emoji || '') + (BLDS[this.grid[adjStats.bestIdx].type]?.n || '') : '';
-      adjRow.innerHTML = `<span style="color:#06d6a0;font-size:0.95em">🔗 邻接加成 ×<span style="font-weight:700">${adjStats.adjCount}</span>条 · <span style="font-weight:700">+${Math.round(adjStats.totalBonus * 100)}%</span></span>`
-        + (bestName ? `<span style="font-size:0.8em;color:var(--dim)">最强: ${bestName} +${Math.round(adjStats.bestBonus * 100)}%</span>` : '');
-      list.appendChild(adjRow);
-
-      // ★ v0.9.3：邻接 Top 5 小排行
-      if (adjStats.top5.length > 0) {
-        const medals = ['🥇','🥈','🥉','④','⑤'];
-        const top5El = document.createElement('div');
-        top5El.style.cssText = 'padding:2px 0 4px 6px;border-bottom:1px solid rgba(6,214,160,0.05);font-size:0.78em;color:var(--dim);line-height:1.6';
-        let top5Html = '';
-        adjStats.top5.forEach((item, i) => {
+      const totalPct = Math.round(adjStats.totalBonus * 100);
+      const barPct = Math.min(totalPct, 100); // 进度条最多100%宽度
+      const barColor = totalPct >= 50 ? '#fbbf24' : totalPct >= 20 ? '#06d6a0' : '#3b82f6';
+      const adjEl = document.createElement('div');
+      adjEl.style.cssText = 'padding:4px 0 5px;border-bottom:1px solid rgba(6,214,160,0.08)';
+      // 保持 Top5 折叠状态
+      const wasTop5Hidden = list.parentElement?.querySelector('.adj-top5-list.adj-hidden') !== null;
+      adjEl.innerHTML = `<div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">
+          <span style="color:#06d6a0;font-size:0.85em;white-space:nowrap">🔗 ×${adjStats.adjCount}</span>
+          <div style="flex:1;height:6px;background:rgba(255,255,255,0.06);border-radius:3px;overflow:hidden">
+            <div style="width:${barPct}%;height:100%;background:${barColor};border-radius:3px;transition:width 0.4s"></div>
+          </div>
+          <span style="color:${barColor};font-size:0.8em;font-weight:700;font-family:'Orbitron',monospace;white-space:nowrap">+${totalPct}%</span>
+        </div>` + (adjStats.top5.length > 0 ? `<div style="display:flex;align-items:center;gap:4px;cursor:pointer" onclick="this.nextElementSibling.classList.toggle('adj-hidden')">
+          <span style="font-size:0.7em;color:var(--dim)">▾ Top ${adjStats.top5.length}</span>
+          ${adjStats.top5.slice(0, 3).map(item => {
+            const bld = BLDS[item.type];
+            return `<span style="font-size:0.75em" title="${bld?.n||'?'} +${Math.round(item.bonus*100)}%">${bld?.emoji||'?'}</span>`;
+          }).join('')}
+        </div>
+        <div class="adj-top5-list${wasTop5Hidden !== false ? ' adj-hidden' : ''}" style="padding:2px 0 0 4px;font-size:0.72em;line-height:1.5">${adjStats.top5.map((item, i) => {
           const bld = BLDS[item.type];
-          const name = (bld?.emoji || '') + (bld?.n || '?');
-          const pct = Math.round(item.bonus * 100);
+          const name = (bld?.emoji||'')+(bld?.n||'?');
+          const pct = Math.round(item.bonus*100);
           const pctColor = pct >= 30 ? '#fbbf24' : pct >= 15 ? '#06d6a0' : '#8aa0c0';
-          top5Html += `<span style="cursor:pointer;display:inline-block;margin-right:6px" onclick="G._focusCell(${item.idx})">${medals[i]} ${name} <span style="color:${pctColor};font-weight:600">+${pct}%</span></span>`;
-        });
-        top5El.innerHTML = top5Html;
-        list.appendChild(top5El);
-      }
+          return `<span style="cursor:pointer;display:inline-block;margin-right:5px" onclick="G._focusCell(${item.idx})">${['🥇','🥈','🥉','④','⑤'][i]}${name} <span style="color:${pctColor};font-weight:600">+${pct}%</span></span>`;
+        }).join('')}</div>` : '');
+      list.appendChild(adjEl);
     }
 
-    // --- 流水线链展示 ---
-    CHAINS.forEach(ch => {
-      const active = ch.reqs.every(r => this.grid.some(g => g && g.type === r));
-      if (active) {
-        hasActive = true;
-        const div = document.createElement('div');
-        div.style.cssText = 'padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.03);color:var(--color-info);display:flex;align-items:center;gap:4px';
-        div.innerHTML = `<span style="color:var(--cyan);font-size:0.95em">⛓</span> ${ch.n}: <span style="color:var(--color-info)">${ch.steps.join(' ')}</span>`;
-        list.appendChild(div);
-      }
-    });
+    // --- 流水线链：图标化管线 ---
+    const activeChains = CHAINS.filter(ch => ch.reqs.every(r => this.grid.some(g => g && g.type === r)));
+    if (activeChains.length > 0) {
+      hasActive = true;
+      const chainEl = document.createElement('div');
+      chainEl.style.cssText = 'padding:3px 0 4px;border-bottom:1px solid rgba(255,255,255,0.04);display:flex;flex-wrap:wrap;gap:3px 2px;align-items:center';
+      const pillStyle = 'display:inline-flex;align-items:center;gap:2px;padding:1px 5px;border-radius:8px;font-size:0.72em;font-weight:600;white-space:nowrap';
+      const arrowStyle = 'color:var(--dim);font-size:0.7em;margin:0 1px';
+      chainEl.innerHTML = activeChains.map(ch => {
+        // steps: ['输入', '→', '输出']
+        const input = ch.steps[0];
+        const output = ch.steps[2];
+        return `<span style="${pillStyle};background:rgba(255,255,255,0.04);color:var(--dim)">${input}</span>`
+          + `<span style="${arrowStyle}">▸</span>`
+          + `<span style="${pillStyle};background:rgba(6,214,160,0.08);color:#86efac">${output}</span>`;
+      }).join('<span style="width:4px"></span>');
+      list.appendChild(chainEl);
+    }
 
     // --- 传送带总览 ---
     if (beltCount > 0) {
