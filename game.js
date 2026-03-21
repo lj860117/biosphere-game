@@ -2419,6 +2419,76 @@ const PRESTIGE = {
   },
 };
 
+// ===== v3.0 §8: 转生变体规则 =====
+const PRESTIGE_VARIANTS = [
+  {
+    id: 'purist', name: '纯粹主义', icon: '🔥', color: '#ef4444',
+    desc: '禁止传送带 — 完全依赖邻接布局',
+    scoreBonus: 2.5,  // 进化因子倍率
+    rules: { noBelts: true },
+    hint: '你能仅靠邻接加成通关吗？极端布局挑战。',
+  },
+  {
+    id: 'energyCrisis', name: '能量危机', icon: '⚡', color: '#f59e0b',
+    desc: 'ATP产出-30% — 远距传送带维护费更痛',
+    scoreBonus: 1.8,
+    rules: { energyMult: 0.7 },
+    hint: '紧凑布局或死！每一点能量都珍贵。',
+  },
+  {
+    id: 'minimalist', name: '极简主义', icon: '🔬', color: '#8b5cf6',
+    desc: '建筑上限8座 — 每条传送带都珍贵',
+    scoreBonus: 2.0,
+    rules: { maxBuildings: 8 },
+    hint: '用最少的建筑通关，每个格子都是战略决策。',
+  },
+  {
+    id: 'chaos', name: '混沌培养皿', icon: '🎲', color: '#ec4899',
+    desc: '新建筑随机放置 — 中继节点成为救命稻草',
+    scoreBonus: 1.5,
+    rules: { randomPlacement: true },
+    hint: '无法控制建筑位置，拥抱混沌！',
+  },
+  {
+    id: 'speedrun', name: '竞速试炼', icon: '⏱️', color: '#06b6d4',
+    desc: '15分钟时限 — 超时后效率持续下降',
+    scoreBonus: 2.2,
+    rules: { timeLimit: 900 }, // 秒
+    hint: '争分夺秒！15分钟后效率每分钟-5%。',
+  },
+  {
+    id: 'toxic', name: '毒素蔓延', icon: '☠️', color: '#84cc16',
+    desc: '每60秒随机一种资源-10% — 适应或灭亡',
+    scoreBonus: 1.6,
+    rules: { toxicDecay: true, toxicInterval: 60 },
+    hint: '资源会自然衰减，保持多元化生产。',
+  },
+];
+
+// ===== v3.0 §8: 转生里程碑 =====
+const PRESTIGE_MILESTONES = [
+  {
+    count: 3, id: 'blueprint', name: '🗺️ 布局蓝图', icon: '🗺️', color: '#3b82f6',
+    desc: '保存/加载传送带布局 — 快速重建物流网络',
+    unlockDesc: '传送带蓝图系统解锁！可保存/加载物流布局。',
+  },
+  {
+    count: 5, id: 'catalyst', name: '🧪 催化剂', icon: '🧪', color: '#f97316',
+    desc: '消耗品系统 — 含物流催化(传送带效率+30%持续120秒)',
+    unlockDesc: '催化剂系统解锁！可使用消耗品临时增强效果。',
+  },
+  {
+    count: 10, id: 'multiStrain', name: '🌐 多菌株', icon: '🌐', color: '#a855f7',
+    desc: '取消科技互斥限制 — 同时研究所有分支',
+    unlockDesc: '多菌株模式解锁！科技互斥限制取消。',
+  },
+  {
+    count: 15, id: 'creative', name: '⭐ 创造模式', icon: '⭐', color: '#fbbf24',
+    desc: '无限资源 — 自由测试最优物流网络',
+    unlockDesc: '创造模式解锁！可以无限资源自由实验。',
+  },
+];
+
 // ===== GAME STATE =====
 const G = {
   res:{}, rates:{}, grid:[], gridSize:20, gridCols:20, gridRows:20,
@@ -2473,6 +2543,15 @@ const G = {
   // v3.0 §9.2: 建筑特化
   _specializations: {},    // { idx: { id, name, icon, color, desc, effect } }
   _specCache: { extraBeltRange: 0, beltEffBonus: 0, relayDecayOverride: null, relayExtraPorts: 0, perBuilding: {} },
+  // v3.0 §8: 转生变体
+  _activeVariant: null,    // 当前激活的变体ID (如 'purist')
+  _variantTimer: 0,        // speedrun计时 / toxic周期计时
+  _toxicTarget: null,      // toxic变体当前衰减目标资源
+  // v3.0 §8: 转生里程碑
+  _unlockedMilestones: {}, // { blueprint: true, catalyst: true, ... }
+  _blueprints: [],         // 蓝图系统: [{ name, belts, grid_snapshot }]
+  _catalysts: {},          // 催化剂: { beltBoost: { active, endTime }, ... }
+  _creativeMode: false,    // 创造模式
   // Power level system
   _foodPowerLevel: 1.0, // 1.0 = full power, 0.2 = minimum
   _powerWarningShown: false,
@@ -2670,6 +2749,12 @@ const G = {
       if (e.key === '1') { this.spd = 1; this._syncSpeedUI(); }
       else if (e.key === '2') { this.spd = 2; this._syncSpeedUI(); }
       else if (e.key === '3') { this.spd = 4; this._syncSpeedUI(); }
+      // v3.0 §7.4: Tab键 — 网络总览模式
+      else if (e.key === 'Tab') {
+        e.preventDefault();
+        this.toggleNetworkOverview();
+        return;
+      }
     });
   },
 
@@ -2680,6 +2765,201 @@ const G = {
     btn.classList.remove('spd-2', 'spd-4');
     if (this.spd === 2) btn.classList.add('spd-2');
     else if (this.spd === 4) btn.classList.add('spd-4');
+  },
+
+  // v3.0 §7.4: 网络总览模式 — Tab键切换
+  toggleNetworkOverview() {
+    if (this._networkOverviewActive) {
+      this._hideNetworkOverview();
+    } else {
+      this._showNetworkOverview();
+    }
+  },
+
+  // v3.0 §7.4: 显示网络总览模式
+  _showNetworkOverview() {
+    if (this._networkOverviewActive) return;
+    
+    this._networkOverviewActive = true;
+    this._originalDisplay = document.getElementById('game').style.display;
+    
+    // 创建网络总览容器
+    const overlay = document.createElement('div');
+    overlay.id = 'networkOverviewOverlay';
+    overlay.style.cssText = `
+      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0, 0, 0, 0.95); z-index: 9999;
+      display: flex; flex-direction: column; align-items: center;
+      justify-content: center; color: white; font-family: 'Rajdhani', sans-serif;
+      animation: fadeIn 0.3s;
+    `;
+    
+    // 生成网络拓扑图
+    const networkData = this._generateNetworkData();
+    
+    let html = `
+      <div style="background: #1a1a2e; border: 1px solid rgba(6, 214, 160, 0.3); 
+                border-radius: 12px; padding: 20px; max-width: 90vw; max-height: 90vh; 
+                overflow: auto; box-shadow: 0 0 40px rgba(6, 214, 160, 0.15);">
+        <div style="text-align: center; margin-bottom: 20px;">
+          <div style="font-size: 1.5em; margin-bottom: 8px;">🌐</div>
+          <div style="font-size: 1.2em; font-weight: 700; color: #06d6a0;">物流网络总览</div>
+          <div style="font-size: 0.8em; color: #94a3b8; margin-top: 4px;">
+            按 Tab 键退出 • ${networkData.totalBelts}条传送带 • ${networkData.totalNodes}个建筑节点
+          </div>
+        </div>
+        
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px;">
+    `;
+    
+    // 按建筑类型分组显示
+    Object.entries(networkData.nodesByType).forEach(([type, nodes]) => {
+      const bd = BLDS[type];
+      if (!bd || nodes.length === 0) return;
+      
+      html += `
+        <div style="background: rgba(6, 214, 160, 0.05); border: 1px solid rgba(6, 214, 160, 0.2); 
+                  border-radius: 8px; padding: 12px;">
+          <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+            <span style="font-size: 1.2em;">${bd.emoji || '🏗️'}</span>
+            <span style="font-weight: 700; color: #06d6a0;">${bd.n}</span>
+            <span style="font-size: 0.8em; color: #94a3b8; margin-left: auto;">${nodes.length}台</span>
+          </div>
+          <div style="font-size: 0.8em; color: #94a3b8; margin-bottom: 8px;">
+            连接: ${nodes.reduce((sum, node) => sum + (node.connections || 0), 0)}条
+          </div>
+          <div style="display: flex; flex-wrap: wrap; gap: 4px;">
+            ${nodes.map(node => {
+              const connColor = node.connections > 0 ? '#06d6a0' : '#64748b';
+              return `<span style="font-size: 0.7em; padding: 2px 6px; background: ${connColor}20; 
+                         border: 1px solid ${connColor}40; border-radius: 4px; color: ${connColor};">
+                       ${node.connections || 0}连
+                     </span>`;
+            }).join('')}
+          </div>
+        </div>
+      `;
+    });
+    
+    html += `
+        </div>
+        
+        <!-- 网络统计 -->
+        <div style="margin-top: 20px; padding: 12px; background: rgba(6, 214, 160, 0.05); 
+                  border-radius: 8px; border: 1px solid rgba(6, 214, 160, 0.2);">
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
+            <div style="text-align: center;">
+              <div style="font-size: 1.5em; color: #06d6a0;">${networkData.totalBelts}</div>
+              <div style="font-size: 0.8em; color: #94a3b8;">总传送带数</div>
+            </div>
+            <div style="text-align: center;">
+              <div style="font-size: 1.5em; color: #f97316;">${networkData.avgConnections.toFixed(1)}</div>
+              <div style="font-size: 0.8em; color: #94a3b8;">平均连接数</div>
+            </div>
+            <div style="text-align: center;">
+              <div style="font-size: 1.5em; color: #a855f7;">${networkData.maxConnections}</div>
+              <div style="font-size: 0.8em; color: #94a3b8;">最大连接数</div>
+            </div>
+            <div style="text-align: center;">
+              <div style="font-size: 1.5em; color: #fbbf24;">${networkData.networkEfficiency}%</div>
+              <div style="font-size: 0.8em; color: #94a3b8;">网络效率</div>
+            </div>
+          </div>
+        </div>
+        
+        <div style="text-align: center; margin-top: 16px; font-size: 0.8em; color: #64748b;">
+          🌐 Tab键切换 • ESC键关闭 • 鼠标滚轮缩放
+        </div>
+      </div>
+    `;
+    
+    overlay.innerHTML = html;
+    document.body.appendChild(overlay);
+    
+    // 绑定ESC键关闭
+    const escHandler = (e) => {
+      if (e.key === 'Escape') {
+        this._hideNetworkOverview();
+        document.removeEventListener('keydown', escHandler);
+      }
+    };
+    document.addEventListener('keydown', escHandler);
+    
+    this.log('🌐 网络总览模式已激活', 's');
+  },
+
+  // v3.0 §7.4: 生成网络数据
+  _generateNetworkData() {
+    const nodesByType = {};
+    let totalBelts = 0;
+    let totalConnections = 0;
+    let maxConnections = 0;
+    
+    // 统计每个建筑的连接数
+    this.grid.forEach((g, idx) => {
+      if (!g) return;
+      
+      const type = g.type;
+      if (!nodesByType[type]) nodesByType[type] = [];
+      
+      // 计算该建筑的连接数
+      const connections = this._activeBelts.filter(belt => 
+        belt.from === idx || belt.to === idx
+      ).length;
+      
+      nodesByType[type].push({ idx, connections });
+      totalConnections += connections;
+      maxConnections = Math.max(maxConnections, connections);
+    });
+    
+    totalBelts = this._activeBelts.length;
+    const totalNodes = Object.values(nodesByType).reduce((sum, nodes) => sum + nodes.length, 0);
+    const avgConnections = totalNodes > 0 ? totalConnections / totalNodes : 0;
+    
+    // 计算网络效率（基于端口利用率）
+    let networkEfficiency = 0;
+    if (totalNodes > 0) {
+      let totalPortUtilization = 0;
+      this.grid.forEach((g, idx) => {
+        if (!g) return;
+        const portDef = PORT_DEFS[g.type];
+        if (!portDef) return;
+        
+        const connections = this._activeBelts.filter(belt => 
+          belt.from === idx || belt.to === idx
+        ).length;
+        const maxPorts = Math.max(portDef.maxIn, portDef.maxOut);
+        const utilization = maxPorts > 0 ? Math.min(connections / maxPorts, 1) : 0;
+        totalPortUtilization += utilization;
+      });
+      networkEfficiency = Math.round((totalPortUtilization / totalNodes) * 100);
+    }
+    
+    return {
+      nodesByType,
+      totalBelts,
+      totalNodes,
+      totalConnections,
+      avgConnections,
+      maxConnections,
+      networkEfficiency
+    };
+  },
+
+  // v3.0 §7.4: 隐藏网络总览模式
+  _hideNetworkOverview() {
+    if (!this._networkOverviewActive) return;
+    
+    this._networkOverviewActive = false;
+    const overlay = document.getElementById('networkOverviewOverlay');
+    if (overlay) overlay.remove();
+    
+    if (this._originalDisplay !== undefined) {
+      document.getElementById('game').style.display = this._originalDisplay;
+    }
+    
+    this.log('🌐 网络总览模式已关闭', 's');
+  },
     SFX.click();
   },
 
@@ -5956,6 +6236,30 @@ const G = {
 
     if (this.grid[idx]) { this.log('这个位置已经有建筑了', 'e'); SFX.buildFail(); return; }
 
+    // v3.0 §8: 变体限制检查
+    // 1. maxBuildings 变体 — 建筑上限8座
+    if (this._variantMaxBuildings && this.totalBuildings() >= this._variantMaxBuildings) {
+      this.log(`🔬 极简主义! 建筑上限 ${this._variantMaxBuildings} 座，无法再建造`, 'e');
+      this.showCursorTooltip(`🔬 变体限制: 建筑上限 ${this._variantMaxBuildings} 座`);
+      SFX.buildFail();
+      return;
+    }
+    // 2. randomPlacement 变体 — 随机放置位置
+    if (this._variantRandomPlace) {
+      const emptyCells = [];
+      for (let i = 0; i < this.grid.length; i++) {
+        if (!this.grid[i]) emptyCells.push(i);
+      }
+      if (emptyCells.length > 0) {
+        const randomIdx = emptyCells[Math.floor(Math.random() * emptyCells.length)];
+        if (randomIdx !== idx) {
+          this.log(`🎲 混沌培养皿! 建筑被随机放置到其他位置`, 'w');
+          this.showCursorTooltip(`🎲 变体限制: 建筑随机放置`);
+          idx = randomIdx; // 重定向到随机位置
+        }
+      }
+    }
+
     const bd = BLDS[this.sel];
     if (!bd) return;
     if (bd.techReq && !this.techs[bd.techReq]?.done) {
@@ -8015,7 +8319,9 @@ const G = {
       const mutGlobalBonus = 1 + (this._mutActiveEffects.globalProdBonus || 0);
       // v3.0 §9.1: 邻接里程碑临时加成
       const adjMilestone = 1 + (this._adjMilestoneBonus || 0);
-      const mult = this.gEff * popMult * bldMult * beltMult * techBonus * adjBonus * syncBonus * (this._foodPowerLevel || 1) * globalProdMult * mutGlobalBonus * adjMilestone;
+      // v3.0 §8: 变体效果 — energyCrisis变体ATP产出-30%
+      const variantEnergyMult = this._variantEnergyMult || 1;
+      const mult = this.gEff * popMult * bldMult * beltMult * techBonus * adjBonus * syncBonus * (this._foodPowerLevel || 1) * globalProdMult * mutGlobalBonus * adjMilestone * variantEnergyMult;
       for (let k in bd.prod) {
         // ★ Q4：突变单资源产出加成
         const mutResBonus = 1 + (this._mutActiveEffects.resProdBonus?.[k] || 0);
@@ -9922,6 +10228,35 @@ const G = {
     if (this._loopId) return;
     this._loopId = setInterval(() => {
       if (this.paused) return;
+
+      // v3.0 §8: 变体运行时效果
+      // speedrun 变体计时器
+      if (this._variantTimeLimit) {
+        this._variantTimer++;
+        if (this._variantTimer >= this._variantTimeLimit) {
+          // 超时后每60秒效率-5%
+          const overtime = this._variantTimer - this._variantTimeLimit;
+          if (overtime > 0 && overtime % 3600 === 0) { // 60秒 (3600 tick)
+            this.gEff = Math.max(0.2, this.gEff - 0.05);
+            this.log(`⏱️ 竞速试炼! 超时 ${Math.floor(overtime/60)} 分钟，效率-5% → ${formatNum(this.gEff*100, 1)}%`, 'w');
+            this.showEvent('⏱️ 超时惩罚', `效率已下降至 ${formatNum(this.gEff*100, 1)}%\n\n时间就是生命！`, '#06b6d4');
+          }
+        }
+      }
+      // toxic 变体资源衰减
+      if (this._variantToxic) {
+        if (this._variantTimer % (this._toxicInterval || 3600) === 0) { // 默认60秒
+          const resources = Object.keys(RES).filter(k => this.res[k] > 0);
+          if (resources.length > 0) {
+            const targetRes = resources[Math.floor(Math.random() * resources.length)];
+            const decayAmount = this.res[targetRes] * 0.1; // -10%
+            this.res[targetRes] = Math.max(0, this.res[targetRes] - decayAmount);
+            this._toxicTarget = targetRes;
+            this.log(`☠️ 毒素蔓延! ${RES[targetRes]?.icon||targetRes}${RES[targetRes]?.n||targetRes} -10%`, 'w');
+            this.showEvent('☠️ 毒素蔓延', `${RES[targetRes]?.icon||targetRes}${RES[targetRes]?.n||targetRes} 被污染了！\n\n保持多元化生产对抗毒素。`, '#84cc16');
+          }
+        }
+      }
 
       for (let s = 0; s < this.spd; s++) {
         this.updateRates();
@@ -14318,6 +14653,13 @@ const G = {
 
   // ===== MANUAL BELT CONNECTION =====
   startBeltConnect() {
+    // v3.0 §8: 纯粹主义变体 — 禁止传送带
+    if (this._variantNoBelts) {
+      this.log('🔥 纯粹主义! 禁止使用传送带 — 只能依赖邻接布局', 'w');
+      this.showCursorTooltip('🔥 变体限制: 禁止传送带');
+      SFX.buildFail();
+      return;
+    }
     this.closeBeltActionMenu();
     if (this._petriMode) this.cancelPetriMode();
     this._beltConnectMode = true;
@@ -14333,6 +14675,9 @@ const G = {
     // ★ Q2：显示传送带模式浮动标签
     this._showBeltModeBanner();
     this._startBeltIdleTimer();
+    
+    // v3.0 §8: 蓝图系统 — 在传送带模式中显示蓝图按钮
+    this._showBeltBlueprintButtons();
   },
 
   cancelBeltConnect() {
@@ -14349,6 +14694,153 @@ const G = {
     // ★ Q2：移除浮动标签和闲置计时器
     this._hideBeltModeBanner();
     this._stopBeltIdleTimer();
+    
+    // v3.0 §8: 蓝图系统 — 退出传送带模式时隐藏蓝图按钮
+    this._hideBeltBlueprintButtons();
+  },
+
+  // v3.0 §8: 蓝图系统 — 在传送带模式中显示蓝图按钮
+  _showBeltBlueprintButtons() {
+    if (!this._unlockedMilestones?.blueprint) return; // 蓝图里程碑未解锁
+    
+    const banner = document.getElementById('beltModeBanner');
+    if (!banner) return;
+    
+    // 在浮动标签中添加蓝图按钮
+    const blueprintHtml = `
+      <div style="margin-top:8px;display:flex;gap:4px;justify-content:center">
+        <button class="belt-blueprint-btn" onclick="G.saveBeltBlueprint()" title="保存当前传送带布局">
+          <span style="font-size:0.9em">💾</span> 保存
+        </button>
+        <button class="belt-blueprint-btn" onclick="G.showBlueprintList()" title="加载已保存的传送带布局">
+          <span style="font-size:0.9em">🗺️</span> 加载
+        </button>
+      </div>
+    `;
+    
+    // 如果已有蓝图按钮区域，先移除
+    const existing = banner.querySelector('.belt-blueprint-buttons');
+    if (existing) existing.remove();
+    
+    const btnContainer = document.createElement('div');
+    btnContainer.className = 'belt-blueprint-buttons';
+    btnContainer.innerHTML = blueprintHtml;
+    banner.appendChild(btnContainer);
+  },
+
+  // v3.0 §8: 蓝图系统 — 隐藏蓝图按钮
+  _hideBeltBlueprintButtons() {
+    const banner = document.getElementById('beltModeBanner');
+    if (!banner) return;
+    
+    const existing = banner.querySelector('.belt-blueprint-buttons');
+    if (existing) existing.remove();
+  },
+
+  // v3.0 §8: 蓝图系统 — 保存当前传送带布局
+  saveBeltBlueprint() {
+    if (!this._unlockedMilestones?.blueprint) return;
+    
+    const name = prompt('为这个传送带布局命名：', `布局${this._blueprints.length + 1}`);
+    if (!name) return;
+    
+    // 保存当前传送带状态
+    const blueprint = {
+      name: name,
+      belts: [...(this._activeBelts || [])], // 当前活跃传送带
+      grid_snapshot: this.grid.map(g => g ? { type: g.type } : null), // 建筑快照
+      timestamp: Date.now()
+    };
+    
+    this._blueprints.push(blueprint);
+    this.log(`🗺️ 蓝图已保存: "${name}" (${blueprint.belts.length}条传送带)`, 's');
+    this.showEvent('💾 蓝图保存', `传送带布局 "${name}" 已保存！\\n\\n可在加载时快速重建物流网络。`, '#3b82f6');
+    SFX.build();
+  },
+
+  // v3.0 §8: 蓝图系统 — 显示蓝图列表
+  showBlueprintList() {
+    if (!this._unlockedMilestones?.blueprint) return;
+    if (this._blueprints.length === 0) {
+      this.log('🗺️ 暂无保存的蓝图，请先使用「保存」功能', 'w');
+      return;
+    }
+    
+    const overlay = document.createElement('div');
+    overlay.id = 'blueprintListOverlay';
+    overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.92);z-index:10000;display:flex;align-items:center;justify-content:center;animation:fadeIn 0.3s';
+    
+    let html = `<div style="background:#1a1a2e;border:1px solid rgba(59,130,246,0.3);border-radius:12px;padding:20px;max-width:400px;width:95%;max-height:70vh;overflow-y:auto;box-shadow:0 0 40px rgba(59,130,246,0.15)">`;
+    html += `<div style="text-align:center;margin-bottom:16px">`;
+    html += `<div style="font-size:1.3em">🗺️</div>`;
+    html += `<div style="font-size:1em;font-weight:700;color:#3b82f6;margin-top:4px">传送带蓝图</div>`;
+    html += `<div style="font-size:0.72em;color:#94a3b8;margin-top:4px">选择蓝图加载，快速重建物流网络</div>`;
+    html += `</div>`;
+    
+    this._blueprints.forEach((bp, idx) => {
+      const date = new Date(bp.timestamp).toLocaleString();
+      html += `<div class="blueprint-item" data-index="${idx}" style="
+        background:rgba(59,130,246,0.08);border:1px solid rgba(59,130,246,0.3);border-radius:8px;
+        padding:12px;margin-bottom:8px;cursor:pointer;transition:all 0.2s"
+        onmouseover="this.style.borderColor='#3b82f6';this.style.boxShadow='0 0 12px rgba(59,130,246,0.2)'"
+        onmouseout="this.style.borderColor='rgba(59,130,246,0.3)';this.style.boxShadow='none'">
+        <div style="font-weight:700;color:#3b82f6;font-size:0.9em">${bp.name}</div>
+        <div style="font-size:0.75em;color:#94a3b8">${bp.belts.length}条传送带 • ${date}</div>
+      </div>`;
+    });
+    
+    html += `<div style="margin-top:12px;text-align:center">`;
+    html += `<button class="belt-blueprint-btn" onclick="this.parentElement.parentElement.remove()" style="
+      background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);color:#ef4444;
+      padding:6px 12px;border-radius:4px;cursor:pointer;font-size:0.8em">
+      取消
+    </button>`;
+    html += `</div>`;
+    html += `</div>`;
+    
+    overlay.innerHTML = html;
+    document.body.appendChild(overlay);
+    
+    // 绑定蓝图点击事件
+    overlay.querySelectorAll('.blueprint-item').forEach(item => {
+      item.onclick = () => {
+        const idx = parseInt(item.dataset.index);
+        this.loadBeltBlueprint(idx);
+        overlay.remove();
+      };
+    });
+  },
+
+  // v3.0 §8: 蓝图系统 — 加载蓝图
+  loadBeltBlueprint(idx) {
+    if (!this._unlockedMilestones?.blueprint || !this._blueprints[idx]) return;
+    
+    const bp = this._blueprints[idx];
+    
+    // 确认加载（会清除当前传送带）
+    if (!confirm(`确定要加载蓝图 "${bp.name}"？\\n\\n当前所有传送带将被清除，替换为蓝图中的布局。`)) return;
+    
+    // 清除当前传送带
+    this._activeBelts = [];
+    this.manualBelts = {};
+    this.removedBelts = {};
+    
+    // 应用蓝图中的传送带
+    bp.belts.forEach(belt => {
+      this._activeBelts.push(belt);
+      const key = `${belt.from}-${belt.to}`;
+      this.manualBelts[key] = { from: belt.from, to: belt.to, level: belt.level || 1 };
+    });
+    
+    this.log(`🗺️ 蓝图已加载: "${bp.name}" (${bp.belts.length}条传送带)`, 's');
+    this.showEvent('🗺️ 蓝图加载', `传送带布局 "${bp.name}" 已加载！\\n\\n${bp.belts.length}条传送带已重建。`, '#3b82f6');
+    
+    // 刷新渲染
+    this._chainsDirty = true;
+    this.renderGrid();
+    this.updateRates();
+    this.updateUI();
+    SFX.wonderDone();
   },
 
   handleBeltConnectClick(idx) {
@@ -15106,7 +15598,7 @@ const G = {
   },
 
   getPrestigeGain() {
-    return PRESTIGE.calcGain(this);
+    return Math.floor(PRESTIGE.calcGain(this) * this.getVariantScoreBonus());
   },
 
   showPrestigePanel() {
@@ -15223,29 +15715,126 @@ const G = {
   doPrestige() {
     if (!this.canPrestige()) return;
     const gain = this.getPrestigeGain();
-    // 显示更丰富的转生信息
     const nextCount = this.prestigeCount + 1;
     let extraInfo = '';
     const nextPassive = PRESTIGE.passiveBonuses.find(pb => pb.count === nextCount);
     if (nextPassive) extraInfo = `\n🌟 新被动解锁: ${nextPassive.n} — ${nextPassive.d}`;
     const pcBonus = PRESTIGE.prestigeCountBonus(nextCount);
     extraInfo += `\n🌀 轮回之力: 全局效率 +${formatNum(pcBonus * 100, 1)}%`;
+    // v3.0 §8: 检查新里程碑解锁
+    const newMilestone = PRESTIGE_MILESTONES.find(m => m.count === nextCount);
+    if (newMilestone) extraInfo += `\n🏆 里程碑解锁: ${newMilestone.icon} ${newMilestone.name} — ${newMilestone.desc}`;
+
     if (!confirm(`确定要转生？\n\n获得 +${formatNum(gain)} ${PRESTIGE.currencyIcon}${PRESTIGE.currencyName}${extraInfo}\n\n所有进度将重置（转生加成和货币保留）`)) return;
 
     this.prestigeCurrency += gain;
     this.prestigeCount++;
 
-    // Save prestige data and reset
+    // v3.0 §8: 更新里程碑
+    const milestones = { ...(this._unlockedMilestones || {}) };
+    for (const m of PRESTIGE_MILESTONES) {
+      if (this.prestigeCount >= m.count) milestones[m.id] = true;
+    }
+
+    // v3.0 §8: 变体选择（转生次数≥2后解锁）
+    if (this.prestigeCount >= 2) {
+      this._pendingPrestigeData = {
+        pc: this.prestigeCurrency,
+        pcount: this.prestigeCount,
+        pbonuses: [...this.prestigeBonuses],
+        infLevels: { ...this.infiniteBonusLevels },
+        milestones,
+        blueprints: this._blueprints || [],
+      };
+      this._showVariantChoice();
+      return; // 等玩家选择后再重载
+    }
+
+    // 无变体的普通转生
     const pData = {
       pc: this.prestigeCurrency,
       pcount: this.prestigeCount,
       pbonuses: [...this.prestigeBonuses],
       infLevels: { ...this.infiniteBonusLevels },
+      milestones,
+      blueprints: this._blueprints || [],
+      variant: null,
     };
     localStorage.removeItem('bioSphereV3');
     localStorage.setItem('bioSpherePrestige', JSON.stringify(pData));
     SFX.wonderDone();
     location.reload();
+  },
+
+  // v3.0 §8: 变体选择面板
+  _showVariantChoice() {
+    const overlay = document.createElement('div');
+    overlay.id = 'variantChoiceOverlay';
+    overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.92);z-index:10000;display:flex;align-items:center;justify-content:center;animation:fadeIn 0.3s';
+
+    let html = `<div style="background:#1a1a2e;border:1px solid rgba(168,85,247,0.3);border-radius:12px;padding:20px;max-width:440px;width:95%;max-height:85vh;overflow-y:auto;box-shadow:0 0 40px rgba(168,85,247,0.15)">`;
+    html += `<div style="text-align:center;margin-bottom:12px">`;
+    html += `<div style="font-size:1.3em">🌀</div>`;
+    html += `<div style="font-size:1em;font-weight:700;color:#a855f7;margin-top:4px">第${this.prestigeCount}世 — 选择变体规则</div>`;
+    html += `<div style="font-size:0.72em;color:#94a3b8;margin-top:4px">变体增加挑战难度，但进化因子获得量大幅提升</div>`;
+    html += `</div>`;
+
+    // 普通选项（无变体）
+    html += `<button class="var-choice-btn" data-variant="none" style="
+      width:100%;background:linear-gradient(135deg,rgba(34,197,94,0.08),rgba(34,197,94,0.03));
+      border:1px solid rgba(34,197,94,0.3);border-radius:8px;padding:10px 12px;margin-bottom:6px;
+      cursor:pointer;text-align:left;color:#e2e8f0;transition:all 0.2s;display:block"
+      onmouseover="this.style.borderColor='#22c55e';this.style.boxShadow='0 0 12px rgba(34,197,94,0.2)'"
+      onmouseout="this.style.borderColor='rgba(34,197,94,0.3)';this.style.boxShadow='none'">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:2px">
+        <span style="font-size:1.1em">🌿</span>
+        <span style="font-weight:700;color:#22c55e;font-size:0.88em">标准模式</span>
+        <span style="font-size:0.7em;color:#94a3b8;margin-left:auto">×1.0 进化因子</span>
+      </div>
+      <div style="font-size:0.72em;color:#94a3b8">无额外限制，正常游戏体验</div>
+    </button>`;
+
+    // 变体选项
+    for (const v of PRESTIGE_VARIANTS) {
+      html += `<button class="var-choice-btn" data-variant="${v.id}" style="
+        width:100%;background:linear-gradient(135deg,${v.color}10,${v.color}05);
+        border:1px solid ${v.color}40;border-radius:8px;padding:10px 12px;margin-bottom:6px;
+        cursor:pointer;text-align:left;color:#e2e8f0;transition:all 0.2s;display:block"
+        onmouseover="this.style.borderColor='${v.color}';this.style.boxShadow='0 0 12px ${v.color}30'"
+        onmouseout="this.style.borderColor='${v.color}40';this.style.boxShadow='none'">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:2px">
+          <span style="font-size:1.1em">${v.icon}</span>
+          <span style="font-weight:700;color:${v.color};font-size:0.88em">${v.name}</span>
+          <span style="font-size:0.7em;color:${v.color};margin-left:auto">×${v.scoreBonus} 进化因子</span>
+        </div>
+        <div style="font-size:0.72em;color:#94a3b8;margin-bottom:2px">${v.desc}</div>
+        <div style="font-size:0.68em;color:#64748b;font-style:italic">💡 ${v.hint}</div>
+      </button>`;
+    }
+    html += `</div>`;
+
+    overlay.innerHTML = html;
+    document.body.appendChild(overlay);
+
+    overlay.querySelectorAll('.var-choice-btn').forEach(btn => {
+      btn.onclick = () => {
+        const variantId = btn.dataset.variant;
+        const pData = this._pendingPrestigeData;
+        pData.variant = variantId === 'none' ? null : variantId;
+        localStorage.removeItem('bioSphereV3');
+        localStorage.setItem('bioSpherePrestige', JSON.stringify(pData));
+        overlay.remove();
+        SFX.wonderDone();
+        location.reload();
+      };
+    });
+  },
+
+  // v3.0 §8: 完成变体后的分数加成
+  getVariantScoreBonus() {
+    if (!this._activeVariant) return 1;
+    const v = PRESTIGE_VARIANTS.find(v => v.id === this._activeVariant);
+    return v ? v.scoreBonus : 1;
   },
 
   closePrestige() {
@@ -15263,6 +15852,18 @@ const G = {
       this.prestigeCount = pData.pcount || 0;
       this.prestigeBonuses = pData.pbonuses || [];
       this.infiniteBonusLevels = pData.infLevels || {};
+
+      // v3.0 §8: 恢复变体、里程碑、蓝图
+      this._activeVariant = pData.variant || null;
+      this._unlockedMilestones = pData.milestones || {};
+      this._blueprints = pData.blueprints || [];
+      // 确保里程碑根据当前转生次数更新
+      for (const m of PRESTIGE_MILESTONES) {
+        if (this.prestigeCount >= m.count) this._unlockedMilestones[m.id] = true;
+      }
+      // v3.0 §8: 里程碑效果
+      if (this._unlockedMilestones.multiStrain) this._multiStrainUnlocked = true;
+      if (this._unlockedMilestones.creative) this._creativeAvailable = true;
 
       // Apply owned fixed bonuses
       for (const idx of this.prestigeBonuses) {
@@ -15285,11 +15886,42 @@ const G = {
       const pcBonus = PRESTIGE.prestigeCountBonus(this.prestigeCount);
       if (pcBonus > 0) this.gEff += pcBonus;
 
+      // v3.0 §8: 应用变体运行时效果
+      if (this._activeVariant) {
+        const variant = PRESTIGE_VARIANTS.find(v => v.id === this._activeVariant);
+        if (variant) {
+          if (variant.rules.energyMult) this._variantEnergyMult = variant.rules.energyMult;
+          if (variant.rules.maxBuildings) this._variantMaxBuildings = variant.rules.maxBuildings;
+          if (variant.rules.noBelts) this._variantNoBelts = true;
+          if (variant.rules.randomPlacement) this._variantRandomPlace = true;
+          if (variant.rules.timeLimit) this._variantTimeLimit = variant.rules.timeLimit;
+          if (variant.rules.toxicDecay) this._variantToxic = true;
+        }
+      }
+
       if (this.prestigeCount > 0) {
         this.log(`🌀 转生加成已应用 (第${this.prestigeCount}世)`, 'ev');
         const pcPct = formatNum(pcBonus * 100, 1);
         if (pcBonus > 0) this.log(`🌀 轮回之力: 全局效率 +${pcPct}%`, 'ev');
         document.querySelector('.topbar')?.classList.add('has-prestige');
+        // v3.0 §8: 变体信息
+        if (this._activeVariant) {
+          const v = PRESTIGE_VARIANTS.find(vr => vr.id === this._activeVariant);
+          if (v) {
+            this.log(`${v.icon} 变体模式: ${v.name} — ${v.desc}`, 'ev');
+            this.showEvent(`${v.icon} ${v.name}`, `本世变体规则:\\n\\n${v.desc}\\n\\n${v.hint}\\n\\n🌀 进化因子获得量 ×${v.scoreBonus}`, v.color);
+          }
+        }
+        // v3.0 §8: 里程碑解锁通知
+        for (const m of PRESTIGE_MILESTONES) {
+          if (m.count === this.prestigeCount) {
+            setTimeout(() => {
+              this.showEvent(`${m.icon} 里程碑解锁!`, m.unlockDesc, m.color);
+              this.showMilestone(m.icon, m.name);
+              SFX.milestone();
+            }, 2000);
+          }
+        }
       }
     } catch(e){}
   },
