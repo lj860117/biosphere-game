@@ -3816,21 +3816,20 @@ const G = {
       if (b.isWonder) tagHTML = '<span class="act-tag" style="color:var(--purple);border:1px solid var(--purple);background:rgba(168,85,247,0.15)">奇观</span>';
       else if (b.tier) tagHTML = `<span class="act-tag" style="color:${b.color}80;border:1px solid ${b.color}30;background:${b.color}08;font-size:0.65em">T${b.tier}</span>`;
 
-      // 直接显示转化比例
-      const corePoweredInfo = b.corePowered
-        ? `<div style="font-size:0.75em;color:var(--color-muted-dark);margin:2px 0">🏠 核心供能上限: ${(CORE_COLONY[this.phase]||CORE_COLONY[1]).maxCollectors}台</div>`
-        : '';
+      // G2: 简化建造按钮 — 描述和核心供能信息移到tooltip
+      const tooltipDesc = b.d + (b.corePowered ? ` | 🏠 核心供能上限: ${(CORE_COLONY[this.phase]||CORE_COLONY[1]).maxCollectors}台` : '');
+      // 提取主产出简写（取 prod 的第一个资源）
+      const mainProd = Object.entries(b.prod || {})[0];
+      const prodHint = mainProd ? `+${mainProd[1]}${RES[mainProd[0]]?.icon||mainProd[0]}/s` : '';
       btn.innerHTML = `
         <div class="act-icon">${SVG[key]||''}</div>
-        <div style="flex:1">
-          <div class="act-name"><span style="margin-right:3px">${b.emoji||''}</span>${b.n}${countTag}</div>
-          <div class="act-desc">${b.d}</div>
-          <div style="font-size:0.82em;color:var(--color-info);font-family:'Share Tech Mono',monospace;margin:2px 0">${b.ratio}</div>
-          ${corePoweredInfo}
-          <div class="act-cost">造价: ${costStr}</div>
+        <div style="flex:1;min-width:0">
+          <div class="act-name"><span style="margin-right:3px">${b.emoji||''}</span>${b.n}${countTag} <span class="act-cost-inline">${costStr}</span></div>
+          <div class="act-prod-hint">${prodHint}</div>
         </div>
         ${tagHTML}
       `;
+      btn.title = tooltipDesc + '\n' + b.ratio;
       btn.onclick = () => {
         if (isP3bLocked) {
           const es = this.getP3bExplorationStatus();
@@ -11288,6 +11287,8 @@ const G = {
       if (this.animTick % 3 === 0) this.computeSyncBonuses();
       // H1: 告警摘要条每3帧更新
       if (this.animTick % 3 === 0) this.updateAlertBar();
+      // G3: 帝国总览折叠摘要每5帧更新
+      if (this.animTick % 5 === 0) this.updateEmpireSummary();
       // v3.0 §2: 探索度检查（每10帧一次）
       if (this.animTick % 10 === 0) this._checkExplorationProgress();
       // v3.0 §3: 科技前置条件检查（每15帧一次）
@@ -13832,6 +13833,20 @@ const G = {
     if (countEl) countEl.textContent = alerts.length > 2 ? `+${alerts.length - 2}` : '';
   },
 
+  // ===== G3: 帝国总览折叠摘要 =====
+  updateEmpireSummary() {
+    const el = document.getElementById('empireOverviewSummary');
+    if (!el) return;
+    const container = document.getElementById('empireOverview');
+    // 只在折叠状态才需要更新
+    if (!container || !container.classList.contains('collapsed')) return;
+    const phaseName = ['', '原始液泡', '代谢体', '物流网络', '群体感应'][this.phase] || `P${this.phase}`;
+    const score = this.calcScore ? this.calcScore() : 0;
+    const rank = this._scoreRank ? this._scoreRank(score).rank : '';
+    const eff = Math.round((this.gEff || 1) * 100);
+    el.textContent = `P${this.phase} ${phaseName}  ⚡${eff}%  🏆${formatNum(score)} [${rank}]`;
+  },
+
   // ===== SECTION TOGGLE (折叠/展开) =====
 
   // === 引导目标元素 → 所属 section ID 映射 ===
@@ -15292,16 +15307,18 @@ const G = {
 
     this.upgradeIdx = idx;
     const costStr = Object.entries(cost).map(([k,v]) => `${formatNum(v)}${RES[k]?.icon||k}`).join(' + ');
+    const curMult = this.getUpgradeMultiplier(idx);
     const nextMult = (1 + lv * 0.4).toFixed(1);
+    // I1: 计算百分比提升
+    const pctUp = Math.round((parseFloat(nextMult) / curMult - 1) * 100);
 
     const pop = document.getElementById('upgradePopup');
     if (!pop) return;
-    document.getElementById('upgradeName').textContent = `${bd.emoji} ${bd.n}`;
-    document.getElementById('upgradeLevel').textContent = `Lv.${lv} → Lv.${lv+1}`;
-    document.getElementById('upgradeEffect').textContent = `产出倍率: ${formatNum(this.getUpgradeMultiplier(idx), 1)}x → ${nextMult}x`;
-    document.getElementById('upgradeCost').textContent = `造价: ${costStr}`;
+    document.getElementById('upgradeName').textContent = `${bd.emoji} ${bd.n} Lv.${lv}→${lv+1}`;
+    document.getElementById('upgradeLevel').textContent = `+${pctUp}% 产出`;
+    document.getElementById('upgradeEffect').textContent = `${formatNum(curMult, 1)}x → ${nextMult}x`;
+    document.getElementById('upgradeCost').textContent = costStr;
 
-    const canAfford = this.checkRes(cost);
     document.getElementById('upgradeYes').disabled = !canAfford;
     document.getElementById('upgradeYes').style.opacity = canAfford ? '1' : '0.3';
 
