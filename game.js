@@ -2960,8 +2960,6 @@ const G = {
     
     this.log('🌐 网络总览模式已关闭', 's');
   },
-    SFX.click();
-  },
 
   // ===== 移动端标签页切换 =====
   _isMobile() { return window.innerWidth <= 768; },
