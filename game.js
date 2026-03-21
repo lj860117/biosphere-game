@@ -622,6 +622,32 @@ const RESOURCE_COMPETITION = {
   p3BufferThreshold: 0.95, // 缓冲期间阈值从95%渐进降到85%
 };
 
+// ===== P2-2: 游戏平衡常量 — 替代散落的魔法数字 =====
+const BALANCE = {
+  // 种群系统
+  popFoodCost: 0.005,         // 每个体每秒葡萄糖消耗
+  popHarvestBonus: 0.003,     // 每个采集个体的产出加成系数
+  popLogisticsBonus: 0.0005,  // 每个物流个体的效率加成系数
+  popGrowthRate: 0.03,        // 种群基础增长率 (per building)
+  // 维护费
+  maintLevelMult: 0.15,       // 建筑每升1级维护费+15%
+  maintDormantMult: 0.25,     // 休眠建筑维护费降至25%
+  maintConsReduceCap: 0.4,    // 代谢回路减维护上限40%
+  maintConsReduceScale: 1.5,  // consReduce → maintReduce 的换算系数
+  // 物流
+  transportBaseRate: 0.10,    // 菌丝运输网基础加成率
+  consReduceCap: 0.3,         // 代谢回路减消耗上限30%
+  // 传送带
+  beltMaintPerDist: 0.3,      // 远距传送带每格超出距离的ATP维护费
+  beltMaintMinDist: 3,        // 触发远距维护费的最小距离
+  // QS系统
+  qsBoostPerLevel: 0.03,      // 每QS等级加成3%
+  qsBaseCap: 0.6,             // QS加成基础上限60%
+  // QS衰减
+  qsProportionalDecay: 0.03,  // QS比例衰减率
+  qsMinDecay: 0.02,           // QS最低衰减速度
+};
+
 // ===== PORT SYSTEM — 端口连接数约束 =====
 const PORT_DEFS = {
   // Phase 1
@@ -643,6 +669,7 @@ const PORT_DEFS = {
   biomassConverter: { maxIn: 2, maxOut: 1, role: 'bypass' },
   quantumExtractor: { maxIn: 2, maxOut: 1, role: 'bypass' },
   fermentVacuole:   { maxIn: 2, maxOut: 2, role: 'bypass' },
+  signalRelay:      { maxIn: 3, maxOut: 3, role: 'relay' },  // v3.0 §5: 中继节点
   // Phase 4
   qsController:    { maxIn: 1, maxOut: 2, role: 'converter' },
   nanoAssembler:    { maxIn: 2, maxOut: 2, role: 'converter' },
@@ -664,9 +691,9 @@ function getUsedPorts(idx, direction) {
     const otherType = G.grid[otherIdx]?.type;
     if (!otherType) continue;
     if (direction === 'in') {
-      if (FLOW_MAP.some(f => f.from === otherType && f.to === type)) count++;
+      if (FLOW_PAIR.has(otherType + '|' + type)) count++;
     } else {
-      if (FLOW_MAP.some(f => f.from === type && f.to === otherType)) count++;
+      if (FLOW_PAIR.has(type + '|' + otherType)) count++;
     }
   }
   return count;
@@ -678,10 +705,22 @@ function hasAvailablePort(idx, direction) {
   if (!type) return false;
   const def = PORT_DEFS[type];
   if (!def) return true;
-  const max = direction === 'in' ? def.maxIn : def.maxOut;
   // 科技加成：自适应物流 +1 输出端口
   const techExtra = (direction === 'out' && G._extraOutPorts) ? G._extraOutPorts : 0;
-  return getUsedPorts(idx, direction) < (max + techExtra);
+  // v2.1 §9.2/§9.3: 突变+转生端口加成
+  const mpb = G._mutPortBonuses?.[type];
+  const mutExtra = mpb ? (direction === 'out' ? mpb.extraOut : mpb.extraIn) : 0;
+  // v3.0 §9.2: 建筑特化端口加成
+  const specBld = G._specCache?.perBuilding?.[idx];
+  let specExtra = 0;
+  if (specBld) {
+    if (direction === 'out' && specBld.extraOutPort) specExtra += specBld.extraOutPort;
+    if (specBld.extraPorts) specExtra += specBld.extraPorts; // relay_hub: 双向+N
+  }
+  const max = direction === 'in' ? def.maxIn : def.maxOut;
+  // v3.0 §8.3: 端口催化剂 +1
+  const catalystExtra = G._isCatalystActive?.('portExtra') ? 1 : 0;
+  return getUsedPorts(idx, direction) < (max + techExtra + mutExtra + specExtra + catalystExtra);
 }
 
 /**
@@ -958,6 +997,17 @@ const BLDS = {
     color:'#f59e0b', bg:'bg-amber', emoji:'🫧', tier:3, techReq:'biofilmTech',
   },
 
+  // Phase 3 — v3.0 §5: 信号中继站（P3b物流辅助）
+  signalRelay: {
+    n:'信号中继站', phase:3,
+    d:'化学信号中继·延伸物流距离',
+    ratio:'中继模式·衰减减半',
+    cost:{ protein:8, biomass:5 }, prod:{}, cons:{},
+    color:'#60a5fa', bg:'bg-blue', emoji:'📡', tier:3,
+    isRelay: true, // 标记为中继建筑
+    techReq:'biofilmTech', // P3b解锁后可建
+  },
+
   // Phase 4 — 旁路建筑（新增）
   resonanceChamber: {
     n:'共振培养箱', phase:4,
@@ -1076,6 +1126,14 @@ const ADJACENCY_RULES = [
   // 反向：发酵液泡作为邻居对其他建筑的增益
   { self:'biofilmReactor',   neighbor:'fermentVacuole',   bonus:0.08, name:'能量回流', icon:'🫧', stackable:true, maxStack:1, phase:3 },
   { self:'sporeSower',       neighbor:'fermentVacuole',   bonus:0.10, name:'发酵驱动', icon:'🫧', stackable:true, maxStack:1, phase:3 },
+
+  // ═══════════════════════════════════════════════════
+  // ⑦ v3.0 §5: 信号中继站邻接
+  // ═══════════════════════════════════════════════════
+  { self:'signalRelay',      neighbor:'signalRelay',       bonus:0.12, name:'中继共振', icon:'📡', stackable:true, maxStack:2, phase:3 },
+  { self:'signalRelay',      neighbor:'biofilmReactor',    bonus:0.08, name:'膜下中继', icon:'🧫', stackable:true, maxStack:1, phase:3 },
+  { self:'signalRelay',      neighbor:'transport',         bonus:0.10, name:'菌丝中继', icon:'🕸️', stackable:true, maxStack:1, phase:3 },
+  { self:'signalRelay',      neighbor:'sporeSower',        bonus:0.06, name:'孢子中继', icon:'🍄', stackable:true, maxStack:1, phase:3 },
 ];
 
 // ===== TECHS =====
@@ -1126,7 +1184,7 @@ const TECHS = {
     n:'自适应物流', phase:3, cost:{ dna:22, biomass:8 }, time:30,
     d:'智能物流路径规划', ef:'菌丝运输网加成→20%，全局+1输出端口，传送带容量+30%',
     req:['biofilmTech'], exclusive:['symbioticNetwork'],
-    fn: s => { s._transportBonus = (s._transportBonus || 0) + 0.05; s._extraOutPorts = 1; s._beltCapBonus = 0.30 },
+    fn: s => { s._transportBonus = (s._transportBonus || 0) + 0.10; s._extraOutPorts = 1; s._beltCapBonus = 0.30 }, // v2.1: 0.05→0.10 使菌丝运输网加成从15%→20%
   },
   symbioticNetwork: {
     n:'共生网络', phase:3, cost:{ protein:18, biomass:10 }, time:35,
@@ -1159,6 +1217,92 @@ const TECHS = {
   },
 };
 
+// ===== v3.0 §3: TECH PREREQS — 科技研究前置操作条件 =====
+// check(s): 是否满足, progress(s): 当前进度, max: 目标值, label: UI显示文字
+const TECH_PREREQS = {
+  // pureCulture: 无前置条件 (P1入门不设门槛)
+  efficientHarvest: {
+    label: '拥有3+传送带连接',
+    icon: '🔗', max: 3,
+    check: s => (s._activeBelts||[]).length >= (s._prereqMax('efficientHarvest')),
+    progress: s => Math.min((s._activeBelts||[]).length, s._prereqMax('efficientHarvest')),
+  },
+  rapidMetabolism: {
+    label: '拥有2台ATP合成酶',
+    icon: '⚡', max: 2,
+    check: s => s.bldCount('energyStation') >= (s._prereqMax('rapidMetabolism')),
+    progress: s => Math.min(s.bldCount('energyStation'), s._prereqMax('rapidMetabolism')),
+  },
+  basicMetab: {
+    label: '发现3条邻接规则',
+    icon: '🏗️', max: 3,
+    check: s => Object.keys(s._discoveredAdj||{}).length >= (s._prereqMax('basicMetab')),
+    progress: s => Math.min(Object.keys(s._discoveredAdj||{}).length, s._prereqMax('basicMetab')),
+  },
+  nitrogenCycle: {
+    label: '拥有1条2格+距离传送带',
+    icon: '🔗', max: 1,
+    check: s => (s.stats.maxBeltDist||0) >= 2,
+    progress: s => (s.stats.maxBeltDist||0) >= 2 ? 1 : 0,
+  },
+  proteinEngineering: {
+    label: '完成1个培养皿实验',
+    icon: '🧫', max: 1,
+    check: s => (s._petriCount||0) >= (s._prereqMax('proteinEngineering')),
+    progress: s => Math.min(s._petriCount||0, s._prereqMax('proteinEngineering')),
+  },
+  biofilmTech: {
+    label: '手动连接5+传送带',
+    icon: '🔗', max: 5,
+    check: s => Object.keys(s.manualBelts||{}).length >= (s._prereqMax('biofilmTech')),
+    progress: s => Math.min(Object.keys(s.manualBelts||{}).length, s._prereqMax('biofilmTech')),
+  },
+  adaptiveLogistics: {
+    label: '拥有2条2格+距离传送带',
+    icon: '🔗', max: 2,
+    check: s => {
+      const belts = Object.keys(s.manualBelts||{});
+      let c = 0; for (const k of belts) { if (s.getBeltDistance(k) >= 2) c++; }
+      return c >= (s._prereqMax('adaptiveLogistics'));
+    },
+    progress: s => {
+      const belts = Object.keys(s.manualBelts||{});
+      let c = 0; for (const k of belts) { if (s.getBeltDistance(k) >= 2) c++; }
+      return Math.min(c, s._prereqMax('adaptiveLogistics'));
+    },
+  },
+  symbioticNetwork: {
+    label: '发现8条邻接规则',
+    icon: '🏗️', max: 8,
+    check: s => Object.keys(s._discoveredAdj||{}).length >= (s._prereqMax('symbioticNetwork')),
+    progress: s => Math.min(Object.keys(s._discoveredAdj||{}).length, s._prereqMax('symbioticNetwork')),
+  },
+  quorumSensing: {
+    label: '2个建筑达到供给同步',
+    icon: '⚡', max: 2,
+    check: s => Object.values(s._syncBonuses||{}).filter(sb => sb.sync >= 0.5).length >= (s._prereqMax('quorumSensing')),
+    progress: s => Math.min(Object.values(s._syncBonuses||{}).filter(sb => sb.sync >= 0.5).length, s._prereqMax('quorumSensing')),
+  },
+  signalAmplifier: {
+    label: '传送带总数≥15',
+    icon: '🔗', max: 15,
+    check: s => (s._activeBelts||[]).length >= (s._prereqMax('signalAmplifier')),
+    progress: s => Math.min((s._activeBelts||[]).length, s._prereqMax('signalAmplifier')),
+  },
+  evolutionCatalyst: {
+    label: '激活2个突变',
+    icon: '🧬', max: 2,
+    check: s => (s._mutSlots||[]).length >= (s._prereqMax('evolutionCatalyst')),
+    progress: s => Math.min((s._mutSlots||[]).length, s._prereqMax('evolutionCatalyst')),
+  },
+  dysonTheory: {
+    label: '传送带总数≥15',
+    icon: '🔗', max: 15,
+    check: s => (s._activeBelts||[]).length >= (s._prereqMax('dysonTheory')),
+    progress: s => Math.min((s._activeBelts||[]).length, s._prereqMax('dysonTheory')),
+  },
+};
+
 // ===== SVGs =====
 const SVG = {
   glucoseCollector:`<svg viewBox="0 0 64 64" fill="none"><rect x="12" y="18" width="40" height="32" rx="3" fill="#0a1a10" stroke="#22c55e" stroke-width="1.5"/><path d="M22 18V12h20v6" fill="none" stroke="#22c55e" stroke-width="1.2"/><circle cx="26" cy="34" r="6" fill="none" stroke="#22c55e" stroke-width="1"/><circle cx="26" cy="34" r="2" fill="#22c55e" opacity="0.5"/><rect x="36" y="27" width="10" height="8" rx="1" fill="#22c55e" opacity="0.1" stroke="#22c55e" stroke-width="0.8"/><circle cx="17" cy="22" r="2" fill="#22c55e" opacity="0.8"><animate attributeName="opacity" values="0.4;1;0.4" dur="1.5s" repeatCount="indefinite"/></circle></svg>`,
@@ -1179,6 +1323,7 @@ const SVG = {
   nanoAssembler:`<svg viewBox="0 0 64 64" fill="none"><rect x="10" y="12" width="44" height="40" rx="3" fill="#0a1208" stroke="#a3e635" stroke-width="1.5"/><rect x="18" y="22" width="10" height="10" rx="1" fill="none" stroke="#a3e635" stroke-width="0.8" opacity="0.5"/><rect x="36" y="22" width="10" height="10" rx="1" fill="none" stroke="#a3e635" stroke-width="0.8" opacity="0.5"/><rect x="27" y="36" width="10" height="10" rx="1" fill="#a3e635" opacity="0.1" stroke="#a3e635" stroke-width="0.8"/><circle cx="32" cy="41" r="2" fill="#a3e635" opacity="0.5"><animate attributeName="r" values="1.5;3;1.5" dur="2s" repeatCount="indefinite"/></circle><path d="M28 27 L22 27M46 27 L40 27M32 36 L32 33" fill="none" stroke="#a3e635" stroke-width="0.8" opacity="0.4"/></svg>`,
   pheromoneStation:`<svg viewBox="0 0 64 64" fill="none"><rect x="10" y="12" width="44" height="40" rx="3" fill="#151208" stroke="#facc15" stroke-width="1.5"/><circle cx="32" cy="28" r="5" fill="#facc15" opacity="0.15" stroke="#facc15" stroke-width="1"/><path d="M26 28 A8 8 0 0 0 22 36" fill="none" stroke="#facc15" stroke-width="0.8" opacity="0.3"><animate attributeName="opacity" values="0.1;0.5;0.1" dur="2s" repeatCount="indefinite"/></path><path d="M38 28 A8 8 0 0 1 42 36" fill="none" stroke="#facc15" stroke-width="0.8" opacity="0.3"><animate attributeName="opacity" values="0.1;0.5;0.1" dur="2s" begin="0.5s" repeatCount="indefinite"/></path><text x="32" y="44" text-anchor="middle" fill="#facc15" font-size="7" opacity="0.4">📢</text></svg>`,
   // 新旁路建筑 SVG
+  signalRelay:`<svg viewBox="0 0 64 64" fill="none"><rect x="10" y="12" width="44" height="40" rx="3" fill="#0a1020" stroke="#60a5fa" stroke-width="1.5"/><circle cx="32" cy="28" r="5" fill="#60a5fa" opacity="0.3"/><circle cx="32" cy="28" r="10" fill="none" stroke="#60a5fa" stroke-width="0.8" opacity="0.2"><animate attributeName="r" values="8;14;8" dur="2s" repeatCount="indefinite"/></circle><circle cx="32" cy="28" r="16" fill="none" stroke="#60a5fa" stroke-width="0.5" opacity="0.1"><animate attributeName="r" values="12;18;12" dur="2.5s" repeatCount="indefinite"/></circle><path d="M20 40 L32 34 L44 40" fill="none" stroke="#60a5fa" stroke-width="1" opacity="0.4"/><circle cx="20" cy="40" r="2" fill="#60a5fa" opacity="0.4"/><circle cx="44" cy="40" r="2" fill="#60a5fa" opacity="0.4"/><text x="32" y="48" text-anchor="middle" fill="#60a5fa" font-size="6" opacity="0.4">📡</text></svg>`,
   biomassConverter:`<svg viewBox="0 0 64 64" fill="none"><rect x="10" y="12" width="44" height="40" rx="3" fill="#051210" stroke="#2dd4bf" stroke-width="1.5"/><path d="M22 25 L32 20 L42 25 L42 38 L32 43 L22 38 Z" fill="#2dd4bf" opacity="0.08" stroke="#2dd4bf" stroke-width="1"/><circle cx="32" cy="32" r="5" fill="#2dd4bf" opacity="0.2"><animate attributeName="r" values="4;6;4" dur="2s" repeatCount="indefinite"/></circle><path d="M28 32 L36 32M32 28 L32 36" stroke="#2dd4bf" stroke-width="1.5" opacity="0.4"/></svg>`,
   quantumExtractor:`<svg viewBox="0 0 64 64" fill="none"><rect x="10" y="12" width="44" height="40" rx="3" fill="#0a0818" stroke="#818cf8" stroke-width="1.5"/><circle cx="32" cy="30" r="10" fill="none" stroke="#818cf8" stroke-width="0.8" opacity="0.3"/><circle cx="32" cy="30" r="5" fill="none" stroke="#818cf8" stroke-width="1.2" opacity="0.5"><animate attributeName="r" values="4;7;4" dur="2.5s" repeatCount="indefinite"/></circle><circle cx="32" cy="30" r="2" fill="#818cf8" opacity="0.6"/><path d="M24 42 L32 38 L40 42" fill="none" stroke="#818cf8" stroke-width="1" opacity="0.4"/></svg>`,
   resonanceChamber:`<svg viewBox="0 0 64 64" fill="none"><rect x="10" y="12" width="44" height="40" rx="3" fill="#0f0520" stroke="#c084fc" stroke-width="1.5"/><circle cx="32" cy="30" r="12" fill="none" stroke="#c084fc" stroke-width="0.8" opacity="0.2"/><circle cx="32" cy="30" r="8" fill="none" stroke="#c084fc" stroke-width="1" opacity="0.3"><animateTransform attributeName="transform" type="rotate" from="0 32 30" to="360 32 30" dur="5s" repeatCount="indefinite"/></circle><circle cx="32" cy="30" r="3" fill="#c084fc" opacity="0.4"><animate attributeName="opacity" values="0.2;0.6;0.2" dur="2s" repeatCount="indefinite"/></circle><text x="32" y="46" text-anchor="middle" fill="#c084fc" font-size="6" opacity="0.4">QS</text></svg>`,
@@ -1426,6 +1571,10 @@ const ACHIEVE = [
   { id:'phase3', n:'🔗 物流时代', d:'进入阶段3', tier:'silver', check: s => s.phase >= 3, reward:{ energy:60, protein:20 } },
   { id:'phase4', n:'📡 自动化纪元', d:'进入阶段4', tier:'gold', check: s => s.phase >= 4, reward:{ energy:100, biomass:15 } },
   { id:'phase5', n:'🏛️ 奇观时代', d:'进入阶段5', tier:'diamond', check: s => s.phase >= 5, reward:{ energy:150, dna:40 } },
+  // P5专属成就
+  { id:'wonderDone', n:'☀️ 戴森之光', d:'完成微型戴森球建造', tier:'diamond', check: s => s.wonderComplete, reward:{ energy:300, dna:80, protein:50 } },
+  { id:'wonderPrestige3', n:'🌟 恒星征服者', d:'完成奇观后转生3次', tier:'diamond', check: s => (s._wonderPrestigeCount || 0) >= 3, reward:{ energy:500, dna:120, protein:80, biomass:40 } },
+  { id:'wonderSpeed', n:'⚡ 极速奇观', d:'20分钟内完成奇观', tier:'diamond', check: s => s._fastestWonder && s._fastestWonder <= 1200, reward:{ energy:400, dna:100, protein:60 } },
   // 效率里程碑
   { id:'eff150', n:'📈 效率突破', d:'全局效率达到150%', tier:'silver', check: s => s.gEff >= 1.5, reward:{ dna:15, energy:40 } },
   { id:'eff200', n:'🚀 效率翻倍', d:'全局效率达到200%', tier:'gold', check: s => s.gEff >= 2.0, reward:{ dna:30, energy:80 } },
@@ -1446,6 +1595,11 @@ const ACHIEVE = [
   { id:'manualBelt8', n:'🔗 物流工程师', d:'手动连接8条传送带', tier:'gold', check: s => Object.keys(s.manualBelts || {}).length >= 8, reward:{ energy:100, dna:25, protein:10 } },
   { id:'beltCombo3', n:'⚡ 连线三连', d:'达成3连击传送带连接', tier:'bronze', check: s => (s.stats.maxBeltCombo || 0) >= 3, reward:{ energy:40, glucose:25 } },
   { id:'beltCombo5', n:'⚡ 连线五杀', d:'达成5连击传送带连接', tier:'silver', check: s => (s.stats.maxBeltCombo || 0) >= 5, reward:{ energy:80, dna:20 } },
+  // v3.0 §4: 远距传送带成就
+  { id:'longBelt2', n:'🔗 远程传输', d:'首次建立2格距离的传送带', tier:'bronze', check: s => (s.stats.maxBeltDist || 0) >= 2, reward:{ energy:10 } },
+  { id:'longBelt3', n:'🔗 远程物流', d:'首次建立3格距离的传送带', tier:'silver', check: s => (s.stats.maxBeltDist || 0) >= 3, reward:{ energy:20, glucose:3 } },
+  { id:'longBelt4', n:'🔗 物流大师', d:'首次建立4格距离的传送带', tier:'gold', check: s => (s.stats.maxBeltDist || 0) >= 4, reward:{ energy:30, glucose:5 } },
+  { id:'longBelt10', n:'🔗 网络编织者', d:'累计建立10条远距(2格+)传送带', tier:'gold', check: s => (s.stats.longBeltCount || 0) >= 10, reward:{ energy:50, dna:10 } },
   { id:'beltLv5', n:'⭐ 满级传送带', d:'将任意传送带升级到Lv.5', tier:'gold', check: s => Object.values(s.beltLevels || {}).some(lv => lv >= 5), reward:{ energy:100, dna:20 } },
   { id:'firstSync', n:'🔄 初次同步', d:'首次达成供给同步加成（同步度≥50%）', tier:'silver', check: s => Object.values(s._syncBonuses || {}).some(sb => sb.sync >= 0.5), reward:{ energy:60, dna:15 } },
   { id:'perfectSync', n:'🔄 完美同步', d:'任意建筑供给同步度达到100%', tier:'gold', check: s => Object.values(s._syncBonuses || {}).some(sb => sb.sync >= 0.99), reward:{ energy:150, dna:35, protein:20 } },
@@ -1475,6 +1629,24 @@ const ACHIEVE = [
   // 转生
   { id:'firstPrestige', n:'♻️ 轮回初始', d:'完成第一次转生', tier:'gold', check: s => s.prestigeCount >= 1, reward:{ energy:100, dna:30 } },
   { id:'prestige3', n:'♻️ 三度轮回', d:'转生3次', tier:'diamond', check: s => s.prestigeCount >= 3, reward:{ energy:200, dna:50, protein:30 } },
+  // v3.0 §8.6: 转生成就链
+  { id:'prestige5', n:'🧪 炼金术士', d:'转生5次(催化剂解锁)', tier:'diamond', check: s => s.prestigeCount >= 5, reward:{ energy:250, dna:60 } },
+  { id:'prestige10', n:'🌐 多菌株先驱', d:'转生10次', tier:'diamond', check: s => s.prestigeCount >= 10, reward:{ energy:400, dna:80, protein:50 } },
+  { id:'prestige15', n:'⭐ 造物主', d:'转生15次(创造模式)', tier:'diamond', check: s => s.prestigeCount >= 15, reward:{ energy:600, dna:120, protein:80 } },
+  // 变体通关成就
+  { id:'variant_purist', n:'🔥 纯粹通关', d:'纯粹主义变体下转生', tier:'gold', check: s => s._completedVariants?.purist, reward:{ energy:200, dna:40 } },
+  { id:'variant_energy', n:'⚡ 节能大师', d:'能量危机变体下转生', tier:'gold', check: s => s._completedVariants?.energyCrisis, reward:{ energy:150, dna:30 } },
+  { id:'variant_minimal', n:'🔬 极简通关', d:'极简主义变体下转生', tier:'gold', check: s => s._completedVariants?.minimalist, reward:{ energy:180, dna:35 } },
+  { id:'variant_chaos', n:'🎲 混沌征服', d:'混沌培养皿变体下转生', tier:'gold', check: s => s._completedVariants?.chaos, reward:{ energy:120, dna:25 } },
+  { id:'variant_speed', n:'⏱️ 极速通关', d:'竞速试炼变体下转生', tier:'diamond', check: s => s._completedVariants?.speedrun, reward:{ energy:220, dna:45 } },
+  { id:'variant_toxic', n:'☠️ 毒素幸存者', d:'毒素蔓延变体下转生', tier:'gold', check: s => s._completedVariants?.toxic, reward:{ energy:140, dna:28 } },
+  { id:'variant_all', n:'🏅 全变体大师', d:'完成所有6种变体', tier:'diamond', check: s => { const cv = s._completedVariants || {}; return PRESTIGE_VARIANTS.every(v => cv[v.id]); }, reward:{ energy:1000, dna:200, protein:100 } },
+  // 蓝图成就
+  { id:'blueprint_save', n:'💾 首个蓝图', d:'保存第一个传送带蓝图', tier:'bronze', check: s => (s._blueprints||[]).length >= 1, reward:{ energy:30 } },
+  { id:'blueprint_5', n:'🗺️ 蓝图收藏家', d:'保存5个蓝图', tier:'silver', check: s => (s._blueprints||[]).length >= 5, reward:{ energy:80, dna:15 } },
+  // 催化剂成就
+  { id:'catalyst_use', n:'🧪 首次催化', d:'使用第一个催化剂', tier:'bronze', check: s => (s.stats.catalystUseCount || 0) >= 1, reward:{ energy:50 } },
+  { id:'catalyst_10', n:'🧪 催化专家', d:'累计使用10个催化剂', tier:'silver', check: s => (s.stats.catalystUseCount || 0) >= 10, reward:{ energy:120, dna:25 } },
   // ★ Q4：变异实验室成就
   { id:'mutFirst', n:'🧬 初次突变', d:'激活第一个突变', tier:'bronze', check: s => s._mutSlots.length >= 1, reward:{ energy:50, dna:15 } },
   { id:'mutSlotsFull', n:'🧬 突变满载', d:'填满所有基础突变槽(3个)', tier:'silver', check: s => s._mutSlots.length >= 3, reward:{ energy:100, dna:25, protein:15 } },
@@ -1499,7 +1671,7 @@ const ACHIEVE = [
   { id:'adjTotal100', n:'🔗 协同大师', d:'全局邻接加成总和达100%', tier:'gold', check: s => {
     let t = 0; for (let i = 0; i < s.grid.length; i++) { if (s.grid[i]) t += s.getAdjacencyBonus(i).bonus; } return t >= 1.00;
   }, reward:{ energy:150, dna:40, protein:20 } },
-  { id:'adjAll', n:'🔗 共生网络', d:'所有已建建筑都有邻接加成', tier:'diamond', check: s => {
+  { id:'adjAllBonus', n:'🔗 共生网络', d:'所有已建建筑都有邻接加成', tier:'diamond', check: s => {
     let hasBuilding = false;
     for (let i = 0; i < s.grid.length; i++) {
       if (!s.grid[i]) continue;
@@ -1510,6 +1682,11 @@ const ACHIEVE = [
     }
     return hasBuilding;
   }, reward:{ energy:200, dna:60, protein:30 } },
+  // v2.1 §10.4: 邻接发现成就
+  { id:'adj5', n:'🔗 初识协同', d:'发现5条邻接规则', tier:'bronze', check: s => Object.keys(s._discoveredAdj||{}).length >= 5, reward:{ glucose:30, energy:20 } },
+  { id:'adj15', n:'🔗 邻接学徒', d:'发现15条邻接规则', tier:'silver', check: s => Object.keys(s._discoveredAdj||{}).length >= 15, reward:{ energy:60, dna:15 } },
+  { id:'adj30', n:'🔗 图鉴达人', d:'发现30条邻接规则', tier:'gold', check: s => Object.keys(s._discoveredAdj||{}).length >= 30, reward:{ energy:120, dna:30, protein:20 } },
+  { id:'adjAllDisc', n:'🔗 完美图鉴', d:'发现所有当前可用的邻接规则', tier:'diamond', check: s => { const u = ADJACENCY_RULES.filter(r => !r.phase || r.phase <= s.phase).length; return u > 0 && Object.keys(s._discoveredAdj||{}).length >= u; }, reward:{ energy:250, dna:60, protein:40 } },
 ];
 
 // ===== ACHIEVEMENT CATEGORIES =====
@@ -1518,7 +1695,7 @@ const ACHV_CATEGORIES = {
   'resource': { name:'资源', icon:'💎', ids:['glucose100','energy200','dna50','protein30','glucose500','energy1000'] },
   'evolution': { name:'进化', icon:'🧬', ids:['evo2','evo3','evo5'] },
   'tech':     { name:'科技', icon:'📖', ids:['firstTech','allTech'] },
-  'phase':    { name:'阶段', icon:'🌍', ids:['phase2','phase3','phase4','phase5'] },
+  'phase':    { name:'阶段', icon:'🌍', ids:['phase2','phase3','phase4','phase5','wonderDone','wonderPrestige3','wonderSpeed'] },
   'efficiency':{ name:'效率', icon:'📈', ids:['eff150','eff200'] },
   'population':{ name:'种群', icon:'🦠', ids:['pop100','pop500','pop1000','pop2000'] },
   'upgrade':  { name:'升级', icon:'🔧', ids:['firstUpgrade','upgrade10','upgrade25'] },
@@ -1526,9 +1703,9 @@ const ACHV_CATEGORIES = {
   'survival': { name:'生存', icon:'🛡️', ids:['powerCrisis','neverLowPower'] },
   'economy':  { name:'经济', icon:'📊', ids:['maintSurvivor','maintBalancer','maintRecovery','efficientEmpire','noCompetition'] },
   'speed':    { name:'速度', icon:'⏱️', ids:['speedPhase2','speedBuild8'] },
-  'prestige': { name:'转生', icon:'♻️', ids:['firstPrestige','prestige3'] },
+  'prestige': { name:'转生', icon:'♻️', ids:['firstPrestige','prestige3','prestige5','prestige10','prestige15','variant_purist','variant_energy','variant_minimal','variant_chaos','variant_speed','variant_toxic','variant_all','blueprint_save','blueprint_5','catalyst_use','catalyst_10'] },
   'mutation': { name:'变异', icon:'🧬', ids:['mutFirst','mutSlotsFull','mutRare','mutEpic','mutLegend','mutCollect10','mutBrew10'] },
-  'adjacency': { name:'邻接', icon:'🔗', ids:['adjFirst','adjCount5','adjTotal50','adjSingle30','adjTotal100','adjAll'] },
+  'adjacency': { name:'邻接', icon:'🔗', ids:['adjFirst','adjCount5','adjTotal50','adjSingle30','adjTotal100','adjAllBonus','adj5','adj15','adj30','adjAllDisc'] },
 };
 
 const ACHV_TIER_LABELS = { bronze:'铜', silver:'银', gold:'金', diamond:'钻石' };
@@ -1604,6 +1781,9 @@ const GUIDE = {
     { check: s => Object.values(s._syncBonuses || {}).some(sb => sb.sync >= 0.5 && sb.sync < 0.85), text:'🔄 同步生效中！传送带颜色变绿表示供给平衡，继续优化让所有输入都满载 → 金色光效=完美同步！', icon:'✨' },
     { check: s => s.bldCount('biofilmReactor') > 0 && s.bldCount('transport') === 0 && Object.values(s._syncBonuses || {}).some(sb => sb.sync >= 0.5), text:'建造「菌丝运输网」— 全局产出+10%！多造叠加效率', icon:'🔗' },
     { check: s => s.bldCount('transport') > 0, text:'多造运输网叠加效率，目标+30%以上！别忘了升级传送带（点线条→升级）', icon:'📈' },
+    // v2.1 §8.2: 培养皿P3配方分散解锁引导
+    { check: s => s.bldCount('transport') > 0 && s.bldCount('biofilmReactor') >= 1 && !s._petriP3Unlocked, text:'🧫 高阶实验配方｜再建造1个生物膜反应器（共需2个）+ 菌丝运输网 → 解锁P3培养皿配方！', icon:'🧫' },
+    { check: s => s._petriP3Unlocked && s._petriCount < 8, text:'🧫 新配方已解锁！在培养皿实验中放置P3建筑组合，触发生物膜培育、菌丝渗透等高阶配方', icon:'🧫' },
     // v2.0 §11.3: 资源竞争启用教学（P3+3分钟）
     { check: s => s._competitionEnabled && !s._competitionTutorialShown, text:'⚖️ 供需平衡｜资源竞争系统已启用！当某种资源的消耗接近产出时，所有消费建筑效率会下降。保持充足的资源供给，或者减少不必要的消费者', icon:'⚖️', once:'competitionTutorial' },
     // ★ 资源竞争教学（已激活后持续提示）
@@ -1615,7 +1795,8 @@ const GUIDE = {
   4: [
     { check: s => !s.techs.quorumSensing.done, text:'研究「群体感应」— 解锁QS信号系统，自动加速全产线', icon:'📖' },
     { check: s => s.techs.quorumSensing.done && s.bldCount('qsController') === 0, text:'建造「群体感应塔」(2⚡→0.8📡/s) — QS信号越多效率越高（上限+80%）', icon:'🗼' },
-    { check: s => s.bldCount('qsController') > 0, text:'QS信号自动加速全产线，多多益善！考虑升级传送带到Lv.3+提高吞吐量', icon:'🚀' },
+    { check: s => s.bldCount('qsController') > 0 && s.prestigeCount === 0, text:'QS信号自动加速全产线！继续推进到P5完成奇观才能首次转生 — 进化因子×5！', icon:'🚀' },
+    { check: s => s.bldCount('qsController') > 0 && s.prestigeCount >= 1, text:'QS信号自动加速全产线，多多益善！可在P4快速转生，或推到P5拿5×进化因子', icon:'🚀' },
   ],
   5: [
     { check: s => !s.techs.dysonTheory.done, text:'研究「微型戴森理论」— 终极科技！为建造奇观做准备', icon:'📖' },
@@ -1727,7 +1908,75 @@ const FLOW_MAP = [
   { from:'fermentVacuole',   to:'nanoAssembler',      res:'energy',   icon:'⚡', color:'#f59e0b', label:'ATP' },
   { from:'fermentVacuole',   to:'pheromoneStation',   res:'energy',   icon:'⚡', color:'#f59e0b', label:'ATP' },
   { from:'fermentVacuole',   to:'resonanceChamber',   res:'energy',   icon:'⚡', color:'#f59e0b', label:'ATP' },
+  // v3.0 §5: 信号中继站 — 万能中继（所有产出建筑可发→中继，中继可发→所有消耗建筑）
+  // 中继不生产不消耗，只转发。FLOW_MAP用于验证连接合法性。
+  { from:'glucoseCollector', to:'signalRelay',         res:'glucose',  icon:'🟢', color:'#22c55e', label:'葡萄糖' },
+  { from:'energyStation',    to:'signalRelay',         res:'energy',   icon:'⚡', color:'#f97316', label:'ATP' },
+  { from:'energyBuffer',     to:'signalRelay',         res:'energy',   icon:'⚡', color:'#fb923c', label:'ATP' },
+  { from:'nitrogenFixer',    to:'signalRelay',         res:'nitrogen', icon:'🔵', color:'#3b82f6', label:'氮源' },
+  { from:'proteinFactory',   to:'signalRelay',         res:'protein',  icon:'🧪', color:'#ec4899', label:'蛋白质' },
+  { from:'aminoSynth',       to:'signalRelay',         res:'protein',  icon:'🧪', color:'#f472b6', label:'蛋白质' },
+  { from:'geneExtractor',    to:'signalRelay',         res:'dna',      icon:'🧬', color:'#a855f7', label:'DNA' },
+  { from:'biofilmReactor',   to:'signalRelay',         res:'biomass',  icon:'🧱', color:'#14b8a6', label:'生物质' },
+  { from:'sporeSower',       to:'signalRelay',         res:'dna',      icon:'🧬', color:'#34d399', label:'DNA' },
+  { from:'qsController',     to:'signalRelay',         res:'qs',       icon:'📡', color:'#eab308', label:'QS信号' },
+  { from:'fermentVacuole',   to:'signalRelay',         res:'energy',   icon:'⚡', color:'#f59e0b', label:'ATP' },
+  { from:'nanoAssembler',    to:'signalRelay',         res:'biomass',  icon:'🧱', color:'#a3e635', label:'生物质' },
+  { from:'resonanceChamber', to:'signalRelay',         res:'glucose',  icon:'🟢', color:'#c084fc', label:'葡萄糖' },
+  // 中继→消耗建筑
+  { from:'signalRelay',      to:'energyStation',       res:'glucose',  icon:'🟢', color:'#60a5fa', label:'葡萄糖' },
+  { from:'signalRelay',      to:'simpleExtractor',     res:'glucose',  icon:'🟢', color:'#60a5fa', label:'葡萄糖' },
+  { from:'signalRelay',      to:'simpleExtractor',     res:'energy',   icon:'⚡', color:'#60a5fa', label:'ATP' },
+  { from:'signalRelay',      to:'energyBuffer',        res:'glucose',  icon:'🟢', color:'#60a5fa', label:'葡萄糖' },
+  { from:'signalRelay',      to:'nitrogenFixer',       res:'energy',   icon:'⚡', color:'#60a5fa', label:'ATP' },
+  { from:'signalRelay',      to:'proteinFactory',      res:'nitrogen', icon:'🔵', color:'#60a5fa', label:'氮源' },
+  { from:'signalRelay',      to:'proteinFactory',      res:'energy',   icon:'⚡', color:'#60a5fa', label:'ATP' },
+  { from:'signalRelay',      to:'geneExtractor',       res:'protein',  icon:'🧪', color:'#60a5fa', label:'蛋白质' },
+  { from:'signalRelay',      to:'geneExtractor',       res:'energy',   icon:'⚡', color:'#60a5fa', label:'ATP' },
+  { from:'signalRelay',      to:'aminoSynth',          res:'nitrogen', icon:'🔵', color:'#60a5fa', label:'氮源' },
+  { from:'signalRelay',      to:'aminoSynth',          res:'glucose',  icon:'🟢', color:'#60a5fa', label:'葡萄糖' },
+  { from:'signalRelay',      to:'ribosomeCluster',     res:'protein',  icon:'🧪', color:'#60a5fa', label:'蛋白质' },
+  { from:'signalRelay',      to:'ribosomeCluster',     res:'energy',   icon:'⚡', color:'#60a5fa', label:'ATP' },
+  { from:'signalRelay',      to:'biofilmReactor',      res:'glucose',  icon:'🟢', color:'#60a5fa', label:'葡萄糖' },
+  { from:'signalRelay',      to:'biofilmReactor',      res:'nitrogen', icon:'🔵', color:'#60a5fa', label:'氮源' },
+  { from:'signalRelay',      to:'biofilmReactor',      res:'energy',   icon:'⚡', color:'#60a5fa', label:'ATP' },
+  { from:'signalRelay',      to:'sporeSower',          res:'biomass',  icon:'🧱', color:'#60a5fa', label:'生物质' },
+  { from:'signalRelay',      to:'sporeSower',          res:'energy',   icon:'⚡', color:'#60a5fa', label:'ATP' },
+  { from:'signalRelay',      to:'biomassConverter',    res:'protein',  icon:'🧪', color:'#60a5fa', label:'蛋白质' },
+  { from:'signalRelay',      to:'biomassConverter',    res:'energy',   icon:'⚡', color:'#60a5fa', label:'ATP' },
+  { from:'signalRelay',      to:'quantumExtractor',    res:'nitrogen', icon:'🔵', color:'#60a5fa', label:'氮源' },
+  { from:'signalRelay',      to:'quantumExtractor',    res:'energy',   icon:'⚡', color:'#60a5fa', label:'ATP' },
+  { from:'signalRelay',      to:'fermentVacuole',      res:'biomass',  icon:'🧱', color:'#60a5fa', label:'生物质' },
+  { from:'signalRelay',      to:'fermentVacuole',      res:'protein',  icon:'🧪', color:'#60a5fa', label:'蛋白质' },
+  { from:'signalRelay',      to:'qsController',        res:'energy',   icon:'⚡', color:'#60a5fa', label:'ATP' },
+  { from:'signalRelay',      to:'nanoAssembler',       res:'qs',       icon:'📡', color:'#60a5fa', label:'QS信号' },
+  { from:'signalRelay',      to:'nanoAssembler',       res:'energy',   icon:'⚡', color:'#60a5fa', label:'ATP' },
+  { from:'signalRelay',      to:'pheromoneStation',    res:'protein',  icon:'🧪', color:'#60a5fa', label:'蛋白质' },
+  { from:'signalRelay',      to:'pheromoneStation',    res:'energy',   icon:'⚡', color:'#60a5fa', label:'ATP' },
+  { from:'signalRelay',      to:'resonanceChamber',    res:'qs',       icon:'📡', color:'#60a5fa', label:'QS信号' },
+  { from:'signalRelay',      to:'resonanceChamber',    res:'energy',   icon:'⚡', color:'#60a5fa', label:'ATP' },
+  // 中继↔中继（中继链）
+  { from:'signalRelay',      to:'signalRelay',         res:'glucose',  icon:'🟢', color:'#60a5fa', label:'中继' },
 ];
+
+// ===== FLOW_MAP 预构建查找表 (P0-1 性能优化) =====
+// O(1) 替代所有 FLOW_MAP.some() / .filter() 的 O(n) 线性扫描
+const FLOW_PAIR = new Set();           // "from|to" → O(1) 存在性检查
+const FLOW_TRIPLE = new Set();         // "from|to|res" → O(1) 带资源的存在性检查
+const FLOW_BY_TO = new Map();          // to → [flow entries]  (某建筑作为接收端的所有流)
+const FLOW_BY_FROM = new Map();        // from → [flow entries] (某建筑作为发送端的所有流)
+const FLOW_TYPES_TO = new Set();       // 所有出现在 to 端的建筑类型
+const FLOW_TYPES_FROM = new Set();     // 所有出现在 from 端的建筑类型
+for (const f of FLOW_MAP) {
+  FLOW_PAIR.add(f.from + '|' + f.to);
+  FLOW_TRIPLE.add(f.from + '|' + f.to + '|' + f.res);
+  FLOW_TYPES_TO.add(f.to);
+  FLOW_TYPES_FROM.add(f.from);
+  if (!FLOW_BY_TO.has(f.to)) FLOW_BY_TO.set(f.to, []);
+  FLOW_BY_TO.get(f.to).push(f);
+  if (!FLOW_BY_FROM.has(f.from)) FLOW_BY_FROM.set(f.from, []);
+  FLOW_BY_FROM.get(f.from).push(f);
+}
 
 // ===== PETRI DISH EXPERIMENT RECIPES =====
 const PETRI_RECIPES = [
@@ -1815,6 +2064,240 @@ const CHALLENGES = [
   { id:'ch_qs20', n:'📡 信号风暴', d:'90秒内QS信号达到20', phase:4, time:90, check: (s) => s.res.qs >= 20, reward:{ energy:200, dna:40 }, icon:'📡' },
   { id:'ch_build15', n:'🌆 都市扩张', d:'拥有15+建筑', phase:4, time:180, check: (s) => s.totalBuildings() >= 15, reward:{ biomass:30, protein:40 }, icon:'🌆' },
 ];
+
+// ===== v3.0 §2: EXPLORATION GOALS — 阶段探索度积分项 =====
+// 每个阶段transition (P1→P2, P2→P3, ...) 定义一组探索度目标
+// required = 需要达成的最低积分数（从列表中任选N个）
+const EXPLORATION_GOALS = {
+  // P1→P2: 需3分（任选3）
+  1: {
+    required: 3,
+    goals: [
+      { id:'p1_belt3',   n:'建立3条传送带',      icon:'🔗', type:'连线',
+        check: s => (s._activeBelts||[]).length >= 3, progress: s => Math.min((s._activeBelts||[]).length, 3), max: 3 },
+      { id:'p1_adj3',    n:'发现3条邻接规则',    icon:'🏗️', type:'布局',
+        check: s => Object.keys(s._discoveredAdj||{}).length >= 3, progress: s => Math.min(Object.keys(s._discoveredAdj||{}).length, 3), max: 3 },
+      { id:'p1_ch1',     n:'完成1个P1挑战',      icon:'🎯', type:'挑战',
+        check: s => CHALLENGES.filter(c => c.phase === 1 && s.completedChallenges[c.id]).length >= 1, progress: s => Math.min(CHALLENGES.filter(c => c.phase === 1 && s.completedChallenges[c.id]).length, 1), max: 1 },
+      { id:'p1_buffer',  n:'拥有能量缓冲池',     icon:'🔋', type:'建设',
+        check: s => s.bldCount('energyBuffer') >= 1, progress: s => Math.min(s.bldCount('energyBuffer'), 1), max: 1 },
+      { id:'p1_bld5',    n:'累计建造5个建筑',     icon:'🏗️', type:'建设',
+        check: s => s.totalBuildings() >= 5, progress: s => Math.min(s.totalBuildings(), 5), max: 5 },
+      { id:'p1_evo3',    n:'进化到Lv.3',         icon:'📈', type:'成长',
+        check: s => s.eL >= 3, progress: s => Math.min(s.eL, 3), max: 3 },
+    ],
+  },
+  // P2→P3: 需4分（任选4）
+  2: {
+    required: 4,
+    goals: [
+      { id:'p2_mbelt4',  n:'手动连接4条传送带',   icon:'🔗', type:'连线',
+        check: s => Object.keys(s.manualBelts||{}).length >= 4, progress: s => Math.min(Object.keys(s.manualBelts||{}).length, 4), max: 4 },
+      { id:'p2_dist2',   n:'建立1条2格+距离传送带', icon:'🔗', type:'远距',
+        check: s => (s.stats.maxBeltDist||0) >= 2, progress: s => Math.min(s.stats.maxBeltDist||0, 2) >= 2 ? 1 : 0, max: 1 },
+      { id:'p2_combo3',  n:'达成3连击传送带',     icon:'⚡', type:'技巧',
+        check: s => (s.stats.maxBeltCombo||0) >= 3, progress: s => Math.min(s.stats.maxBeltCombo||0, 3), max: 3 },
+      { id:'p2_adj6',    n:'发现6条邻接规则',     icon:'🏗️', type:'布局',
+        check: s => Object.keys(s._discoveredAdj||{}).length >= 6, progress: s => Math.min(Object.keys(s._discoveredAdj||{}).length, 6), max: 6 },
+      { id:'p2_petri2',  n:'完成2个培养皿实验',   icon:'🧫', type:'探索',
+        check: s => (s._petriCount||0) >= 2, progress: s => Math.min(s._petriCount||0, 2), max: 2 },
+      { id:'p2_branch',  n:'研究1个P2互斥科技',   icon:'🔬', type:'科技',
+        check: s => !!(s.techs.nitrogenCycle?.done || s.techs.proteinEngineering?.done), progress: s => (s.techs.nitrogenCycle?.done || s.techs.proteinEngineering?.done) ? 1 : 0, max: 1 },
+      { id:'p2_bld8',    n:'拥有8+建筑',          icon:'🏗️', type:'建设',
+        check: s => s.totalBuildings() >= 8, progress: s => Math.min(s.totalBuildings(), 8), max: 8 },
+    ],
+  },
+  // P3→P4: 需5分（任选5）
+  3: {
+    required: 5,
+    goals: [
+      { id:'p3_mbelt10', n:'手动连接10条传送带',   icon:'🔗', type:'连线',
+        check: s => Object.keys(s.manualBelts||{}).length >= 10, progress: s => Math.min(Object.keys(s.manualBelts||{}).length, 10), max: 10 },
+      { id:'p3_dist3',   n:'建立2条3格+距离传送带', icon:'🔗', type:'远距',
+        check: s => { const belts = Object.keys(s.manualBelts||{}); let c=0; for(const k of belts){if(s.getBeltDistance(k)>=3)c++;} return c>=2; },
+        progress: s => { const belts = Object.keys(s.manualBelts||{}); let c=0; for(const k of belts){if(s.getBeltDistance(k)>=3)c++;} return Math.min(c,2); }, max: 2 },
+      { id:'p3_sync1',   n:'达成1个供给同步加成',  icon:'⚡', type:'优化',
+        check: s => Object.values(s._syncBonuses||{}).some(sb => sb.sync >= 0.5), progress: s => Object.values(s._syncBonuses||{}).some(sb => sb.sync >= 0.5) ? 1 : 0, max: 1 },
+      { id:'p3_mut1',    n:'激活1个突变',          icon:'🧬', type:'突变',
+        check: s => (s._mutSlots||[]).length >= 1, progress: s => Math.min((s._mutSlots||[]).length, 1), max: 1 },
+      { id:'p3_adj12',   n:'发现12条邻接规则',     icon:'🏗️', type:'布局',
+        check: s => Object.keys(s._discoveredAdj||{}).length >= 12, progress: s => Math.min(Object.keys(s._discoveredAdj||{}).length, 12), max: 12 },
+      { id:'p3_petri3',  n:'完成3个培养皿实验',    icon:'🧫', type:'探索',
+        check: s => (s._petriCount||0) >= 3, progress: s => Math.min(s._petriCount||0, 3), max: 3 },
+      { id:'p3_p3bld3',  n:'拥有3种不同P3建筑',   icon:'🏗️', type:'建设',
+        check: s => { const p3b=['biofilmReactor','transport','sporeSower','metabolicLoop','nanoAssembler']; return p3b.filter(b=>s.bldCount(b)>0).length>=3; },
+        progress: s => { const p3b=['biofilmReactor','transport','sporeSower','metabolicLoop','nanoAssembler']; return Math.min(p3b.filter(b=>s.bldCount(b)>0).length,3); }, max: 3 },
+    ],
+  },
+  // P4→P5: 需4分（任选4）
+  4: {
+    required: 4,
+    goals: [
+      { id:'p4_belt15',  n:'传送带总数≥15',       icon:'🔗', type:'连线',
+        check: s => (s._activeBelts||[]).length >= 15, progress: s => Math.min((s._activeBelts||[]).length, 15), max: 15 },
+      { id:'p4_sync2',   n:'2个建筑达到供给同步',  icon:'⚡', type:'优化',
+        check: s => Object.values(s._syncBonuses||{}).filter(sb => sb.sync >= 0.5).length >= 2, progress: s => Math.min(Object.values(s._syncBonuses||{}).filter(sb => sb.sync >= 0.5).length, 2), max: 2 },
+      { id:'p4_mut3',    n:'激活3个突变',          icon:'🧬', type:'突变',
+        check: s => (s._mutSlots||[]).length >= 3, progress: s => Math.min((s._mutSlots||[]).length, 3), max: 3 },
+      { id:'p4_adj18',   n:'发现18条邻接规则',     icon:'🏗️', type:'布局',
+        check: s => Object.keys(s._discoveredAdj||{}).length >= 18, progress: s => Math.min(Object.keys(s._discoveredAdj||{}).length, 18), max: 18 },
+      { id:'p4_qs30',    n:'QS信号库存≥30',       icon:'📡', type:'经济',
+        check: s => (s.res.qs||0) >= 30, progress: s => Math.min(s.res.qs||0, 30), max: 30 },
+      { id:'p4_ch4',     n:'完成1个P4挑战',        icon:'🎯', type:'挑战',
+        check: s => CHALLENGES.filter(c => c.phase === 4 && s.completedChallenges[c.id]).length >= 1, progress: s => Math.min(CHALLENGES.filter(c => c.phase === 4 && s.completedChallenges[c.id]).length, 1), max: 1 },
+      { id:'p4_branch4', n:'研究1个P4互斥科技',    icon:'🔬', type:'科技',
+        check: s => !!(s.techs.signalAmplifier?.done || s.techs.evolutionCatalyst?.done), progress: s => (s.techs.signalAmplifier?.done || s.techs.evolutionCatalyst?.done) ? 1 : 0, max: 1 },
+    ],
+  },
+};
+
+// ===== v3.0 §6: P3子阶段 — P3b建筑集合 + P3a→P3b探索度 =====
+// P3a (物流基础): biofilmReactor, transport, sporeSower — 研究biofilmTech后解锁
+// P3b (物流进阶): metabolicLoop, signalRelay, fermentVacuole, biomassConverter, quantumExtractor — P3a探索度≥3
+const P3B_BUILDINGS = new Set(['metabolicLoop', 'signalRelay', 'fermentVacuole', 'biomassConverter', 'quantumExtractor']);
+
+const P3B_EXPLORATION_GOALS = {
+  required: 3,
+  goals: [
+    { id:'p3b_bld2',   n:'拥有2种P3a建筑',         icon:'🏗️', type:'建设',
+      check: s => ['biofilmReactor','transport','sporeSower'].filter(b => s.bldCount(b) > 0).length >= 2,
+      progress: s => Math.min(['biofilmReactor','transport','sporeSower'].filter(b => s.bldCount(b) > 0).length, 2), max: 2 },
+    { id:'p3b_petri1', n:'完成1个P3培养皿实验',     icon:'🧫', type:'探索',
+      check: s => (s._petriCount||0) >= 1 + (s._p3bPetriBase||0),
+      progress: s => Math.min((s._petriCount||0) - (s._p3bPetriBase||0), 1), max: 1 },
+    { id:'p3b_mut1',   n:'激活1个突变',             icon:'🧬', type:'突变',
+      check: s => (s._mutSlots||[]).length >= 1,
+      progress: s => Math.min((s._mutSlots||[]).length, 1), max: 1 },
+    { id:'p3b_belt8',  n:'手动连接8+传送带',        icon:'🔗', type:'连线',
+      check: s => Object.keys(s.manualBelts||{}).length >= 8,
+      progress: s => Math.min(Object.keys(s.manualBelts||{}).length, 8), max: 8 },
+    { id:'p3b_adj10',  n:'发现10条邻接规则',        icon:'🏗️', type:'布局',
+      check: s => Object.keys(s._discoveredAdj||{}).length >= 10,
+      progress: s => Math.min(Object.keys(s._discoveredAdj||{}).length, 10), max: 10 },
+    { id:'p3b_dist3',  n:'拥有1条3格+距离传送带',   icon:'🔗', type:'远距',
+      check: s => (s.stats.maxBeltDist||0) >= 3,
+      progress: s => (s.stats.maxBeltDist||0) >= 3 ? 1 : 0, max: 1 },
+  ],
+};
+
+// ===== v3.0 §9.2: 建筑Lv3特化 — 二选一路线 =====
+const SPECIALIZATIONS = {
+  transport: {
+    name: '菌丝运输网',
+    options: [
+      { id:'transport_range', name:'覆盖扩展', icon:'📡', color:'#14b8a6',
+        desc:'+1最大传送带连线距离（4→5格）',
+        effect: { type:'beltRange', value: 1 } },
+      { id:'transport_speed', name:'高速通道', icon:'⚡', color:'#eab308',
+        desc:'所有传送带效率+15%',
+        effect: { type:'beltEfficiency', value: 0.15 } },
+    ]
+  },
+  biofilmReactor: {
+    name: '生物膜反应器',
+    options: [
+      { id:'biofilm_adj', name:'膜基防护', icon:'🛡️', color:'#22c55e',
+        desc:'该建筑邻接加成+20%',
+        effect: { type:'adjBonus', value: 0.20 } },
+      { id:'biofilm_port', name:'膜基枢纽', icon:'🔗', color:'#f97316',
+        desc:'+1输出端口',
+        effect: { type:'extraOutPort', value: 1 } },
+    ]
+  },
+  signalRelay: {
+    name: '信号中继站',
+    options: [
+      { id:'relay_amp', name:'信号增幅', icon:'📶', color:'#60a5fa',
+        desc:'中继衰减降至0%（正常5%/跳）',
+        effect: { type:'relayDecay', value: 0 } },
+      { id:'relay_hub', name:'分流枢纽', icon:'🔀', color:'#c084fc',
+        desc:'+2端口（可实现1进5出的分流）',
+        effect: { type:'extraPorts', value: 2 } },
+    ]
+  },
+};
+
+// ===== v3.0 §1: EVOLUTION TASKS — 进化培养3选1任务 =====
+// 每个阶段transition定义3类任务(连线/布局/经济)，进化时随机抽1个/类
+const EVOLUTION_TASKS = {
+  // P1→P2 (简单教学)
+  1: [
+    { id:'et1_belt2', type:'连线', icon:'🔗', n:'建立2条传送带连接',
+      check: s => (s._activeBelts||[]).length >= 2 + (s._evoTaskBase?.belt||0),
+      progress: s => Math.min((s._activeBelts||[]).length - (s._evoTaskBase?.belt||0), 2),
+      max: 2, reward: { energy: 15 } },
+    { id:'et1_adj1', type:'布局', icon:'🏗️', n:'发现1条新邻接规则',
+      check: s => Object.keys(s._discoveredAdj||{}).length >= 1 + (s._evoTaskBase?.adj||0),
+      progress: s => Math.min(Object.keys(s._discoveredAdj||{}).length - (s._evoTaskBase?.adj||0), 1),
+      max: 1, reward: { glucose: 20 } },
+    { id:'et1_econ30', type:'经济', icon:'⏱️', n:'维持30秒葡萄糖正收益',
+      check: s => (s._evoEconTimer||0) >= 30,
+      progress: s => Math.min(s._evoEconTimer||0, 30),
+      max: 30, reward: { dna: 5 } },
+  ],
+  // P2→P3 (引入远距/效率)
+  2: [
+    { id:'et2_dist2', type:'连线', icon:'🔗', n:'建立1条2格+距离传送带',
+      check: s => (s.stats.maxBeltDist||0) >= 2,
+      progress: s => (s.stats.maxBeltDist||0) >= 2 ? 1 : 0,
+      max: 1, reward: { energy: 30 } },
+    { id:'et2_adj3', type:'布局', icon:'🏗️', n:'发现3条新邻接规则',
+      check: s => Object.keys(s._discoveredAdj||{}).length >= 3 + (s._evoTaskBase?.adj||0),
+      progress: s => Math.min(Object.keys(s._discoveredAdj||{}).length - (s._evoTaskBase?.adj||0), 3),
+      max: 3, reward: { nitrogen: 10 } },
+    { id:'et2_res4', type:'经济', icon:'⏱️', n:'同时拥有4种资源≥10',
+      check: s => ['glucose','energy','dna','nitrogen','protein','biomass','qs'].filter(r => (s.res[r]||0)>=10).length >= 4,
+      progress: s => Math.min(['glucose','energy','dna','nitrogen','protein','biomass','qs'].filter(r => (s.res[r]||0)>=10).length, 4),
+      max: 4, reward: { protein: 8 } },
+  ],
+  // P3→P4 (策略深度)
+  3: [
+    { id:'et3_combo3', type:'连线', icon:'🔗', n:'达成3连击传送带',
+      check: s => (s.stats.maxBeltCombo||0) >= 3,
+      progress: s => Math.min(s.stats.maxBeltCombo||0, 3),
+      max: 3, reward: { biomass: 15 } },
+    { id:'et3_adj20', type:'布局', icon:'🏗️', n:'使1建筑获≥20%邻接加成',
+      check: s => {
+        if (!s.grid) return false;
+        for (let i = 0; i < s.grid.length; i++) {
+          if (!s.grid[i]) continue;
+          const adj = s.getAdjacencyBonus(i, s.grid[i].type);
+          if (adj && adj.total >= 0.20) return true;
+        }
+        return false;
+      },
+      progress: s => {
+        let best = 0;
+        if (!s.grid) return 0;
+        for (let i = 0; i < s.grid.length; i++) {
+          if (!s.grid[i]) continue;
+          const adj = s.getAdjacencyBonus(i, s.grid[i].type);
+          if (adj) best = Math.max(best, adj.total);
+        }
+        return best >= 0.20 ? 1 : 0;
+      },
+      max: 1, reward: { protein: 12 } },
+    { id:'et3_sync1', type:'经济', icon:'⏱️', n:'让1个建筑达到供给同步',
+      check: s => Object.values(s._syncBonuses||{}).some(sb => sb.sync >= 0.5),
+      progress: s => Object.values(s._syncBonuses||{}).some(sb => sb.sync >= 0.5) ? 1 : 0,
+      max: 1, reward: { dna: 15 } },
+  ],
+  // P4→P5 (综合挑战)
+  4: [
+    { id:'et4_dist4', type:'连线', icon:'🔗', n:'建立1条4格距离传送带',
+      check: s => (s.stats.maxBeltDist||0) >= 4,
+      progress: s => (s.stats.maxBeltDist||0) >= 4 ? 1 : 0,
+      max: 1, reward: { qs: 5 } },
+    { id:'et4_bld12', type:'布局', icon:'🏗️', n:'拥有12+建筑',
+      check: s => s.totalBuildings() >= 12,
+      progress: s => Math.min(s.totalBuildings(), 12),
+      max: 12, reward: { biomass: 20 } },
+    { id:'et4_qs15', type:'经济', icon:'⏱️', n:'QS信号库存≥15',
+      check: s => (s.res.qs||0) >= 15,
+      progress: s => Math.min(Math.floor(s.res.qs||0), 15),
+      max: 15, reward: { dna: 20 } },
+  ],
+};
 
 // ===== MORE RANDOM EVENTS (with choice events) =====
 const EVENTS_EXTRA = [
@@ -1926,7 +2409,7 @@ const PRESTIGE = {
     const phaseMult = state.phase;
     const evoMult = state.eL;
     const buildMult = Math.floor(state.stats.totalBuilt / 5);
-    return Math.floor((achieveCount * 2 + phaseMult * 3 + evoMult * 2 + buildMult) * (state.wonderComplete ? 3 : 1));
+    return Math.floor((achieveCount * 2 + phaseMult * 3 + evoMult * 2 + buildMult) * (state.wonderComplete ? 5 : 1));
   },
   // 转生加成 — 分层解锁，鼓励多次转生
   bonuses: [
@@ -2033,6 +2516,96 @@ const PRESTIGE = {
   },
 };
 
+// ===== v3.0 §8: 转生变体规则 =====
+const PRESTIGE_VARIANTS = [
+  {
+    id: 'purist', name: '纯粹主义', icon: '🔥', color: '#ef4444',
+    desc: '禁止传送带 — 完全依赖邻接布局',
+    scoreBonus: 2.5,  // 进化因子倍率
+    rules: { noBelts: true },
+    hint: '你能仅靠邻接加成通关吗？极端布局挑战。',
+  },
+  {
+    id: 'energyCrisis', name: '能量危机', icon: '⚡', color: '#f59e0b',
+    desc: 'ATP产出-30% — 远距传送带维护费更痛',
+    scoreBonus: 1.8,
+    rules: { energyMult: 0.7 },
+    hint: '紧凑布局或死！每一点能量都珍贵。',
+  },
+  {
+    id: 'minimalist', name: '极简主义', icon: '🔬', color: '#8b5cf6',
+    desc: '建筑上限8座 — 每条传送带都珍贵',
+    scoreBonus: 2.0,
+    rules: { maxBuildings: 8 },
+    hint: '用最少的建筑通关，每个格子都是战略决策。',
+  },
+  {
+    id: 'chaos', name: '混沌培养皿', icon: '🎲', color: '#ec4899',
+    desc: '新建筑随机放置 — 中继节点成为救命稻草',
+    scoreBonus: 1.5,
+    rules: { randomPlacement: true },
+    hint: '无法控制建筑位置，拥抱混沌！',
+  },
+  {
+    id: 'speedrun', name: '竞速试炼', icon: '⏱️', color: '#06b6d4',
+    desc: '15分钟时限 — 超时后效率持续下降',
+    scoreBonus: 2.2,
+    rules: { timeLimit: 900 }, // 秒
+    hint: '争分夺秒！15分钟后效率每分钟-5%。',
+  },
+  {
+    id: 'toxic', name: '毒素蔓延', icon: '☠️', color: '#84cc16',
+    desc: '每60秒随机一种资源-10% — 适应或灭亡',
+    scoreBonus: 1.6,
+    rules: { toxicDecay: true, toxicInterval: 60 },
+    hint: '资源会自然衰减，保持多元化生产。',
+  },
+];
+
+// ===== v3.0 §8: 转生里程碑 =====
+const PRESTIGE_MILESTONES = [
+  {
+    count: 1, id: 'fastPrestige', name: '🚀 快速转生', icon: '🚀', color: '#22c55e',
+    desc: 'P4即可转生 — 不必每次都推到P5',
+    unlockDesc: 'P4快速转生已解锁！老练的菌主可以跳过奇观阶段加速循环。',
+  },
+  {
+    count: 2, id: 'turbo', name: '⚡ 超频模式', icon: '⚡', color: '#facc15',
+    desc: '解锁4×加速 — 快进到下一个决策点',
+    unlockDesc: '4×超频加速已解锁！在右上角切换速度档位。',
+  },
+  {
+    count: 3, id: 'blueprint', name: '🗺️ 布局蓝图', icon: '🗺️', color: '#3b82f6',
+    desc: '保存/加载传送带布局 — 快速重建物流网络',
+    unlockDesc: '传送带蓝图系统解锁！可保存/加载物流布局。',
+  },
+  {
+    count: 5, id: 'catalyst', name: '🧪 催化剂', icon: '🧪', color: '#f97316',
+    desc: '消耗品系统 — 含物流催化(传送带效率+30%持续120秒)',
+    unlockDesc: '催化剂系统解锁！可使用消耗品临时增强效果。',
+  },
+  {
+    count: 10, id: 'multiStrain', name: '🌐 多菌株', icon: '🌐', color: '#a855f7',
+    desc: '取消科技互斥限制 — 同时研究所有分支',
+    unlockDesc: '多菌株模式解锁！科技互斥限制取消。',
+  },
+  {
+    count: 15, id: 'creative', name: '⭐ 创造模式', icon: '⭐', color: '#fbbf24',
+    desc: '无限资源 — 自由测试最优物流网络',
+    unlockDesc: '创造模式解锁！可以无限资源自由实验。',
+  },
+];
+
+// ===== v3.0 §8.3: 催化剂消耗品系统（转生5次解锁）=====
+const CATALYSTS = [
+  { id:'beltBoost',  n:'物流催化', icon:'🚀', color:'#3b82f6', cost:3, duration:120, desc:'传送带效率+30%', effect:'beltEff',  value:0.30 },
+  { id:'prodBoost',  n:'产出催化', icon:'📈', color:'#22c55e', cost:4, duration:90,  desc:'全局产出+25%',   effect:'prodMult', value:0.25 },
+  { id:'adjBoost',   n:'邻接催化', icon:'🔗', color:'#06d6a0', cost:3, duration:60,  desc:'邻接加成+50%',   effect:'adjMult',  value:0.50 },
+  { id:'portBoost',  n:'端口催化', icon:'🔌', color:'#a855f7', cost:5, duration:180, desc:'全局+1端口',     effect:'portExtra', value:1 },
+  { id:'timeBoost',  n:'时间催化', icon:'⏩', color:'#eab308', cost:2, duration:120, desc:'科技研究速度×2', effect:'techSpeed', value:2 },
+  { id:'luckBoost',  n:'幸运催化', icon:'🍀', color:'#84cc16', cost:3, duration:-1,  desc:'培养皿实验buff+30%', effect:'petriBuff', value:0.30 },
+];
+
 // ===== GAME STATE =====
 const G = {
   res:{}, rates:{}, grid:[], gridSize:20, gridCols:20, gridRows:20,
@@ -2084,6 +2657,20 @@ const G = {
   _coreBonus: 0,
   _beltBonus: 0,
   _costDiscount: 0,
+  // v3.0 §9.2: 建筑特化
+  _specializations: {},    // { idx: { id, name, icon, color, desc, effect } }
+  _specCache: { extraBeltRange: 0, beltEffBonus: 0, relayDecayOverride: null, relayExtraPorts: 0, perBuilding: {} },
+  // v3.0 §8: 转生变体
+  _activeVariant: null,    // 当前激活的变体ID (如 'purist')
+  _completedVariants: {},  // v3.0 §8.6: 已通关的变体 { purist: true, ... }
+  _ratingRewardsClaimed: {}, // v1.0.2: 评级首次达成奖励 { D:true, C:true, ... }
+  _variantTimer: 0,        // speedrun计时 / toxic周期计时
+  _toxicTarget: null,      // toxic变体当前衰减目标资源
+  // v3.0 §8: 转生里程碑
+  _unlockedMilestones: {}, // { blueprint: true, catalyst: true, ... }
+  _blueprints: [],         // 蓝图系统: [{ name, belts, grid_snapshot }]
+  _catalysts: {},          // 催化剂: { beltBoost: endTick, prodBoost: endTick, ... } (0=未激活)
+  _creativeMode: false,    // 创造模式
   // Power level system
   _foodPowerLevel: 1.0, // 1.0 = full power, 0.2 = minimum
   _powerWarningShown: false,
@@ -2103,6 +2690,16 @@ const G = {
   _prevSyncState: {},      // 上一帧同步状态（用于检测阈值跨越）
   _beltCombo: 0,           // ★ 方案A：传送带连击计数
   _beltComboTimer: null,   // 传送带连击计时器
+  _beltMaintCost: 0,       // v3.0 §4: 远距传送带维护费总计
+  _prevExplScore: 0,       // v3.0 §2: 上一次探索度得分（用于检测变化）
+  // v3.0 §1: 进化培养任务
+  _evoTask: null,          // 当前活跃的培养任务 { id, type, icon, n, check, progress, max, reward, startTime }
+  _evoTaskBase: null,      // 任务开始时的基线快照 { belt, adj }
+  _evoEconTimer: 0,        // 经济任务秒计时器（如"维持30秒正收益"）
+  _evoTaskStartTime: 0,    // 任务开始时间戳
+  // v3.0 §6: P3子阶段
+  _p3bUnlocked: false,     // P3b是否已解锁
+  _p3bExplScore: 0,        // P3a→P3b 探索度得分（缓存）
   // ★ 方案A+C：维护费与资源竞争
   _maintenanceCost: {},    // 当前帧总维护费 { energy: X, glucose: Y, ... }
   _maintenanceOverhead: 1, // 当前管理开销倍率
@@ -2133,6 +2730,8 @@ const G = {
   _competitionEnabled: false,       // 资源竞争系统已启用
   _competitionTutorialShown: false, // 资源竞争教学已显示
   _portFullShown: false,            // 首次端口满提示已显示
+  // v2.1 §8.2: 培养皿P3+配方分散解锁
+  _petriP3Unlocked: false,          // P3+配方是否已解锁（需2×生物膜反应器+菌丝运输网）
 
   // ===== INIT =====
   init() {
@@ -2268,7 +2867,13 @@ const G = {
       // 1/2/3 — 速度控制
       if (e.key === '1') { this.spd = 1; this._syncSpeedUI(); }
       else if (e.key === '2') { this.spd = 2; this._syncSpeedUI(); }
-      else if (e.key === '3') { this.spd = 4; this._syncSpeedUI(); }
+      else if (e.key === '3') { if (this._unlockedMilestones?.turbo) { this.spd = 4; this._syncSpeedUI(); } else { this.log('⚡ 4×加速需转生2次解锁', 'w'); } }
+      // v3.0 §7.4: Tab键 — 网络总览模式
+      else if (e.key === 'Tab') {
+        e.preventDefault();
+        this.toggleNetworkOverview();
+        return;
+      }
     });
   },
 
@@ -2279,7 +2884,203 @@ const G = {
     btn.classList.remove('spd-2', 'spd-4');
     if (this.spd === 2) btn.classList.add('spd-2');
     else if (this.spd === 4) btn.classList.add('spd-4');
-    SFX.click();
+    // v3.0: 4×未解锁时提示
+    const turbo = this._unlockedMilestones?.turbo;
+    btn.title = turbo ? '加速 (1×/2×/4×)' : '加速 (1×/2×) — 转生2次解锁4×';
+  },
+
+  // v3.0 §7.4: 网络总览模式 — Tab键切换
+  toggleNetworkOverview() {
+    if (this._networkOverviewActive) {
+      this._hideNetworkOverview();
+    } else {
+      this._showNetworkOverview();
+    }
+  },
+
+  // v3.0 §7.4: 显示网络总览模式
+  _showNetworkOverview() {
+    if (this._networkOverviewActive) return;
+    
+    this._networkOverviewActive = true;
+    this._originalDisplay = document.getElementById('game').style.display;
+    
+    // 创建网络总览容器
+    const overlay = document.createElement('div');
+    overlay.id = 'networkOverviewOverlay';
+    overlay.style.cssText = `
+      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0, 0, 0, 0.95); z-index: 9999;
+      display: flex; flex-direction: column; align-items: center;
+      justify-content: center; color: white; font-family: 'Rajdhani', sans-serif;
+      animation: fadeIn 0.3s;
+    `;
+    
+    // 生成网络拓扑图
+    const networkData = this._generateNetworkData();
+    
+    let html = `
+      <div style="background: #1a1a2e; border: 1px solid rgba(6, 214, 160, 0.3); 
+                border-radius: 12px; padding: 20px; max-width: 90vw; max-height: 90vh; 
+                overflow: auto; box-shadow: 0 0 40px rgba(6, 214, 160, 0.15);">
+        <div style="text-align: center; margin-bottom: 20px;">
+          <div style="font-size: 1.5em; margin-bottom: 8px;">🌐</div>
+          <div style="font-size: 1.2em; font-weight: 700; color: #06d6a0;">物流网络总览</div>
+          <div style="font-size: 0.8em; color: #94a3b8; margin-top: 4px;">
+            按 Tab 键退出 • ${networkData.totalBelts}条传送带 • ${networkData.totalNodes}个建筑节点
+          </div>
+        </div>
+        
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px;">
+    `;
+    
+    // 按建筑类型分组显示
+    Object.entries(networkData.nodesByType).forEach(([type, nodes]) => {
+      const bd = BLDS[type];
+      if (!bd || nodes.length === 0) return;
+      
+      html += `
+        <div style="background: rgba(6, 214, 160, 0.05); border: 1px solid rgba(6, 214, 160, 0.2); 
+                  border-radius: 8px; padding: 12px;">
+          <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+            <span style="font-size: 1.2em;">${bd.emoji || '🏗️'}</span>
+            <span style="font-weight: 700; color: #06d6a0;">${bd.n}</span>
+            <span style="font-size: 0.8em; color: #94a3b8; margin-left: auto;">${nodes.length}台</span>
+          </div>
+          <div style="font-size: 0.8em; color: #94a3b8; margin-bottom: 8px;">
+            连接: ${nodes.reduce((sum, node) => sum + (node.connections || 0), 0)}条
+          </div>
+          <div style="display: flex; flex-wrap: wrap; gap: 4px;">
+            ${nodes.map(node => {
+              const connColor = node.connections > 0 ? '#06d6a0' : '#64748b';
+              return `<span style="font-size: 0.7em; padding: 2px 6px; background: ${connColor}20; 
+                         border: 1px solid ${connColor}40; border-radius: 4px; color: ${connColor};">
+                       ${node.connections || 0}连
+                     </span>`;
+            }).join('')}
+          </div>
+        </div>
+      `;
+    });
+    
+    html += `
+        </div>
+        
+        <!-- 网络统计 -->
+        <div style="margin-top: 20px; padding: 12px; background: rgba(6, 214, 160, 0.05); 
+                  border-radius: 8px; border: 1px solid rgba(6, 214, 160, 0.2);">
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
+            <div style="text-align: center;">
+              <div style="font-size: 1.5em; color: #06d6a0;">${networkData.totalBelts}</div>
+              <div style="font-size: 0.8em; color: #94a3b8;">总传送带数</div>
+            </div>
+            <div style="text-align: center;">
+              <div style="font-size: 1.5em; color: #f97316;">${networkData.avgConnections.toFixed(1)}</div>
+              <div style="font-size: 0.8em; color: #94a3b8;">平均连接数</div>
+            </div>
+            <div style="text-align: center;">
+              <div style="font-size: 1.5em; color: #a855f7;">${networkData.maxConnections}</div>
+              <div style="font-size: 0.8em; color: #94a3b8;">最大连接数</div>
+            </div>
+            <div style="text-align: center;">
+              <div style="font-size: 1.5em; color: #fbbf24;">${networkData.networkEfficiency}%</div>
+              <div style="font-size: 0.8em; color: #94a3b8;">网络效率</div>
+            </div>
+          </div>
+        </div>
+        
+        <div style="text-align: center; margin-top: 16px; font-size: 0.8em; color: #64748b;">
+          🌐 Tab键切换 • ESC键关闭 • 鼠标滚轮缩放
+        </div>
+      </div>
+    `;
+    
+    overlay.innerHTML = html;
+    document.body.appendChild(overlay);
+    
+    // 绑定ESC键关闭
+    const escHandler = (e) => {
+      if (e.key === 'Escape') {
+        this._hideNetworkOverview();
+        document.removeEventListener('keydown', escHandler);
+      }
+    };
+    document.addEventListener('keydown', escHandler);
+    
+    this.log('🌐 网络总览模式已激活', 's');
+  },
+
+  // v3.0 §7.4: 生成网络数据
+  _generateNetworkData() {
+    const nodesByType = {};
+    let totalBelts = 0;
+    let totalConnections = 0;
+    let maxConnections = 0;
+    
+    // 统计每个建筑的连接数
+    this.grid.forEach((g, idx) => {
+      if (!g) return;
+      
+      const type = g.type;
+      if (!nodesByType[type]) nodesByType[type] = [];
+      
+      // 计算该建筑的连接数
+      const connections = this._activeBelts.filter(belt => 
+        belt.from === idx || belt.to === idx
+      ).length;
+      
+      nodesByType[type].push({ idx, connections });
+      totalConnections += connections;
+      maxConnections = Math.max(maxConnections, connections);
+    });
+    
+    totalBelts = this._activeBelts.length;
+    const totalNodes = Object.values(nodesByType).reduce((sum, nodes) => sum + nodes.length, 0);
+    const avgConnections = totalNodes > 0 ? totalConnections / totalNodes : 0;
+    
+    // 计算网络效率（基于端口利用率）
+    let networkEfficiency = 0;
+    if (totalNodes > 0) {
+      let totalPortUtilization = 0;
+      this.grid.forEach((g, idx) => {
+        if (!g) return;
+        const portDef = PORT_DEFS[g.type];
+        if (!portDef) return;
+        
+        const connections = this._activeBelts.filter(belt => 
+          belt.from === idx || belt.to === idx
+        ).length;
+        const maxPorts = Math.max(portDef.maxIn, portDef.maxOut);
+        const utilization = maxPorts > 0 ? Math.min(connections / maxPorts, 1) : 0;
+        totalPortUtilization += utilization;
+      });
+      networkEfficiency = Math.round((totalPortUtilization / totalNodes) * 100);
+    }
+    
+    return {
+      nodesByType,
+      totalBelts,
+      totalNodes,
+      totalConnections,
+      avgConnections,
+      maxConnections,
+      networkEfficiency
+    };
+  },
+
+  // v3.0 §7.4: 隐藏网络总览模式
+  _hideNetworkOverview() {
+    if (!this._networkOverviewActive) return;
+    
+    this._networkOverviewActive = false;
+    const overlay = document.getElementById('networkOverviewOverlay');
+    if (overlay) overlay.remove();
+    
+    if (this._originalDisplay !== undefined) {
+      document.getElementById('game').style.display = this._originalDisplay;
+    }
+    
+    this.log('🌐 网络总览模式已关闭', 's');
   },
 
   // ===== 移动端标签页切换 =====
@@ -2583,7 +3384,7 @@ const G = {
     this._hideBackdrop();
   },
 
-  // ===== OFFLINE EARNINGS =====
+  // ===== OFFLINE EARNINGS + WELCOME BACK =====
   calcOfflineEarnings() {
     if (!this.lastOnlineTime || this.totalBuildings() === 0) return;
     const now = Date.now();
@@ -2608,41 +3409,132 @@ const G = {
       }
     }
 
+    const timeStr = elapsed >= 3600 ? `${Math.floor(elapsed/3600)}小时${Math.floor((elapsed%3600)/60)}分钟` :
+                    elapsed >= 60 ? `${Math.floor(elapsed/60)}分钟` : `${Math.floor(elapsed)}秒`;
+
+    // 不管有没有收益，都显示欢迎回来弹窗
+    setTimeout(() => {
+      this.showWelcomeBack(elapsed, timeStr, earnings, hasEarnings);
+    }, 500);
+
     if (hasEarnings) {
-      const timeStr = elapsed >= 3600 ? `${Math.floor(elapsed/3600)}小时${Math.floor((elapsed%3600)/60)}分钟` :
-                      elapsed >= 60 ? `${Math.floor(elapsed/60)}分钟` : `${Math.floor(elapsed)}秒`;
       const earningStr = Object.entries(earnings).map(([k,v]) => `+${formatNum(v)}${RES[k]?.icon||k}`).join(' ');
-
-      // Show welcome back popup
-      setTimeout(() => {
-        this.showOfflinePopup(timeStr, earningStr, earnings);
-      }, 500);
-
       this.log(`🌙 离线${timeStr}，收获: ${earningStr}`, 's');
+    } else {
+      this.log(`🧫 菌主回来了！离开了${timeStr}`, 'i');
     }
   },
 
-  showOfflinePopup(timeStr, earningStr, earnings) {
+  // 情感文案池 — 根据离线时长和转生次数
+  _getWelcomeGreeting(elapsedSec) {
+    const pc = this.prestigeCount || 0;
+    // 称呼
+    const title = pc >= 15 ? '造物主' : pc >= 6 ? '资深菌主' : pc >= 1 ? '菌主' : '菌主';
+    // 情感语句池（按离线时长分档）
+    const pools = {
+      short: [ // < 5 min
+        '菌群："咦，刚才去了哪？"',
+        '培养皿还热着呢。',
+        '菌落：短暂离开，一切正常！',
+      ],
+      medium: [ // 5 min - 1 hour
+        '菌落们自主运转了一会儿，效率还行！',
+        '你的培养皿一切正常 🧪',
+        '菌群自治委员会：运转良好。',
+      ],
+      long: [ // 1 - 6 hours
+        '菌群自治委员会报告：一切稳定。',
+        'ATP储备正常，菌落安心运作中。',
+        '菌落们有条不紊地代谢着。',
+      ],
+      vlong: [ // 6 - 24 hours
+        '培养皿安静了好久…菌群们有点想你。',
+        '过夜期间，菌落代谢运转正常。',
+        '菌群议会召开了好几次会…',
+      ],
+      epic: [ // > 24 hours
+        '菌群差点要成立民主政府了。',
+        '离开超过一天，菌落群情激动！',
+        '好久不见！培养皿差点长出文明了。',
+      ],
+      legendary: [ // > 7 days
+        '传说中的菌主…真的回来了？！',
+        '考古级别的回归！培养皿落灰了…',
+        '菌群已经开始写史书记载你的离去了。',
+      ],
+    };
+    let pool;
+    if (elapsedSec < 300) pool = pools.short;
+    else if (elapsedSec < 3600) pool = pools.medium;
+    else if (elapsedSec < 21600) pool = pools.long;
+    else if (elapsedSec < 86400) pool = pools.vlong;
+    else if (elapsedSec < 604800) pool = pools.epic;
+    else pool = pools.legendary;
+    const flavor = pool[Math.floor(Math.random() * pool.length)];
+    return { title, flavor };
+  },
+
+  showWelcomeBack(elapsedSec, timeStr, earnings, hasEarnings) {
     const pop = document.getElementById('offlinePopup');
     if (!pop) return;
-    document.getElementById('offlineTime').textContent = `离开了 ${timeStr}`;
-    const detailEl = document.getElementById('offlineDetail');
-    let html = '';
-    for (let k in earnings) {
-      html += `<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid rgba(255,255,255,0.03)">
-        <span style="color:var(--dim)">${RES[k]?.icon||''} ${RES[k]?.n||k}</span>
-        <span style="color:var(--green);font-weight:700;font-family:'Orbitron',monospace">+${formatNum(earnings[k])}</span>
+
+    const { title, flavor } = this._getWelcomeGreeting(elapsedSec);
+
+    // — 标题区 —
+    const titleEl = document.getElementById('welcomeTitle');
+    if (titleEl) titleEl.textContent = `欢迎${title}回来！`;
+    const flavorEl = document.getElementById('welcomeFlavor');
+    if (flavorEl) flavorEl.textContent = flavor;
+
+    // — 离线时间 —
+    const timeEl = document.getElementById('offlineTime');
+    if (timeEl) timeEl.textContent = `离开了 ${timeStr}`;
+
+    // — 状态快报 —
+    const statusEl = document.getElementById('welcomeStatus');
+    if (statusEl) {
+      const techDone = Object.values(this.techs).filter(t => t.done).length;
+      const techTotal = Object.keys(this.techs).length;
+      const worldStr = this.prestigeCount > 0 ? `♻️ 第${this.prestigeCount + 1}世` : '🌱 初始世界';
+      statusEl.innerHTML = `<div class="wb-status-grid">
+        <span>🏗️ 建筑 ${this.totalBuildings()}座</span>
+        <span>🧬 阶段 P${this.phase}</span>
+        <span>🔬 科技 ${techDone}/${techTotal}</span>
+        <span>${worldStr}</span>
       </div>`;
     }
-    detailEl.innerHTML = html;
+
+    // — 离线收益 —
+    const earningsSection = document.getElementById('welcomeEarningsSection');
+    const detailEl = document.getElementById('offlineDetail');
+    if (hasEarnings && earningsSection && detailEl) {
+      earningsSection.style.display = '';
+      let html = '';
+      for (let k in earnings) {
+        html += `<div class="wb-earning-row">
+          <span style="color:var(--dim)">${RES[k]?.icon||''} ${RES[k]?.n||k}</span>
+          <span style="color:var(--green);font-weight:700;font-family:'Orbitron',monospace">+${formatNum(earnings[k])}</span>
+        </div>`;
+      }
+      detailEl.innerHTML = html;
+    } else if (earningsSection) {
+      earningsSection.style.display = 'none';
+    }
+
     this._showPopup(pop);
-    SFX.bigReward();
-    this.screenShake(5);
-    // 安全网：8秒后自动关闭
-    setTimeout(() => this.closeOffline(), 8000);
+    if (hasEarnings) {
+      SFX.bigReward();
+      this.screenShake(5);
+    } else {
+      SFX.click?.();
+    }
+    // 安全网：根据内容量调整自动关闭时间
+    const autoClose = hasEarnings ? 10000 : 6000;
+    this._welcomeTimer = setTimeout(() => this.closeOffline(), autoClose);
   },
 
   closeOffline() {
+    clearTimeout(this._welcomeTimer);
     this._hidePopup('offlinePopup');
   },
 
@@ -2819,10 +3711,13 @@ const G = {
 
   // === Buildings ===
   renderBuildings() {
+    this._buildBtnCacheDirty = true; // P1-2: 重建时标记缓存失效
     const list = document.getElementById('buildList');
     list.innerHTML = '';
     let _lastPhase = 0;      // 用于追踪阶段分隔
     let _p2bDividerShown = false; // P2b分隔符是否已插入
+    let _p3aDividerShown = false; // P3a分隔符
+    let _p3bDividerShown = false; // P3b分隔符
     for (let key in BLDS) {
       const b = BLDS[key];
       if (b.phase > this.phase) continue;
@@ -2848,9 +3743,39 @@ const G = {
           list.appendChild(p2bHeader);
         }
       }
+
+      // v3.0 §6: P3子阶段视觉分隔
+      if (this.phase >= 3 && b.phase === 3) {
+        // P3a标题（首次遇到P3建筑时插入）
+        if (_lastPhase < 3 && !_p3aDividerShown) {
+          _p3aDividerShown = true;
+          const p3aHeader = document.createElement('div');
+          p3aHeader.className = 'phase-sub-header';
+          p3aHeader.innerHTML = '<span class="phase-sub-icon">🧫</span> P3a · 物流基础';
+          p3aHeader.style.cssText = 'font-size:0.78em;color:var(--teal);padding:6px 8px 2px;opacity:0.85;font-weight:600;letter-spacing:0.5px;border-top:1px solid rgba(20,184,166,0.15);margin-top:4px';
+          list.appendChild(p3aHeader);
+        }
+        // P3b分隔符（在第一个P3b建筑前插入）
+        if (P3B_BUILDINGS.has(key) && !_p3bDividerShown) {
+          _p3bDividerShown = true;
+          const p3bHeader = document.createElement('div');
+          p3bHeader.className = 'phase-sub-header';
+          const p3bStatus = this._p3bUnlocked
+            ? '<span style="color:var(--green);font-size:0.85em">✓ 已解锁</span>'
+            : (() => {
+                const es = this.getP3bExplorationStatus();
+                return `<span style="color:var(--orange);font-size:0.85em">🔒 P3a探索度 ${es.score}/${es.required}</span>`;
+              })();
+          p3bHeader.innerHTML = `<span class="phase-sub-icon">📡</span> P3b · 物流进阶 ${p3bStatus}`;
+          p3bHeader.style.cssText = 'font-size:0.78em;color:#60a5fa;padding:6px 8px 2px;opacity:0.85;font-weight:600;letter-spacing:0.5px;border-top:1px dashed rgba(96,165,250,0.25);margin-top:6px';
+          list.appendChild(p3bHeader);
+        }
+      }
       _lastPhase = b.phase;
 
-      const locked = b.techReq && !this.techs[b.techReq]?.done;
+      // v3.0 §6: P3b门控 — 未解锁P3b时，P3b建筑显示锁定
+      const isP3bLocked = b.phase === 3 && P3B_BUILDINGS.has(key) && !this._p3bUnlocked;
+      const locked = isP3bLocked || (b.techReq && !this.techs[b.techReq]?.done);
 
       // 外层容器，包含建筑按钮 + 升级按钮
       const row = document.createElement('div');
@@ -2886,7 +3811,14 @@ const G = {
         </div>
         ${tagHTML}
       `;
-      btn.onclick = () => { if(!locked) this.selectBuilding(key); };
+      btn.onclick = () => {
+        if (isP3bLocked) {
+          const es = this.getP3bExplorationStatus();
+          this.showEvent('🔒 需要 P3b 物流进阶', `这个建筑需要完成P3a阶段的探索才能解锁。\n\n当前P3b探索度: ${es.score}/${es.required}\n\n继续在P3a阶段探索：建造P3a建筑、连接传送带、发现邻接规则...`, '#60a5fa');
+          return;
+        }
+        if(!locked) this.selectBuilding(key);
+      };
 
       // ===== 拖拽建造：从侧栏拖建筑到网格直接放置 =====
       if (!locked) {
@@ -3462,16 +4394,160 @@ const G = {
       setTimeout(() => updatedItem.classList.remove('just-upgraded'), 600);
     }
 
-    this.renderGrid();
-    this.renderBuildings();
-    this.updateRates();
-    this.updateUI();
+    this.refreshAll();
+
+    // v3.0 §9.2: 升级到Lv3时触发特化选择
+    if (lv === 3 && SPECIALIZATIONS[buildingKey] && !this._specializations?.[idx]) {
+      setTimeout(() => this._showSpecializationChoice(idx, buildingKey), 300);
+    }
 
     // 如果全部满级了，显示完成提示
     const allMax = instances.every(i => (this.buildingLevels[i] || 1) >= 5);
     if (allMax) {
       this.showGoldenFloat(`🌟 ${bd.n} 全部满级！`);
     }
+  },
+
+  // ===== v3.0 §9.2: 建筑Lv3特化系统 =====
+  _showSpecializationChoice(idx, bldType) {
+    const spec = SPECIALIZATIONS[bldType];
+    if (!spec) return;
+    if (!this._specializations) this._specializations = {};
+    if (this._specializations[idx]) return; // 已特化
+
+    const bd = BLDS[bldType];
+    const overlay = document.createElement('div');
+    overlay.id = 'specChoiceOverlay';
+    overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.88);z-index:9999;display:flex;align-items:center;justify-content:center;animation:fadeIn 0.3s';
+
+    let html = `<div style="background:#1a1a2e;border:1px solid #fbbf2440;border-radius:10px;padding:20px;max-width:360px;width:90%;box-shadow:0 0 30px rgba(251,191,36,0.15)">`;
+    html += `<div style="text-align:center;margin-bottom:12px">`;
+    html += `<div style="font-size:1.5em">${bd.emoji}</div>`;
+    html += `<div style="font-size:1em;font-weight:700;color:#fbbf24;margin-top:4px">${spec.name} — Lv.3 特化</div>`;
+    html += `<div style="font-size:0.75em;color:#94a3b8;margin-top:4px">选择一条永久特化路线（不可更改）</div>`;
+    html += `</div>`;
+
+    html += `<div style="display:flex;flex-direction:column;gap:8px">`;
+    for (let i = 0; i < spec.options.length; i++) {
+      const opt = spec.options[i];
+      html += `<button class="spec-choice-btn" data-idx="${i}" style="
+        background:linear-gradient(135deg, ${opt.color}15, ${opt.color}08);
+        border:1px solid ${opt.color}40;
+        border-radius:8px;
+        padding:12px;
+        cursor:pointer;
+        text-align:left;
+        transition:all 0.2s;
+        color:#e2e8f0;
+      " onmouseover="this.style.borderColor='${opt.color}';this.style.boxShadow='0 0 12px ${opt.color}30'"
+         onmouseout="this.style.borderColor='${opt.color}40';this.style.boxShadow='none'">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+          <span style="font-size:1.2em">${opt.icon}</span>
+          <span style="font-weight:700;color:${opt.color};font-size:0.9em">${opt.name}</span>
+        </div>
+        <div style="font-size:0.75em;color:#94a3b8;line-height:1.4">${opt.desc}</div>
+      </button>`;
+    }
+    html += `</div>`;
+    html += `</div>`;
+
+    overlay.innerHTML = html;
+    document.body.appendChild(overlay);
+
+    // 绑定选择事件
+    overlay.querySelectorAll('.spec-choice-btn').forEach(btn => {
+      btn.onclick = () => {
+        const optIdx = parseInt(btn.dataset.idx);
+        const chosen = spec.options[optIdx];
+        this._applySpecialization(idx, bldType, chosen);
+        overlay.remove();
+      };
+    });
+  },
+
+  _applySpecialization(idx, bldType, option) {
+    if (!this._specializations) this._specializations = {};
+    this._specializations[idx] = {
+      type: bldType,
+      id: option.id,
+      name: option.name,
+      icon: option.icon,
+      color: option.color,
+      desc: option.desc,
+      effect: option.effect,
+    };
+
+    // 即时反馈
+    const bd = BLDS[bldType];
+    this.log(`⭐ ${bd.n} 特化为 ${option.icon} ${option.name} — ${option.desc}`, 's');
+    this.showEvent(
+      `⭐ ${option.icon} ${option.name}`,
+      `${bd.emoji} ${bd.n} 已永久特化！\n\n${option.desc}\n\n💡 此选择不可更改，同类建筑可以选择不同特化。`,
+      option.color
+    );
+    SFX.milestone();
+    this.buildBurst(idx);
+    this.screenShake(5);
+
+    // 重新计算特化效果缓存
+    this._recalcSpecEffects();
+    this.refreshAll({ buildings: false });
+  },
+
+  // 重新计算所有特化效果的聚合缓存
+  _recalcSpecEffects() {
+    const specs = this._specializations || {};
+    // 聚合效果
+    let extraBeltRange = 0;       // transport_range: +N格
+    let beltEffBonus = 0;         // transport_speed: +N%
+    let relayDecayOverride = null; // relay_amp: 衰减覆盖
+    let relayExtraPorts = 0;      // relay_hub: 额外端口
+    // 逐建筑效果存储在 _specPerBuilding
+    const perBuilding = {};
+
+    for (const idxStr in specs) {
+      const s = specs[idxStr];
+      const idx = parseInt(idxStr);
+      const eff = s.effect;
+      if (!eff) continue;
+
+      switch (eff.type) {
+        case 'beltRange':
+          extraBeltRange += eff.value;
+          break;
+        case 'beltEfficiency':
+          beltEffBonus += eff.value;
+          break;
+        case 'adjBonus':
+          if (!perBuilding[idx]) perBuilding[idx] = {};
+          perBuilding[idx].adjBonusMult = 1 + eff.value;
+          break;
+        case 'extraOutPort':
+          if (!perBuilding[idx]) perBuilding[idx] = {};
+          perBuilding[idx].extraOutPort = eff.value;
+          break;
+        case 'relayDecay':
+          relayDecayOverride = eff.value;
+          break;
+        case 'extraPorts':
+          if (!perBuilding[idx]) perBuilding[idx] = {};
+          perBuilding[idx].extraPorts = eff.value;
+          break;
+      }
+    }
+
+    this._specCache = {
+      extraBeltRange,
+      beltEffBonus,
+      relayDecayOverride,
+      relayExtraPorts,
+      perBuilding,
+    };
+  },
+
+  // 获取建筑的特化信息（用于tooltip等）
+  getSpecialization(idx) {
+    return this._specializations?.[idx] || null;
   },
 
   // 全部升到满级（逐级升，带动画序列）
@@ -3515,10 +4591,7 @@ const G = {
 
       // 刷新列表
       this._renderBldTypeList(buildingKey, bd, instances);
-      this.renderGrid();
-      this.renderBuildings();
-      this.updateRates();
-      this.updateUI();
+      this.refreshAll();
     }
   },
 
@@ -3531,6 +4604,14 @@ const G = {
     const section = document.getElementById('techSection');
     const list = document.getElementById('techList');
     list.innerHTML = '';
+
+    // v3.0 §8.4: 多菌株模式标识
+    if (this._multiStrainUnlocked) {
+      const badge = document.createElement('div');
+      badge.style.cssText = 'text-align:center;padding:6px 10px;margin-bottom:8px;background:linear-gradient(135deg,rgba(34,197,94,0.12),rgba(34,197,94,0.04));border:1px solid rgba(34,197,94,0.25);border-radius:8px;font-size:0.78em;color:#22c55e;font-weight:600';
+      badge.textContent = '🌐 多菌株模式 — 无互斥限制';
+      list.appendChild(badge);
+    }
 
     // 按阶段组织科技树数据
     const phaseMap = {}; // { phase: { trunk: key, branches: [keyA, keyB] } }
@@ -3556,9 +4637,13 @@ const G = {
       const done = this.techs[key]?.done;
       const isResearching = this.rTech === key;
 
+      // v3.0 §3: 前置条件状态
+      const prereq = this.getTechPrereqStatus(key);
+      const prereqLocked = prereq.hasPrereq && !prereq.met && !done;
+
       let exclusiveLocked = false;
       let exclusiveBy = '';
-      if (t.exclusive) {
+      if (t.exclusive && !this._multiStrainUnlocked) {
         for (const exKey of t.exclusive) {
           if (this.techs[exKey]?.done) { exclusiveLocked = true; exclusiveBy = TECHS[exKey].n; break; }
         }
@@ -3569,6 +4654,7 @@ const G = {
       if (done) cls += ' done';
       else if (exclusiveLocked) cls += ' exclusive-locked';
       else if (locked) cls += ' locked';
+      else if (prereqLocked) cls += ' prereq-locked';
       if (isResearching) cls += ' researching';
       node.className = cls;
       node.id = 'tech-' + key;
@@ -3584,20 +4670,45 @@ const G = {
         statusStr = `${costStr} · ${t.time}s`;
       }
 
+      // v3.0 §3: 前置条件显示行
+      let prereqHTML = '';
+      if (prereq.hasPrereq && !done && !exclusiveLocked) {
+        if (prereq.met) {
+          prereqHTML = `<div class="tt-prereq met">✅ ${prereq.icon} ${prereq.label}</div>`;
+        } else {
+          const pct = prereq.max > 0 ? Math.min(prereq.progress / prereq.max * 100, 100) : 0;
+          const reducedTag = prereq.reduced ? ' <span style="color:#14b8a6;font-size:0.8em">♻️-25%</span>' : '';
+          prereqHTML = `<div class="tt-prereq">🔒 ${prereq.icon} ${prereq.label} <span class="tt-prereq-prog">(${prereq.progress}/${prereq.max})</span>${reducedTag}
+            <div class="tt-prereq-bar"><div class="tt-prereq-fill" style="width:${pct}%"></div></div>
+          </div>`;
+        }
+      }
+
       let branchTag = '';
       if (t.exclusive && !done && !exclusiveLocked) {
-        branchTag = '<span class="tt-exclusive-tag">⚡二选一</span>';
+        branchTag = this._multiStrainUnlocked
+          ? '<span class="tt-exclusive-tag" style="background:rgba(34,197,94,0.15);color:#22c55e;border-color:rgba(34,197,94,0.3)">🌐 可同时研究</span>'
+          : '<span class="tt-exclusive-tag">⚡二选一</span>';
       }
 
       node.innerHTML = `
         <div class="tt-name">${done ? '<span class="done-mark">✓</span>' : ''}${t.n}${branchTag}</div>
         <div class="tt-desc">${t.d} — ${t.ef}</div>
+        ${prereqHTML}
         <div class="tt-cost">${statusStr}</div>
         ${isResearching ? `<div class="prog-wrap"><div class="prog-bar"><div class="prog-fill" id="techFill-${key}" style="width:0%;background:var(--cyan)"></div></div></div>` : ''}
       `;
 
-      if (!locked && !done && !exclusiveLocked) {
+      if (!locked && !done && !exclusiveLocked && !prereqLocked) {
         node.onclick = () => this.startResearch(key);
+      } else if (prereqLocked && !locked && !exclusiveLocked) {
+        // v3.0 §3: 点击前置条件锁定科技时弹出友好提示
+        node.style.cursor = 'pointer';
+        node.onclick = () => {
+          const pq = this.getTechPrereqStatus(key);
+          this.showEvent(`🔒 前置条件未满足`, `「${t.n}」需要先完成:\n\n${pq.icon} ${pq.label}\n当前: ${pq.progress}/${pq.max}\n\n${pq.reduced ? '♻️ 转生减免: 原始要求 ' + pq.baseMax + ' → ' + pq.max : '💡 满足条件后即可开始研究'}`, '#f97316');
+          SFX.buildFail();
+        };
       }
 
       return { node, done, exclusiveLocked };
@@ -3915,6 +5026,18 @@ const G = {
         if (portDef) {
           cell.classList.add('role-' + portDef.role);
         }
+        // v2.1: 休眠建筑视觉
+        if (this._dormantCells[i]) {
+          cell.classList.add('dormant');
+          cell.style.borderColor = '';  // 清除内联色，让CSS class接管
+        }
+        // v2.1: 休眠状态badge（顶部灰色标签）
+        const dormBadge = document.createElement('div');
+        dormBadge.className = 'cell-dormant-badge';
+        dormBadge.id = 'dormantBadge-' + i;
+        dormBadge.textContent = '💤 休眠中';
+        dormBadge.style.display = this._dormantCells[i] ? 'block' : 'none';
+        cell.appendChild(dormBadge);
 
         // 主题色 L 型色标（左竖条 + 顶横条）
         const stripe = document.createElement('div');
@@ -3981,7 +5104,7 @@ const G = {
         cell.appendChild(dot);
 
         // 【增强】资源阻塞指示 — 需要输入资源的建筑如果没有传送带连接
-        const needsInput = FLOW_MAP.some(f => f.to === btype);
+        const needsInput = FLOW_TYPES_TO.has(btype);
         if (needsInput) {
           // 斜线遮罩
           const overlay = document.createElement('div');
@@ -4014,10 +5137,18 @@ const G = {
         // v2.0 §4 — 端口UI视觉渲染（基于PORT_DEFS，P2+才显示）
         if (this.phase >= 2 && portDef && (portDef.maxIn > 0 || portDef.maxOut > 0)) {
           const techExtra = this._extraOutPorts || 0;
+          // v2.1 §9.2/§9.3: 突变+转生端口加成
+          const mpb = this._mutPortBonuses?.[btype];
+          const mutExtraIn = mpb ? mpb.extraIn : 0;
+          const mutExtraOut = mpb ? mpb.extraOut : 0;
           const usedIn = getUsedPorts(i, 'in');
           const usedOut = getUsedPorts(i, 'out');
-          const totalMaxIn = portDef.maxIn;
-          const totalMaxOut = portDef.maxOut + techExtra;
+          // v3.0 §9.2: 特化端口加成
+          const specBld = this._specCache?.perBuilding?.[i];
+          const specExtraOut = (specBld?.extraOutPort || 0) + (specBld?.extraPorts || 0);
+          const specExtraIn = specBld?.extraPorts || 0;
+          const totalMaxIn = portDef.maxIn + mutExtraIn + specExtraIn;
+          const totalMaxOut = portDef.maxOut + techExtra + mutExtraOut + specExtraOut;
 
           // 输入端口（左侧半圆形）
           if (totalMaxIn > 0) {
@@ -4169,7 +5300,7 @@ const G = {
         self.showCursorTooltip('已取消建造');
         return;
       }
-      if (self.grid[idx]) self.showRecycle(idx);
+      if (self.grid[idx]) self.showBuildingContextMenu(idx, e);
     });
 
     gridEl.addEventListener('mouseenter', (e) => {
@@ -4197,38 +5328,51 @@ const G = {
         self._dragOverIdx = idx;
       }
       if (!self.grid[idx]) {
-        // 邻接预览 tooltip：空格子且有预览数据时显示加成明细
-        if (self._adjPreviewData && self._adjPreviewData[idx]) {
-          const p = self._adjPreviewData[idx];
+        const hasAdj = self._adjPreviewData && self._adjPreviewData[idx];
+        const hasSel = !!self.sel;
+        if (hasAdj || hasSel) {
           const tt = document.getElementById('tooltip');
-          const bld = BLDS[self.sel];
-          const bldName = bld ? `${bld.emoji||''} ${bld.n}` : self.sel;
-          let html = `<span style="color:#06d6a0;font-weight:700">🔗 邻接加成预览</span> — 放置 ${bldName}`;
-          // 正向加成明细
-          const forward = p.result.bonuses.filter(b => !b.isReverse);
-          if (forward.length > 0) {
-            html += `<br><span style="color:#22d3ee;font-size:0.85em;margin-top:2px;display:inline-block">▼ 自身获得：+${Math.round(p.forwardPct * 100)}%</span>`;
-            for (const b of forward) {
-              const nType = self.grid[b.neighborIdx]?.type;
-              const nBld = nType ? BLDS[nType] : null;
-              const nName = nBld ? `${nBld.emoji||''} ${nBld.n}` : '?';
-              html += `<br><span style="color:#06d6a080;font-size:0.85em">  ${b.rule.icon} ${b.rule.name} +${Math.round(b.bonus * 100)}% ← ${nName}</span>`;
+          const bld = hasSel ? BLDS[self.sel] : null;
+          const bldName = bld ? `${bld.emoji||''} ${bld.n}` : (self.sel || '');
+          let html = '';
+          let ttTitle = '';
+
+          // 邻接预览部分
+          if (hasAdj) {
+            const p = self._adjPreviewData[idx];
+            html += `<span style="color:#06d6a0;font-weight:700">🔗 邻接加成预览</span> — 放置 ${bldName}`;
+            const forward = p.result.bonuses.filter(b => !b.isReverse);
+            if (forward.length > 0) {
+              html += `<br><span style="color:#22d3ee;font-size:0.85em;margin-top:2px;display:inline-block">▼ 自身获得：+${Math.round(p.forwardPct * 100)}%</span>`;
+              for (const b of forward) {
+                const nType = self.grid[b.neighborIdx]?.type;
+                const nBld = nType ? BLDS[nType] : null;
+                const nName = nBld ? `${nBld.emoji||''} ${nBld.n}` : '?';
+                html += `<br><span style="color:#06d6a080;font-size:0.85em">  ${b.rule.icon} ${b.rule.name} +${Math.round(b.bonus * 100)}% ← ${nName}</span>`;
+              }
             }
-          }
-          // 反向加成明细
-          const reverse = p.result.bonuses.filter(b => b.isReverse);
-          if (reverse.length > 0) {
-            html += `<br><span style="color:#fbbf24;font-size:0.85em;margin-top:2px;display:inline-block">▼ 邻居受益：+${Math.round(p.reversePct * 100)}%</span>`;
-            for (const b of reverse) {
-              const nType = self.grid[b.neighborIdx]?.type;
-              const nBld = nType ? BLDS[nType] : null;
-              const nName = nBld ? `${nBld.emoji||''} ${nBld.n}` : '?';
-              html += `<br><span style="color:#fbbf2480;font-size:0.85em">  ${b.rule.icon} ${b.rule.name} +${Math.round(b.bonus * 100)}% → ${nName}</span>`;
+            const reverse = p.result.bonuses.filter(b => b.isReverse);
+            if (reverse.length > 0) {
+              html += `<br><span style="color:#fbbf24;font-size:0.85em;margin-top:2px;display:inline-block">▼ 邻居受益：+${Math.round(p.reversePct * 100)}%</span>`;
+              for (const b of reverse) {
+                const nType = self.grid[b.neighborIdx]?.type;
+                const nBld = nType ? BLDS[nType] : null;
+                const nName = nBld ? `${nBld.emoji||''} ${nBld.n}` : '?';
+                html += `<br><span style="color:#fbbf2480;font-size:0.85em">  ${b.rule.icon} ${b.rule.name} +${Math.round(b.bonus * 100)}% → ${nName}</span>`;
+              }
             }
+            html += `<br><span style="color:#fff;font-weight:700;font-size:0.9em;margin-top:3px;display:inline-block">∑ 综合加成：+${Math.round(p.totalPct * 100)}%</span>`;
+            ttTitle = `🔗 邻接分数：<span style="color:#06d6a0;font-weight:700">+${Math.round(p.totalPct * 100)}%</span>`;
           }
-          // 总计
-          html += `<br><span style="color:#fff;font-weight:700;font-size:0.9em;margin-top:3px;display:inline-block">∑ 综合加成：+${Math.round(p.totalPct * 100)}%</span>`;
-          document.getElementById('ttName').innerHTML = `🔗 邻接分数：<span style="color:#06d6a0;font-weight:700">+${Math.round(p.totalPct * 100)}%</span>`;
+
+          // v2.1: 资源冲击预览部分
+          if (hasSel) {
+            const impact = self._calcBuildImpact(self.sel, idx);
+            html += self._renderBuildImpactHTML(impact);
+            if (!ttTitle) ttTitle = `📊 ${bldName} — 建造预览`;
+          }
+
+          document.getElementById('ttName').innerHTML = ttTitle;
           document.getElementById('ttDesc').innerHTML = html;
           tt.classList.add('show');
           tt.style.left = Math.min(e.clientX + 12, window.innerWidth - 280) + 'px';
@@ -4245,7 +5389,7 @@ const G = {
       const multStr = lvl > 1 ? `<br><span style="color:var(--color-upgrade)">产出倍率: ${formatNum(self.getUpgradeMultiplier(idx), 1)}x</span>` : '';
       const beltMult = self.getBeltMultiplierForBuilding(idx);
       let capInfo = '';
-      if (bd.cons && Object.keys(bd.cons).length > 0 && FLOW_MAP.some(f => f.to === bd.key || f.to === self.grid[idx]?.type)) {
+      if (bd.cons && Object.keys(bd.cons).length > 0 && FLOW_TYPES_TO.has(bd.key || self.grid[idx]?.type)) {
         const belts = self._activeBelts || [];
         let totalCap = 0;
         const selfType = self.grid[idx]?.type;
@@ -4254,7 +5398,7 @@ const G = {
           const otherIdx = belt.fi === idx ? belt.ti : belt.fi;
           const otherG = self.grid[otherIdx];
           if (!otherG) continue;
-          if (FLOW_MAP.some(f => f.from === otherG.type && f.to === selfType)) {
+          if (FLOW_PAIR.has(otherG.type + '|' + selfType)) {
             const key = Math.min(belt.fi, belt.ti) + '-' + Math.max(belt.fi, belt.ti);
             totalCap += self.getBeltCapacity(key);
           }
@@ -4290,7 +5434,7 @@ const G = {
         if (prodEntries.length > 0 && !rateStr.includes('闲置')) {
           const bldMult = self.getUpgradeMultiplier(idx);
           const hPop = Math.min(self.pop, self._popCap()) * (self.popAlloc.harvest / 100);
-          const popMult = 1 + hPop * 0.003 * (self._popEffMult || 1);
+          const popMult = 1 + hPop * BALANCE.popHarvestBonus * (self._popEffMult || 1);
           const _gProdMult = self._prodMult || 1;
           const mult = self.gEff * popMult * (self.lEff || 1) * bldMult * beltMult * _gProdMult;
           const prodParts = prodEntries.map(([res, base]) => {
@@ -4303,7 +5447,7 @@ const G = {
         if (consEntries.length > 0 && !rateStr.includes('闲置')) {
           const bldMult = self.getUpgradeMultiplier(idx);
           const hPop = Math.min(self.pop, self._popCap()) * (self.popAlloc.harvest / 100);
-          const popMult = 1 + hPop * 0.003 * (self._popEffMult || 1);
+          const popMult = 1 + hPop * BALANCE.popHarvestBonus * (self._popEffMult || 1);
           const mult = self.gEff * popMult * (self.lEff || 1) * bldMult * beltMult;
           const consParts = consEntries.map(([res, base]) => {
             const actual = base * mult;
@@ -4349,7 +5493,7 @@ const G = {
           const baseMaint = MAINTENANCE.baseCost[tier];
           if (baseMaint && Object.keys(baseMaint).length > 0) {
             const bldLv = self.buildingLevels[idx] || 1;
-            const lvMult = 1 + (bldLv - 1) * 0.15;
+            const lvMult = 1 + (bldLv - 1) * BALANCE.maintLevelMult;
             const oh = self._maintenanceOverhead || 1;
             const parts = [];
             for (let mk in baseMaint) {
@@ -4375,12 +5519,29 @@ const G = {
         const usedIn = getUsedPorts(idx, 'in');
         const usedOut = getUsedPorts(idx, 'out');
         const techExtra = self._extraOutPorts || 0;
-        const maxOutEff = portDef.maxOut + techExtra;
-        const freeIn = portDef.maxIn - usedIn;
+        // v2.1 §9.2/§9.3: 突变+转生端口加成
+        const mpb = self._mutPortBonuses?.[gridType];
+        const mutExtraIn = mpb ? mpb.extraIn : 0;
+        const mutExtraOut = mpb ? mpb.extraOut : 0;
+        // v3.0 §9.2: 特化端口加成
+        const specBld2 = self._specCache?.perBuilding?.[idx];
+        const specExtraOut2 = (specBld2?.extraOutPort || 0) + (specBld2?.extraPorts || 0);
+        const specExtraIn2 = specBld2?.extraPorts || 0;
+        const maxInEff = portDef.maxIn + mutExtraIn + specExtraIn2;
+        const maxOutEff = portDef.maxOut + techExtra + mutExtraOut + specExtraOut2;
+        const freeIn = maxInEff - usedIn;
         const freeOut = maxOutEff - usedOut;
         const portColor = (freeIn === 0 && freeOut === 0) ? '#facc15' : (freeIn > 0 || freeOut > 0) ? '#06d6a0' : '#888';
-        portStr = `<br><span style="color:${portColor};font-size:0.9em">📥 输入: ${usedIn}/${portDef.maxIn}${freeIn > 0 ? ` (空闲${freeIn})` : ''} 📤 输出: ${usedOut}/${maxOutEff}${freeOut > 0 ? ` (空闲${freeOut})` : ''}</span>`;
+        portStr = `<br><span style="color:${portColor};font-size:0.9em">📥 输入: ${usedIn}/${maxInEff}${freeIn > 0 ? ` (空闲${freeIn})` : ''} 📤 输出: ${usedOut}/${maxOutEff}${freeOut > 0 ? ` (空闲${freeOut})` : ''}</span>`;
         if (freeIn === 0 && freeOut === 0) portStr += `<br><span style="color:#facc15;font-size:0.85em">✨ 端口满载！</span>`;
+      }
+      // v3.0 §9.2: 特化信息
+      const specInfo = self.getSpecialization(idx);
+      let specStr = '';
+      if (specInfo) {
+        specStr = `<br><span style="color:${specInfo.color};font-size:0.9em">⭐ 特化: ${specInfo.icon} ${specInfo.name} — ${specInfo.desc}</span>`;
+      } else if (SPECIALIZATIONS[self.grid[idx]?.type] && (self.buildingLevels[idx] || 1) >= 3) {
+        specStr = `<br><span style="color:#94a3b8;font-size:0.85em">⭐ 可特化（需升至Lv.3后选择）</span>`;
       }
       // 资源竞争影响
       if (self.phase >= 3) {
@@ -4396,7 +5557,7 @@ const G = {
         }
       }
       document.getElementById('ttName').innerHTML = `${bd.emoji||''} ${bd.n}${lvlStr} <span style="color:${bd.color};font-size:0.85em">[T${bd.tier||1}]</span>`;
-      document.getElementById('ttDesc').innerHTML = `${bd.d}${multStr}${rateStr}${beltStr}${adjStr}${syncStr}${portStr}${econStr}<br><span style="color:var(--color-info);font-family:'Share Tech Mono',monospace">${bd.ratio}</span><br><span style="color:var(--color-muted-dark);font-size:0.85em">拖拽移动 · 双击升级 · 右键回收 · 空白拖拽框选</span>`;
+      document.getElementById('ttDesc').innerHTML = `${bd.d}${multStr}${rateStr}${beltStr}${adjStr}${syncStr}${portStr}${specStr}${econStr}<br><span style="color:var(--color-info);font-family:'Share Tech Mono',monospace">${bd.ratio}</span><br><span style="color:var(--color-muted-dark);font-size:0.85em">拖拽移动 · 双击升级 · 右键回收 · 空白拖拽框选</span>`;
       tt.classList.add('show');
       tt.style.left = Math.min(e.clientX + 12, window.innerWidth - 240) + 'px';
       tt.style.top = Math.min(e.clientY + 12, window.innerHeight - 100) + 'px';
@@ -4511,12 +5672,13 @@ const G = {
         collectorSeq++;
       }
 
-      // 更新资源阻塞状态
+      // 更新资源阻塞状态（休眠建筑排除——它是主动停机，不是阻塞）
       const overlayEl = document.getElementById('blockOverlay-' + idx);
       const badgeEl = document.getElementById('blockBadge-' + idx);
       if (overlayEl || badgeEl) {
+        const isDormant = !!this._dormantCells[idx];
         const beltMult = this.getBeltMultiplierForBuilding(idx);
-        const isBlocked = beltMult === 0;
+        const isBlocked = !isDormant && beltMult === 0;
         const gridEl = document.getElementById('grid');
         const cellEl = gridEl && gridEl.children[idx];
         if (cellEl) {
@@ -4524,6 +5686,12 @@ const G = {
         }
         if (overlayEl) overlayEl.style.display = isBlocked ? 'block' : 'none';
         if (badgeEl) badgeEl.style.display = isBlocked ? 'block' : 'none';
+      }
+      // v2.1: 更新休眠状态badge
+      const dormBadgeEl = document.getElementById('dormantBadge-' + idx);
+      if (dormBadgeEl) {
+        const isDorm = !!this._dormantCells[idx];
+        dormBadgeEl.style.display = isDorm ? 'block' : 'none';
       }
 
       // 更新邻接加成badge
@@ -4679,8 +5847,8 @@ const G = {
     if (!cell) return;
 
     // 判断这个建筑需要哪些输入资源
-    const needsInput = FLOW_MAP.filter(f => f.to === bd.key || f.to === this.grid[idx]?.type);
-    const needsOutput = FLOW_MAP.filter(f => f.from === bd.key || f.from === this.grid[idx]?.type);
+    const needsInput = FLOW_BY_TO.get(bd.key) || FLOW_BY_TO.get(this.grid[idx]?.type) || [];
+    const needsOutput = FLOW_BY_FROM.get(bd.key) || FLOW_BY_FROM.get(this.grid[idx]?.type) || [];
     const isReceiver = needsInput.length > 0;
 
     const tip = document.createElement('div');
@@ -4829,10 +5997,7 @@ const G = {
     this._cleanupDrag();
 
     // 刷新渲染
-    this.renderGrid();
-    this.updateRates();
-    this.renderBuildings();
-    this.updateUI();
+    this.refreshAll();
 
     const bd = BLDS[srcBuilding.type];
     if (destBuilding) {
@@ -5219,10 +6384,7 @@ const G = {
     this._cleanupMultiDrag();
     this._clearBoxSelection();
 
-    this.renderGrid();
-    this.updateRates();
-    this.renderBuildings();
-    this.updateUI();
+    this.refreshAll();
 
     this.log(`➜ 整体移动了 ${selected.length} 个建筑`, 's');
     SFX.click();
@@ -5281,6 +6443,30 @@ const G = {
     }
 
     if (this.grid[idx]) { this.log('这个位置已经有建筑了', 'e'); SFX.buildFail(); return; }
+
+    // v3.0 §8: 变体限制检查
+    // 1. maxBuildings 变体 — 建筑上限8座
+    if (this._variantMaxBuildings && this.totalBuildings() >= this._variantMaxBuildings) {
+      this.log(`🔬 极简主义! 建筑上限 ${this._variantMaxBuildings} 座，无法再建造`, 'e');
+      this.showCursorTooltip(`🔬 变体限制: 建筑上限 ${this._variantMaxBuildings} 座`);
+      SFX.buildFail();
+      return;
+    }
+    // 2. randomPlacement 变体 — 随机放置位置
+    if (this._variantRandomPlace) {
+      const emptyCells = [];
+      for (let i = 0; i < this.grid.length; i++) {
+        if (!this.grid[i]) emptyCells.push(i);
+      }
+      if (emptyCells.length > 0) {
+        const randomIdx = emptyCells[Math.floor(Math.random() * emptyCells.length)];
+        if (randomIdx !== idx) {
+          this.log(`🎲 混沌培养皿! 建筑被随机放置到其他位置`, 'w');
+          this.showCursorTooltip(`🎲 变体限制: 建筑随机放置`);
+          idx = randomIdx; // 重定向到随机位置
+        }
+      }
+    }
 
     const bd = BLDS[this.sel];
     if (!bd) return;
@@ -5347,7 +6533,7 @@ const G = {
       if (beltInfoAfter.count > 0) {
         this.log(`🔗 传送带已自动连接 ×${beltInfoAfter.count}`, 's');
       } else {
-        const hasFlowRole = FLOW_MAP.some(f => f.from === this.sel || f.to === this.sel);
+        const hasFlowRole = FLOW_TYPES_FROM.has(this.sel) || FLOW_TYPES_TO.has(this.sel);
         if (hasFlowRole) {
           this.log('🔗 传送带已自动规划，放心建造！', 's');
         }
@@ -5357,7 +6543,7 @@ const G = {
       if (beltInfoAfter.count > 0) {
         this.log(`🔗 自动连接 ×${beltInfoAfter.count} | 💡 你也可以手动添加管线来优化产线`, 's');
       }
-      const hasFlowRole = FLOW_MAP.some(f => f.from === this.sel || f.to === this.sel);
+      const hasFlowRole = FLOW_TYPES_FROM.has(this.sel) || FLOW_TYPES_TO.has(this.sel);
       if (hasFlowRole) {
         this._showBeltGuide(idx, bd);
       }
@@ -5366,7 +6552,7 @@ const G = {
       if (beltInfoAfter.count > 0) {
         this.log(`🔗 检测到 ${beltInfoAfter.count} 条可用连接`, 's');
       }
-      const hasFlowRole = FLOW_MAP.some(f => f.from === this.sel || f.to === this.sel);
+      const hasFlowRole = FLOW_TYPES_FROM.has(this.sel) || FLOW_TYPES_TO.has(this.sel);
       if (hasFlowRole) {
         this._showBeltGuide(idx, bd);
       }
@@ -5396,9 +6582,234 @@ const G = {
     }
   },
 
+  // ===== BUILD IMPACT PREVIEW (建造前资源冲击预览) =====
+  _calcBuildImpact(bldType, targetIdx) {
+    const bd = BLDS[bldType];
+    if (!bd) return null;
+    const result = { cost: {}, costPct: {}, rateChanges: {}, warnings: [] };
+
+    // 1. 建造成本 & 库存占比
+    const actualCost = this.scaledCost(bldType);
+    for (let k in actualCost) {
+      result.cost[k] = actualCost[k];
+      const have = this.res[k] || 0;
+      result.costPct[k] = have > 0 ? Math.round(actualCost[k] / have * 100) : 999;
+      if (have < actualCost[k]) {
+        result.warnings.push(`${RES[k]?.icon||k} 不足`);
+      }
+    }
+
+    // 2. 预估速率变化（基于当前全局乘数的近似值）
+    if (!bd.isWonder && !bd.isBoost) {
+      // 产出侧乘数估算
+      const popEffMult = this._popEffMult || 1;
+      const harvestPop = Math.min(this.pop, this._popCap()) * (this.popAlloc.harvest / 100);
+      const popMult = 1 + harvestPop * BALANCE.popHarvestBonus * popEffMult;
+      let techBonus = 1;
+      if (bldType === 'glucoseCollector' && this._collectorBonus) techBonus += this._collectorBonus;
+      if (bldType === 'energyStation' && this._energyBonus) techBonus += this._energyBonus;
+      if (bldType === 'nitrogenFixer' && this._nitrogenBonus) techBonus += this._nitrogenBonus;
+      if (bldType === 'proteinFactory' && this._proteinBonus) techBonus += this._proteinBonus;
+      // 邻接预估
+      let adjBonus = 1;
+      if (targetIdx != null) {
+        const adjR = previewAdjacencyBonuses(targetIdx, bldType);
+        const fwd = adjR.bonuses.filter(b => !b.isReverse).reduce((s, b) => s + b.bonus, 0);
+        adjBonus = 1 + fwd;
+      }
+      const globalProdMult = this._prodMult || 1;
+      const mutGlobalBonus = 1 + (this._mutActiveEffects?.globalProdBonus || 0);
+      const gEff = this.gEff || 1;
+      const foodPwr = this._foodPowerLevel || 1;
+      const prodMult = gEff * popMult * techBonus * adjBonus * foodPwr * globalProdMult * mutGlobalBonus;
+
+      for (let k in (bd.prod || {})) {
+        const mutResBonus = 1 + (this._mutActiveEffects?.resProdBonus?.[k] || 0);
+        result.rateChanges[k] = (result.rateChanges[k] || 0) + bd.prod[k] * prodMult * mutResBonus;
+      }
+      for (let k in (bd.cons || {})) {
+        result.rateChanges[k] = (result.rateChanges[k] || 0) - bd.cons[k]; // 消耗以基础值计（Lv1无传送带）
+      }
+
+      // 3. 维护费影响
+      if (this.phase >= 2) {
+        const tier = bd.phase || 1;
+        const baseMaint = MAINTENANCE.baseCost[tier];
+        if (baseMaint && !MAINTENANCE.exempt.includes(bldType)) {
+          const totalBld = this.totalBuildings();
+          const excess = Math.max(0, totalBld + 1 - MAINTENANCE.overheadThreshold);
+          const overhead = Math.min(1 + excess * MAINTENANCE.overheadRate, MAINTENANCE.maxOverhead);
+          for (let k in baseMaint) {
+            result.rateChanges[k] = (result.rateChanges[k] || 0) - baseMaint[k] * overhead;
+          }
+        }
+      }
+
+      // 4. 核心供给检查
+      if (bd.corePowered) {
+        const cc = CORE_COLONY[this.phase] || CORE_COLONY[1];
+        const maxC = (cc.maxCollectors || 2) + (this._coreBonus || 0);
+        const cur = this.bldCount(bldType);
+        if (cur >= maxC) {
+          result.warnings.push('⚠ 超出核心供给上限（将闲置）');
+        }
+      }
+
+      // 5. 关键资源警告：建造后某资源净速率变负
+      for (let k in result.rateChanges) {
+        const curRate = this.rates[k] || 0;
+        const newRate = curRate + result.rateChanges[k];
+        if (curRate >= 0 && newRate < -0.01) {
+          result.warnings.push(`⚠ ${RES[k]?.icon||k} 将变为赤字`);
+        }
+      }
+    } else if (bd.isBoost) {
+      result.rateChanges = { _boost: 0.12 }; // 全局+12%
+    }
+
+    return result;
+  },
+
+  _renderBuildImpactHTML(impact) {
+    if (!impact) return '';
+    let html = `<br><span style="color:var(--bright);font-weight:700;font-size:0.9em;margin-top:4px;display:inline-block;border-top:1px solid rgba(150,170,190,0.15);padding-top:4px;width:100%">📊 建造冲击预览</span>`;
+
+    // 建造成本
+    html += `<br><span style="color:var(--dim);font-size:0.82em">建造花费：</span>`;
+    for (let k in impact.cost) {
+      const pct = impact.costPct[k];
+      const color = pct > 90 ? '#ef4444' : pct > 60 ? '#f59e0b' : '#22c55e';
+      html += `<span style="color:${color};font-size:0.82em"> ${RES[k]?.icon||k}${formatNum(impact.cost[k])}(${pct}%)</span>`;
+    }
+
+    // 速率变化
+    const rKeys = Object.keys(impact.rateChanges).filter(k => k !== '_boost' && Math.abs(impact.rateChanges[k]) > 0.005);
+    if (rKeys.length > 0) {
+      html += `<br><span style="color:var(--dim);font-size:0.82em">速率影响（/秒）：</span>`;
+      for (const k of rKeys) {
+        const v = impact.rateChanges[k];
+        const sign = v > 0 ? '+' : '';
+        const color = v > 0 ? '#22c55e' : '#ef4444';
+        html += `<br><span style="color:${color};font-size:0.82em;padding-left:8px">${RES[k]?.icon||k} ${sign}${formatNum(v, 2)}/s</span>`;
+        // 显示建造后的新净速率
+        const curRate = this.rates[k] || 0;
+        const newRate = curRate + v;
+        const nColor = newRate >= 0 ? 'var(--dim)' : '#ef4444';
+        html += `<span style="color:${nColor};font-size:0.75em"> (${formatNum(curRate, 2)}→${formatNum(newRate, 2)})</span>`;
+      }
+    }
+    if (impact.rateChanges._boost) {
+      html += `<br><span style="color:#14b8a6;font-size:0.82em;padding-left:8px">✦ 全局产出 +${Math.round(impact.rateChanges._boost * 100)}%</span>`;
+    }
+
+    // 警告
+    if (impact.warnings.length > 0) {
+      for (const w of impact.warnings) {
+        html += `<br><span style="color:#ef4444;font-weight:700;font-size:0.82em">${w}</span>`;
+      }
+    }
+
+    return html;
+  },
+
+  // ===== BUILDING DORMANCY (建筑休眠) =====
+  _dormantCells: {}, // { cellIdx: true }
+
+  isDormant(idx) {
+    return !!this._dormantCells[idx];
+  },
+
+  toggleDormant(idx) {
+    const g = this.grid[idx];
+    if (!g || !BLDS[g.type]) return;
+    const bd = BLDS[g.type];
+    if (bd.isWonder) { this.log('奇观不可休眠', 'w'); return; }
+    if (bd.corePowered) { this.log('核心供能建筑不可休眠', 'w'); return; }
+
+    if (this._dormantCells[idx]) {
+      // 唤醒
+      delete this._dormantCells[idx];
+      this.log(`▸ ${bd.emoji||''} ${bd.n} 已唤醒`, 's');
+      SFX.build();
+    } else {
+      // 休眠
+      this._dormantCells[idx] = true;
+      this.log(`💤 ${bd.emoji||''} ${bd.n} 已休眠 — 停止生产，维护费降至25%`, 'w');
+      SFX.click();
+    }
+
+    this.refreshAll();
+  },
+
   // ===== RECYCLE =====
   recycleIdx: null,
   RECYCLE_RATE: 0.5, // 返还50%资源
+
+  // ===== BUILDING CONTEXT MENU (右键菜单) =====
+  showBuildingContextMenu(idx, e) {
+    const g = this.grid[idx];
+    if (!g || !BLDS[g.type]) return;
+    const bd = BLDS[g.type];
+
+    // 移除旧的上下文菜单
+    document.getElementById('bldContextMenu')?.remove();
+
+    const menu = document.createElement('div');
+    menu.id = 'bldContextMenu';
+    menu.style.cssText = `position:fixed;z-index:10010;background:rgba(6,10,18,0.96);border:1px solid rgba(150,170,190,0.25);border-radius:6px;padding:6px;box-shadow:0 4px 20px rgba(0,0,0,0.6);font-size:0.82em;min-width:140px`;
+
+    const isDormant = this.isDormant(idx);
+    const canDormant = !bd.isWonder && !bd.corePowered;
+
+    let html = `<div style="color:var(--bright);font-weight:700;padding:4px 8px;border-bottom:1px solid rgba(150,170,190,0.12);margin-bottom:4px">${bd.emoji||''} ${bd.n}</div>`;
+
+    // 休眠/唤醒按钮
+    if (canDormant) {
+      if (isDormant) {
+        html += `<div class="ctx-item ctx-wake" data-action="dormant" style="display:flex;align-items:center;gap:6px;padding:6px 8px;cursor:pointer;border-radius:4px;color:#22c55e;transition:background 0.15s" onmouseenter="this.style.background='rgba(34,197,94,0.1)'" onmouseleave="this.style.background=''">☀️ 唤醒</div>`;
+      } else {
+        html += `<div class="ctx-item ctx-dormant" data-action="dormant" style="display:flex;align-items:center;gap:6px;padding:6px 8px;cursor:pointer;border-radius:4px;color:#fbbf24;transition:background 0.15s" onmouseenter="this.style.background='rgba(251,191,36,0.1)'" onmouseleave="this.style.background=''">💤 休眠</div>`;
+      }
+    }
+
+    // 回收按钮
+    html += `<div class="ctx-item ctx-recycle" data-action="recycle" style="display:flex;align-items:center;gap:6px;padding:6px 8px;cursor:pointer;border-radius:4px;color:#ef4444;transition:background 0.15s" onmouseenter="this.style.background='rgba(239,68,68,0.1)'" onmouseleave="this.style.background=''">♻️ 回收</div>`;
+
+    menu.innerHTML = html;
+
+    // 定位
+    const x = (e?.clientX || 200);
+    const y = (e?.clientY || 200);
+    menu.style.left = Math.min(x, window.innerWidth - 160) + 'px';
+    menu.style.top = Math.min(y, window.innerHeight - 120) + 'px';
+
+    // 事件
+    menu.addEventListener('click', (ev) => {
+      const item = ev.target.closest('[data-action]');
+      if (!item) return;
+      menu.remove();
+      if (item.dataset.action === 'dormant') {
+        this.toggleDormant(idx);
+      } else if (item.dataset.action === 'recycle') {
+        this.showRecycle(idx);
+      }
+    });
+
+    // 点击其他地方关闭
+    const closeHandler = (ev) => {
+      if (!menu.contains(ev.target)) {
+        menu.remove();
+        document.removeEventListener('click', closeHandler, true);
+        document.removeEventListener('contextmenu', closeHandler, true);
+      }
+    };
+    setTimeout(() => {
+      document.addEventListener('click', closeHandler, true);
+      document.addEventListener('contextmenu', closeHandler, true);
+    }, 50);
+
+    document.body.appendChild(menu);
+  },
 
   showRecycle(idx) {
     const g = this.grid[idx];
@@ -5453,6 +6864,13 @@ const G = {
     this.grid[idx] = null;
     this.recycleIdx = null;
     this.stats.totalRecycled++;
+    // v2.1: 回收时清除休眠状态
+    delete this._dormantCells[idx];
+    // v3.0 §9.2: 回收时清除特化
+    if (this._specializations?.[idx]) {
+      delete this._specializations[idx];
+      this._recalcSpecEffects();
+    }
     // 清理与该格子相关的传送带等级记录
     for (const key of Object.keys(this.beltLevels)) {
       const [a, b] = key.split('-').map(Number);
@@ -5469,10 +6887,7 @@ const G = {
     this._hidePopup('recyclePopup');
     this._hideBackdrop();
 
-    this.renderGrid();
-    this.updateRates();
-    this.renderBuildings();
-    this.updateUI();
+    this.refreshAll();
   },
 
   cancelRecycle() {
@@ -5483,6 +6898,8 @@ const G = {
 
   // ===== ACHIEVEMENTS =====
   checkAchievements() {
+    // v3.0 §8.5: 创造模式不记录成就
+    if (this._creativeMode) return;
     const prevCount = Object.keys(this.achievements).length;
 
     for (const a of ACHIEVE) {
@@ -5896,6 +7313,17 @@ const G = {
     const timePenalty = Math.min(Math.floor(hours * 50), Math.floor(score * 0.15)); // 最多扣15%
     score -= timePenalty;
 
+    // 12. 转生经验 — 老玩家应该有更高的分数上限
+    score += (this.prestigeCount || 0) * 100;
+
+    // 13. 变体通关 — 高难度 = 高分
+    const variantCount = Object.keys(this._completedVariants || {}).length;
+    score += variantCount * 300;
+    if (variantCount >= 6) score += 2000; // 全变体额外大分
+
+    // 14. 催化剂使用效率
+    score += Math.min((this.stats.catalystUseCount || 0), 50) * 20;
+
     return Math.max(0, Math.floor(score));
   },
 
@@ -5909,6 +7337,87 @@ const G = {
     if (score >= 600)  return { rank:'C',   color:'#22c55e', glow:false };
     if (score >= 200)  return { rank:'D',   color:'#6b7280', glow:false };
     return { rank:'E', color:'#4b5563', glow:false };
+  },
+
+  // ===== 评级首次达成奖励 =====
+  // 按评级从低到高排列，每个评级首次达成给一次性奖励（跨世保留）
+  _RATING_REWARDS: [
+    { rank:'D', min:200,  rewards:{ energy:30 } },
+    { rank:'C', min:600,  rewards:{ energy:50, dna:20 } },
+    { rank:'B', min:1200, rewards:{ energy:100, dna:30, protein:15 } },
+    { rank:'A', min:2000, rewards:{ energy:200, dna:50, protein:30 } },
+    { rank:'S', min:3000, rewards:{ energy:300, dna:80, protein:40, biomass:20 } },
+    { rank:'SS', min:4000, rewards:{ energy:500, dna:120, protein:60, biomass:30 } },
+    { rank:'SSS', min:5000, rewards:{ energy:1000, dna:200, protein:100, biomass:50 } },
+  ],
+
+  // 检查并发放评级奖励（在 UI tick 中调用）
+  _checkRatingRewards(score) {
+    const { rank } = this._scoreRank(score);
+    if (rank === 'E') return; // E级无奖励
+    const claimed = this._ratingRewardsClaimed || {};
+    for (const rr of this._RATING_REWARDS) {
+      if (score >= rr.min && !claimed[rr.rank]) {
+        // 首次达成！
+        claimed[rr.rank] = true;
+        this._ratingRewardsClaimed = claimed;
+        // 发放奖励
+        const parts = [];
+        for (const k in rr.rewards) {
+          this.res[k] = (this.res[k] || 0) + rr.rewards[k];
+          parts.push(`+${rr.rewards[k]}${RES[k]?.icon||k}`);
+        }
+        const { color } = this._scoreRank(score);
+        this.log(`🏅 评级 ${rr.rank} 首次达成！奖励: ${parts.join(' ')}`, 's');
+        this.showEvent(`🏅 评级 ${rr.rank} 达成！`, `恭喜首次达到 ${rr.rank} 评级！\n\n🎁 奖励: ${parts.join(' ')}\n\n继续加油冲击更高评级！`, color);
+        SFX.achieve();
+        this.screenShake(6);
+        // 持久化到 prestige 数据
+        this._saveRatingRewardsToPrestige();
+        break; // 一次只弹一个，下一 tick 继续检测
+      }
+    }
+  },
+
+  // 将评级奖励状态同步到 prestige 数据（跨世保留）
+  _saveRatingRewardsToPrestige() {
+    try {
+      const pd = localStorage.getItem('bioSpherePrestige');
+      if (!pd) return;
+      const pData = JSON.parse(pd);
+      pData.ratingRewardsClaimed = this._ratingRewardsClaimed || {};
+      localStorage.setItem('bioSpherePrestige', JSON.stringify(pData));
+    } catch(e) { /* ignore */ }
+  },
+
+  // ===== 传奇分 — 跨世累计成就评分，永不重置 =====
+  calcLegacyScore() {
+    let ls = 0;
+    // 历史最高当世分
+    const highScore = parseInt(localStorage.getItem('bioHighScore') || '0', 10);
+    ls += Math.max(this.calcScore(), highScore);
+    // 转生次数
+    ls += (this.prestigeCount || 0) * 200;
+    // 变体通关
+    const variantCount = Object.keys(this._completedVariants || {}).length;
+    ls += variantCount * 500;
+    if (variantCount >= 6) ls += 2000; // 全通关额外
+    // 催化剂使用次数 (上限50次计分)
+    ls += Math.min((this.stats.catalystUseCount || 0), 50) * 30;
+    // 蓝图收藏
+    ls += (this._blueprints || []).length * 50;
+    // 成就完成率 (100%=3000分)
+    const achieveRate = Object.keys(this.achievements).length / Math.max(ACHIEVE.length, 1);
+    ls += Math.floor(achieveRate * 3000);
+    // 最快奇观时间奖励
+    const fw = this._fastestWonder;
+    if (fw && fw <= 600) ls += 1500;
+    else if (fw && fw <= 900) ls += 1000;
+    else if (fw && fw <= 1200) ls += 500;
+    // 多菌株/创造模式解锁
+    if (this._multiStrainUnlocked) ls += 500;
+    if (this._creativeAvailable) ls += 300;
+    return Math.floor(ls);
   },
 
   // 右键显示评级说明 tooltip
@@ -5960,7 +7469,7 @@ const G = {
       </div>
       ${rows}
       <div style="text-align:center;margin-top:8px;padding-top:6px;border-top:1px solid rgba(255,255,255,0.04);color:var(--dim);font-size:0.75em">
-        分数 = 阶段 + 进化 + 建筑 + 科技 + 成就 + 挑战 + 资源峰值 + 效率 + 邻接加成 − 时间惩罚
+        分数 = 阶段 + 进化 + 建筑 + 科技 + 成就 + 挑战 + 资源峰值 + 效率 + 邻接加成 + 转生 + 变体 + 催化 − 时间惩罚
       </div>
     `;
 
@@ -6073,6 +7582,9 @@ const G = {
   _lbLastFetch: 0,
   _miniLbCache: null,
   _miniLbLastFetch: 0,
+  // v1.0.2: 排名头衔系统
+  _lbRankTitle: null,     // 当前头衔 { title, color, effBonus }
+  _lbMyPosition: 99,      // 当前排名位置
 
   // 初始化玩家 ID 和昵称
   _initPlayer() {
@@ -6192,6 +7704,8 @@ const G = {
       wonder: this.wonderComplete,
       online_time: Math.floor(this.stats.onlineTime),
       score_sig: sig,
+      legacy_score: this.calcLegacyScore(),
+      prestige_count: this.prestigeCount || 0,
       updated_at: new Date().toISOString()
     };
 
@@ -6207,6 +7721,8 @@ const G = {
       if (error && (error.code === '42703' || error.code === 'PGRST204' || error.message?.includes('could not find') || error.message?.includes('does not exist'))) {
         delete data.score_sig;
         delete data.online_time;
+        delete data.legacy_score;
+        delete data.prestige_count;
         ({ error } = await window.supa
           .from('leaderboard')
           .upsert(data, { onConflict: 'player_id' }));
@@ -6238,6 +7754,20 @@ const G = {
     }
   },
 
+  // ★ 转生前保存最高分到 Supabase + localStorage
+  _saveHighScoreBeforePrestige() {
+    const score = this.calcScore();
+    // 更新 localStorage 最高分
+    const oldBest = parseInt(localStorage.getItem('bioHighScore') || '0', 10);
+    if (score > oldBest) {
+      localStorage.setItem('bioHighScore', String(score));
+    }
+    // 提交到 Supabase（确保排行榜记录巅峰状态而非转生后归零）
+    if (window.supaReady && window.supa && this._playerName) {
+      this.submitScore(); // 提交当前分数（转生前的巅峰分）
+    }
+  },
+
   // 自动提交（save 时静默同步，节流 5 分钟一次）
   _lastAutoSubmit: 0,
   _autoSubmitScore() {
@@ -6249,12 +7779,34 @@ const G = {
   },
 
   // === 排行榜 UI ===
+  _lbActiveTab: 'current', // 'current' | 'legacy'
+
   showLeaderboard() {
     const pop = document.getElementById('leaderboardPopup');
     if (!pop) return;
     pop.classList.add('show');
     this._showBackdrop();
+    this._lbActiveTab = 'current';
+    this._updateLbTabs();
     this.refreshLeaderboard();
+  },
+
+  switchLbTab(tab) {
+    this._lbActiveTab = tab;
+    this._updateLbTabs();
+    if (tab === 'current') {
+      if (this._lbCache) this._renderLeaderboard(this._lbCache);
+      else this.refreshLeaderboard();
+    } else {
+      if (this._legacyLbCache) this._renderLegacyLeaderboard(this._legacyLbCache);
+      else this.refreshLegacyLeaderboard();
+    }
+  },
+
+  _updateLbTabs() {
+    document.querySelectorAll('#lbTabs .lb-tab').forEach(t => {
+      t.classList.toggle('active', t.dataset.tab === this._lbActiveTab);
+    });
   },
 
   closeLeaderboard() {
@@ -6293,6 +7845,8 @@ const G = {
       }));
       this._lbCache = entries;
       this._lbLastFetch = Date.now();
+      // v1.0.2: 检测自己的排名并更新头衔
+      this._updateRankTitle(entries);
       this._renderLeaderboard(entries);
       // 同步更新迷你排行榜
       const top3 = entries.slice(0, 3).map(e => ({ id: e.id, name: e.name, score: e.score, rank: e.rank }));
@@ -6426,6 +7980,201 @@ const G = {
     const d = document.createElement('div');
     d.textContent = s;
     return d.innerHTML;
+  },
+
+  // ===== 排名头衔系统 =====
+  // 排名→头衔映射
+  _RANK_TITLE_DEFS: [
+    { maxRank: 1,  title: '👑 至高菌皇', color: '#fbbf24', effBonus: 0.05 },
+    { maxRank: 3,  title: '🏆 传奇元老', color: '#fbbf24', effBonus: 0.03 },
+    { maxRank: 10, title: '⭐ 精英领主', color: '#a855f7', effBonus: 0.01 },
+    { maxRank: 20, title: '🌟 荣耀先驱', color: '#3b82f6', effBonus: 0 },
+  ],
+
+  _updateRankTitle(entries) {
+    const myId = this._playerId;
+    if (!myId) return;
+    const idx = entries.findIndex(e => e.id === myId);
+    const position = idx >= 0 ? idx + 1 : 99;
+    this._lbMyPosition = position;
+    const oldTitle = this._lbRankTitle;
+    let newTitle = null;
+    for (const def of this._RANK_TITLE_DEFS) {
+      if (position <= def.maxRank) {
+        newTitle = { ...def, position };
+        break;
+      }
+    }
+    this._lbRankTitle = newTitle;
+
+    // 如果头衔变化了，通知玩家
+    if (newTitle && (!oldTitle || oldTitle.title !== newTitle.title)) {
+      this.log(`🏅 排行榜头衔: ${newTitle.title}${newTitle.effBonus > 0 ? ` (全局效率 +${(newTitle.effBonus*100).toFixed(0)}%)` : ''}`, 's');
+      if (newTitle.effBonus > 0) {
+        this.showCursorTooltip(`${newTitle.title} — 效率 +${(newTitle.effBonus*100).toFixed(0)}%`);
+      }
+    }
+
+    // 更新昵称显示的头衔
+    this._updateTitleDisplay();
+  },
+
+  // 获取当前排名头衔的效率加成
+  getRankTitleBonus() {
+    return this._lbRankTitle?.effBonus || 0;
+  },
+
+  // 更新头衔在 UI 上的显示
+  _updateTitleDisplay() {
+    const titleEl = document.getElementById('empireTitleDisplay');
+    if (!titleEl) return;
+    if (this._lbRankTitle) {
+      // 排名头衔优先级高于帝国称号，追加显示
+      const lbBadge = document.getElementById('lbRankBadge');
+      if (!lbBadge) {
+        const badge = document.createElement('span');
+        badge.id = 'lbRankBadge';
+        badge.style.cssText = `font-size:0.72em;color:${this._lbRankTitle.color};margin-left:6px;`;
+        badge.textContent = `[${this._lbRankTitle.title}]`;
+        titleEl.parentElement?.appendChild(badge);
+      } else {
+        lbBadge.textContent = `[${this._lbRankTitle.title}]`;
+        lbBadge.style.color = this._lbRankTitle.color;
+      }
+    }
+  },
+
+  // ===== 传奇榜（Legacy Leaderboard）=====
+  _legacyLbCache: null,
+  _legacyLbLastFetch: 0,
+
+  async refreshLegacyLeaderboard() {
+    const listEl = document.getElementById('leaderboardList');
+    if (!listEl) return;
+
+    if (!window.supaReady || !window.supa) {
+      listEl.innerHTML = '<div style="text-align:center;color:var(--orange);padding:20px 0">⚠ 排行榜服务未连接</div>';
+      return;
+    }
+
+    listEl.innerHTML = '<div style="text-align:center;color:var(--dim);padding:20px 0">加载传奇榜...</div>';
+
+    try {
+      // 尝试按 legacy_score 排序获取传奇榜数据
+      const { data, error } = await window.supa
+        .from('leaderboard')
+        .select('player_id, name, score, rank, phase, buildings, wonder, legacy_score, prestige_count')
+        .order('legacy_score', { ascending: false })
+        .limit(20);
+
+      if (error) {
+        // 如果 legacy_score 列不存在，回退到按 score 排序 + 本地计算
+        if (error.message?.includes('does not exist') || error.code === '42703') {
+          this._renderLegacyFallback();
+          return;
+        }
+        throw error;
+      }
+
+      const entries = (data || []).map(r => ({
+        id: r.player_id,
+        name: r.name,
+        score: r.score,
+        rank: r.rank,
+        phase: r.phase,
+        buildings: r.buildings,
+        wonder: r.wonder,
+        legacyScore: r.legacy_score || r.score,
+        prestigeCount: r.prestige_count || 0,
+      }));
+      this._legacyLbCache = entries;
+      this._legacyLbLastFetch = Date.now();
+      this._renderLegacyLeaderboard(entries);
+    } catch (err) {
+      console.error('Legacy leaderboard error:', err);
+      listEl.innerHTML = '<div style="text-align:center;color:var(--red);padding:20px 0">加载失败</div>';
+    }
+  },
+
+  // 传奇榜 legacy_score 列不存在时的回退方案（用 score 代替）
+  _renderLegacyFallback() {
+    const listEl = document.getElementById('leaderboardList');
+    if (!listEl) return;
+    // 使用缓存的当世榜数据，添加本地传奇分
+    const entries = (this._lbCache || []).map(e => ({
+      ...e,
+      legacyScore: e.score,
+      prestigeCount: 0,
+    }));
+    // 把自己的真实传奇分加上
+    const myId = this._playerId;
+    const myEntry = entries.find(e => e.id === myId);
+    if (myEntry) {
+      myEntry.legacyScore = this.calcLegacyScore();
+      myEntry.prestigeCount = this.prestigeCount || 0;
+    }
+    entries.sort((a, b) => b.legacyScore - a.legacyScore);
+    this._legacyLbCache = entries;
+    this._renderLegacyLeaderboard(entries);
+  },
+
+  _renderLegacyLeaderboard(entries) {
+    const listEl = document.getElementById('leaderboardList');
+    if (!listEl) return;
+    if (this._lbActiveTab !== 'legacy') return; // 防止 tab 切换竞态
+
+    if (!entries || entries.length === 0) {
+      listEl.innerHTML = '<div style="text-align:center;color:var(--dim);padding:20px 0">传奇榜暂无数据，快去冲击更高排名！</div>';
+      return;
+    }
+
+    const myId = this._playerId;
+    // 排名头衔映射
+    const RANK_TITLES = [
+      { rank: 1, title: '👑 至高菌皇', color: '#fbbf24' },
+      { rank: 2, title: '🏆 传奇元老', color: '#fbbf24' },
+      { rank: 3, title: '🏆 传奇元老', color: '#fbbf24' },
+    ];
+
+    let html = '<div class="lb-legacy-title"><span>🏛️</span><span>传奇榜 — 跨世累计成就</span></div>';
+    entries.forEach((e, i) => {
+      const isMe = e.id === myId;
+      const rankNum = i + 1;
+      const medal = rankNum <= 3 ? ['🥇','🥈','🥉'][i] : `<span style="color:var(--dim)">${rankNum}</span>`;
+      const { color: rankColor } = this._scoreRank(e.legacyScore || e.score);
+      const titleInfo = RANK_TITLES.find(t => t.rank === rankNum);
+      const titleBadge = titleInfo ? `<span style="font-size:0.72em;color:${titleInfo.color}">${titleInfo.title}</span>` : '';
+      const prestStr = e.prestigeCount > 0 ? `♻️${e.prestigeCount}世` : '';
+      const detailBits = [prestStr, `P${e.phase || 1}`].filter(Boolean);
+      if (e.wonder) detailBits.push('☀️');
+
+      html += `
+        <div class="lb-row ${isMe ? 'lb-me' : ''}">
+          <div class="lb-rank">${medal}</div>
+          <div class="lb-name" ${isMe ? 'style="color:var(--cyan)"' : ''}>${this._escHtml(e.name || '???')}${isMe ? ' <span style="font-size:0.8em;color:var(--cyan)">(我)</span>' : ''} ${titleBadge}</div>
+          <div class="lb-score" style="color:${rankColor}">${formatNum(e.legacyScore || e.score || 0)}</div>
+          <div class="lb-grade" style="color:${rankColor};background:${rankColor}15;border:1px solid ${rankColor}30">${e.rank || 'E'}</div>
+          <div class="lb-detail">${detailBits.join(' ')}</div>
+        </div>`;
+    });
+
+    // 如果自己不在列表中
+    if (myId && !entries.find(e => e.id === myId) && this._playerName) {
+      const myLegacy = this.calcLegacyScore();
+      const { rank, color: myColor } = this._scoreRank(myLegacy);
+      html += `
+        <div style="border-top:1px solid rgba(255,255,255,0.06);margin-top:6px;padding-top:6px">
+          <div class="lb-row lb-me">
+            <div class="lb-rank"><span style="color:var(--dim)">—</span></div>
+            <div class="lb-name" style="color:var(--cyan)">${this._escHtml(this._playerName)} <span style="font-size:0.8em">(我)</span></div>
+            <div class="lb-score" style="color:${myColor}">${formatNum(myLegacy)}</div>
+            <div class="lb-grade" style="color:${myColor};background:${myColor}15;border:1px solid ${myColor}30">${rank}</div>
+            <div class="lb-detail">♻️${this.prestigeCount || 0}世 P${this.phase}</div>
+          </div>
+        </div>`;
+    }
+
+    listEl.innerHTML = html;
   },
 
   // ===== 游戏修改建议 =====
@@ -6610,6 +8359,39 @@ const G = {
       const ruleBonus = rule.bonus * stacks;
       totalBonus += ruleBonus;
       details.push({ name: rule.name, icon: rule.icon, bonus: ruleBonus, count: stacks });
+      // v2.1 §10.4: 追踪已发现的邻接规则
+      const rIdx = ADJACENCY_RULES.indexOf(rule);
+      if (!this._discoveredAdj) this._discoveredAdj = {};
+      if (!this._discoveredAdj[rIdx]) {
+        this._discoveredAdj[rIdx] = true;
+        // v3.0 §9.1: 邻接发现奖励
+        const adjCount = Object.keys(this._discoveredAdj).length;
+        // 连续发现追踪（30秒窗口）
+        const now = Date.now();
+        if (!this._adjDiscoverTimes) this._adjDiscoverTimes = [];
+        this._adjDiscoverTimes.push(now);
+        // 清理30秒前的记录
+        this._adjDiscoverTimes = this._adjDiscoverTimes.filter(t => now - t < 30000);
+        const streak = this._adjDiscoverTimes.length;
+        // 基础奖励: +5⚡ +3🟢
+        let rewardMult = 1.0;
+        if (streak >= 2) rewardMult = 1.5; // 连续发现+50%
+        const eReward = Math.round(5 * rewardMult);
+        const gReward = Math.round(3 * rewardMult);
+        this.res.energy = (this.res.energy || 0) + eReward;
+        this.res.glucose = (this.res.glucose || 0) + gReward;
+        const streakStr = streak >= 2 ? ` 🔥×${streak}连续!` : '';
+        this.log(`🔗 发现邻接: ${rule.icon} ${rule.name} — +${eReward}⚡ +${gReward}🟢${streakStr} (${adjCount}条)`, 'ev');
+        this.showMilestone(rule.icon, rule.name);
+        // 每5条里程碑: 临时+5%产出60秒
+        if (adjCount > 0 && adjCount % 5 === 0) {
+          this._adjMilestoneBonus = (this._adjMilestoneBonus || 0) + 0.05;
+          this.log(`📊 邻接里程碑 ${adjCount}条! +5%产出加成(60秒)`, 's');
+          setTimeout(() => {
+            this._adjMilestoneBonus = Math.max(0, (this._adjMilestoneBonus || 0) - 0.05);
+          }, 60000);
+        }
+      }
     }
 
     // v2.0 §10.5: 虚拟邻接（传送带直连建筑，加成为物理邻接的50%，最多2条）
@@ -6647,6 +8429,30 @@ const G = {
         const ruleBonus = rule.bonus * stacks * 0.5; // 虚拟邻接50%
         totalBonus += ruleBonus;
         details.push({ name: rule.name + '(管线)', icon: '🔗', bonus: ruleBonus, count: stacks });
+
+        // v3.0 §9.1: 虚拟邻接发现追踪 + 远距专属奖励
+        const vRIdx = ADJACENCY_RULES.indexOf(rule);
+        const vKey = 'v' + vRIdx; // 虚拟发现用 'v' 前缀区分
+        if (!this._discoveredAdj) this._discoveredAdj = {};
+        if (!this._discoveredAdj[vKey]) {
+          this._discoveredAdj[vKey] = true;
+          // 同时标记物理索引（使邻接图鉴也显示为已发现）
+          if (!this._discoveredAdj[vRIdx]) this._discoveredAdj[vRIdx] = true;
+          // 远距专属奖励: +8⚡ + "远程共振" badge
+          this.res.energy = (this.res.energy || 0) + 8;
+          this.log(`📡 远程共振! 发现管线邻接: ${rule.icon} ${rule.name}(管线) — +8⚡`, 'ev');
+          this.showMilestone('📡', '远程共振·' + rule.name);
+          if (typeof SFX !== 'undefined') SFX.milestone();
+          // 也纳入总邻接计数（影响里程碑等）
+          const totalAdj = Object.keys(this._discoveredAdj).length;
+          if (totalAdj > 0 && totalAdj % 5 === 0) {
+            this._adjMilestoneBonus = (this._adjMilestoneBonus || 0) + 0.05;
+            this.log(`📊 邻接里程碑 ${totalAdj}条! +5%产出加成(60秒)`, 's');
+            setTimeout(() => {
+              this._adjMilestoneBonus = Math.max(0, (this._adjMilestoneBonus || 0) - 0.05);
+            }, 60000);
+          }
+        }
       }
     }
 
@@ -6656,6 +8462,22 @@ const G = {
       const extra = totalBonus * mutAdjBonus;
       totalBonus += extra;
       details.push({ name: '突变增幅', icon: '🧬', bonus: extra, count: 1 });
+    }
+
+    // v3.0 §9.2: 建筑特化邻接加成（biofilm_adj）
+    const specPerBld = this._specCache?.perBuilding?.[idx];
+    if (specPerBld?.adjBonusMult && totalBonus > 0) {
+      const extra = totalBonus * (specPerBld.adjBonusMult - 1);
+      totalBonus += extra;
+      details.push({ name: '特化增幅', icon: '🛡️', bonus: extra, count: 1 });
+    }
+
+    // v3.0 §8.3: 邻接催化剂加成
+    const catAdjValue = this._getCatalystValue('adjMult');
+    if (catAdjValue > 0 && totalBonus > 0) {
+      const extra = totalBonus * catAdjValue;
+      totalBonus += extra;
+      details.push({ name: '催化增幅', icon: '🔗', bonus: extra, count: 1 });
     }
 
     return { bonus: totalBonus, details };
@@ -6695,6 +8517,77 @@ const G = {
     this._adjStatsCacheTime = 0;
   },
 
+  // v2.1 §10.4: 邻接图鉴面板
+  showAdjGuide() {
+    const disc = this._discoveredAdj || {};
+    const discovered = Object.keys(disc).length;
+    const unlocked = this.getUnlockedAdjacencyCount();
+    const total = ADJACENCY_RULES.length;
+    const pct = unlocked > 0 ? Math.round(discovered / unlocked * 100) : 0;
+
+    // 分类显示
+    const categories = {
+      '同类协同': [], '核心供给链': [], '特殊增益': [],
+      '跨阶段协同': [], '旁路专属': [], '发酵液泡': [],
+    };
+    const catNames = ['同类协同', '核心供给链', '特殊增益', '跨阶段协同', '旁路专属', '发酵液泡'];
+    let catIdx = 0;
+    for (let i = 0; i < ADJACENCY_RULES.length; i++) {
+      const rule = ADJACENCY_RULES[i];
+      // 根据规则索引确定类别（参照ADJACENCY_RULES的分段注释）
+      if (i <= 6) catIdx = 0;
+      else if (i <= 39) catIdx = 1;
+      else if (i <= 46) catIdx = 2;
+      else if (i <= 54) catIdx = 3;
+      else if (i <= 67) catIdx = 4;
+      else catIdx = 5;
+      const cat = catNames[catIdx];
+      const isUnlocked = !rule.phase || rule.phase <= this.phase;
+      const isDiscovered = !!disc[i];
+      categories[cat].push({ rule, idx: i, isUnlocked, isDiscovered });
+    }
+
+    let html = `<div style="max-height:70vh;overflow-y:auto;padding:8px">`;
+    html += `<div style="text-align:center;margin-bottom:8px">`;
+    html += `<div style="font-size:1.1em;font-weight:700;color:var(--cyan)">🔗 邻接图鉴</div>`;
+    html += `<div style="color:var(--dim);font-size:0.8em;margin-top:4px">已发现 ${discovered}/${unlocked} | 解锁率 ${pct}% | 总规则 ${total}</div>`;
+    // 进度条
+    html += `<div style="width:100%;height:6px;background:#333;border-radius:3px;margin-top:6px"><div style="width:${pct}%;height:100%;background:linear-gradient(90deg,#14b8a6,#06d6a0);border-radius:3px;transition:width 0.3s"></div></div>`;
+    html += `</div>`;
+
+    for (const catName of catNames) {
+      const items = categories[catName];
+      if (items.length === 0) continue;
+      const discCount = items.filter(it => it.isDiscovered).length;
+      html += `<div style="margin-top:10px;font-weight:600;color:#ccc;font-size:0.78em;border-bottom:1px solid #333;padding-bottom:3px">${catName} <span style="color:var(--dim)">(${discCount}/${items.length})</span></div>`;
+      for (const it of items) {
+        if (!it.isUnlocked) {
+          html += `<div style="font-size:0.7em;color:#555;padding:2px 4px">🔒 ???×??? <span style="font-size:0.85em">(P${it.rule.phase}解锁)</span></div>`;
+        } else if (!it.isDiscovered) {
+          html += `<div style="font-size:0.7em;color:#666;padding:2px 4px">❓ ${BLDS[it.rule.self]?.n || '通用'}×??? <span style="font-size:0.85em">(+?%)</span></div>`;
+        } else {
+          const selfName = it.rule.self === '*' ? '通用' : (BLDS[it.rule.self]?.n || it.rule.self);
+          const neighborName = BLDS[it.rule.neighbor]?.n || it.rule.neighbor;
+          html += `<div style="font-size:0.7em;color:#aaa;padding:2px 4px">`;
+          html += `${it.rule.icon} <span style="color:#06d6a0;font-weight:600">${it.rule.name}</span> <span style="color:#22c55e">+${Math.round(it.rule.bonus*100)}%</span> — ${selfName} ← ${neighborName}`;
+          if (it.rule.stackable) html += ` <span style="color:var(--dim)">(max×${it.rule.maxStack})</span>`;
+          html += `</div>`;
+        }
+      }
+    }
+    html += `</div>`;
+    // 使用自定义覆盖层
+    const overlay = document.createElement('div');
+    overlay.id = 'adjGuideOverlay';
+    overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.85);z-index:9999;display:flex;align-items:center;justify-content:center';
+    overlay.innerHTML = `<div style="background:#1a1a2e;border:1px solid #14b8a640;border-radius:8px;padding:16px;max-width:420px;width:90%;max-height:80vh;overflow-y:auto;position:relative">
+      <button onclick="document.getElementById('adjGuideOverlay').remove()" style="position:absolute;top:8px;right:12px;background:none;border:none;color:#888;font-size:1.2em;cursor:pointer">✕</button>
+      ${html}
+    </div>`;
+    overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+    document.body.appendChild(overlay);
+  },
+
   // ★ 方案F：计算所有多输入建筑的供给同步加成
   // 返回并缓存到 this._syncBonuses
   computeSyncBonuses() {
@@ -6727,7 +8620,7 @@ const G = {
 
           // 检查对端是否产出此资源且 FLOW_MAP 匹配
           if (otherBd.prod && otherBd.prod[resKey]) {
-            const isValid = FLOW_MAP.some(f => f.from === otherG.type && f.to === g.type && f.res === resKey);
+            const isValid = FLOW_TRIPLE.has(otherG.type + '|' + g.type + '|' + resKey);
             if (isValid) {
               const key = Math.min(belt.fi, belt.ti) + '-' + Math.max(belt.fi, belt.ti);
               supplyCap += otherBd.prod[resKey] * (this.getUpgradeMultiplier(otherIdx) || 1) * this.getBeltEfficiency(key);
@@ -6780,12 +8673,15 @@ const G = {
     }
     this._syncBonuses = newSync;
 
-    // ★ 教学：更新同步建筑格子的视觉边框
+    // ★ P1-3: 用 prevSync keys 定向清除旧 class（避免 querySelectorAll 全局扫描）
     const gridEl = document.getElementById('grid');
     if (gridEl) {
-      gridEl.querySelectorAll('.cell.sync-active,.cell.sync-perfect').forEach(c => {
-        c.classList.remove('sync-active', 'sync-perfect');
-      });
+      // 清除上一轮有同步状态的 cell
+      for (const pidx in this._prevSyncState) {
+        const cell = gridEl.children[pidx];
+        if (cell) cell.classList.remove('sync-active', 'sync-perfect');
+      }
+      // 设置新的同步状态
       for (const idx in newSync) {
         const cell = gridEl.children[idx];
         if (!cell) continue;
@@ -6863,8 +8759,8 @@ const G = {
   },
 
   // ===== UTILITY =====
-  checkRes(cost) { for (let k in cost) if ((this.res[k]||0) < cost[k]) return false; return true; },
-  spend(cost) { for (let k in cost) this.res[k] -= cost[k]; },
+  checkRes(cost) { if (this._creativeMode) return true; for (let k in cost) if ((this.res[k]||0) < cost[k]) return false; return true; },
+  spend(cost) { if (this._creativeMode) return; for (let k in cost) this.res[k] -= cost[k]; },
 
   bldCount(type) {
     return this.grid.filter(g => g && g.type === type).length;
@@ -6935,9 +8831,9 @@ const G = {
     const researchPop = pop * (this.popAlloc.research / 100);
     const logisticsPop = pop * (this.popAlloc.logistics / 100);
     return {
-      harvest: { pop: Math.floor(harvestPop), bonus: formatNum(harvestPop * 0.003 * popEffMult * 100, 1) },
+      harvest: { pop: Math.floor(harvestPop), bonus: formatNum(harvestPop * BALANCE.popHarvestBonus * popEffMult * 100, 1) },
       research: { pop: Math.floor(researchPop), bonus: formatNum(researchPop * 0.002 * 100, 1) },
-      logistics: { pop: Math.floor(logisticsPop), bonus: formatNum(logisticsPop * 0.0005 * 100, 1) },
+      logistics: { pop: Math.floor(logisticsPop), bonus: formatNum(logisticsPop * BALANCE.popLogisticsBonus * 100, 1) },
     };
   },
 
@@ -6971,7 +8867,33 @@ const G = {
     return scaled;
   },
 
-  // ===== RATES =====
+  // ===== P1-1: 统一刷新方法 — 替代散落的"四件套"模式 =====
+  // 根据需要的刷新级别调用对应子系统，避免不必要的全量重绘
+  refreshAll(opts) {
+    const o = opts || {};
+    if (o.grid !== false)      this.renderGrid();
+    if (o.rates !== false)     this.updateRates();
+    if (o.buildings !== false) this.renderBuildings();
+    if (o.ui !== false)        this.updateUI();
+  },
+
+  // ===== P2-3: 传送带渲染用建筑流量计算 — 消除 3 处重复 =====
+  // 给定建筑索引和资源key，返回该建筑该资源的近似产出速率（用于传送带粒子动画）
+  _calcBuildingFlowRate(buildingIdx, resKey) {
+    const g = this.grid[buildingIdx];
+    if (!g) return 0;
+    const bd = BLDS[g.type];
+    if (!bd || !bd.prod[resKey]) return 0;
+    const bldMult = this.getUpgradeMultiplier(buildingIdx);
+    const beltMult = this.getBeltMultiplierForBuilding(buildingIdx);
+    const hPop = Math.min(this.pop, this._popCap()) * (this.popAlloc.harvest / 100);
+    const fullMult = this.gEff * (1 + hPop * BALANCE.popHarvestBonus * (this._popEffMult || 1)) * bldMult * beltMult * this.lEff * (this._prodMult || 1);
+    const qsCap = BALANCE.qsBaseCap + (this._qsCapBonus || 0);
+    const qsBoost = this.qsLv > 0 ? (1 + Math.min(this.qsLv * BALANCE.qsBoostPerLevel, qsCap)) : 1;
+    return bd.prod[resKey] * fullMult * qsBoost;
+  },
+
+  // ===== RATES ===== (P0-2/P0-3: 单次遍历优化)
   updateRates() {
     const r = {};
     for (let k in RES) r[k] = 0;
@@ -6984,125 +8906,184 @@ const G = {
     const coreConfig = CORE_COLONY[this.phase] || CORE_COLONY[1];
     const maxCollectors = (coreConfig.maxCollectors || 2) + (this._coreBonus || 0);
 
-    // 先统计碳源采集器数量和索引
-    const collectorIndices = [];
-    this.grid.forEach((g, idx) => {
-      if (g && g.type === 'glucoseCollector') collectorIndices.push(idx);
-    });
-    const activeCollectors = Math.min(collectorIndices.length, maxCollectors);
-    // 记录供给状态供UI显示
-    this._coreSupplyUsed = collectorIndices.length;
-    this._coreSupplyMax = maxCollectors;
-    this._coreSupplyActive = activeCollectors;
+    // ★ 预计算循环不变量（避免每建筑重复计算）
+    const popEffMult = this._popEffMult || 1;
+    const harvestPop = Math.min(this.pop, this._popCap()) * (this.popAlloc.harvest / 100);
+    const popMult = 1 + harvestPop * BALANCE.popHarvestBonus * popEffMult;
+    const globalProdMult = this._prodMult || 1;
+    const mutGlobalBonus = 1 + (this._mutActiveEffects.globalProdBonus || 0);
+    const adjMilestone = 1 + (this._adjMilestoneBonus || 0);
+    const variantEnergyMult = this._variantEnergyMult || 1;
+    const catalystProdMult = 1 + this._getCatalystValue('prodMult');
+    const rankTitleMult = 1 + this.getRankTitleBonus(); // v1.0.2: 排名头衔效率加成
+    const foodPowerLv = this._foodPowerLevel || 1;
+    const phaseGe2 = this.phase >= 2;
 
+    // ★ P0-2: 单次遍历，同时收集所有数据
     let totalTransport = 0;
-    let totalConsReduce = 0; // 代谢回路的消耗减少
+    let totalConsReduce = 0;
     let collectorCount = 0;
+    const collectorIndices = [];
+    // 资源竞争用的总产出/总消耗累计（P0-2: 消除第4次遍历）
+    const grossProd = {};
+    const grossCons = {};
+    for (let k in RES) { grossProd[k] = 0; grossCons[k] = 0; }
+    // 维护费相关
+    const totalBld = this.totalBuildings();
+    const maint = { total: {}, overhead: 1 };
+    let maintOverhead = 1, maintReduce = 1, mutMaintMod = 1;
+
     this.grid.forEach((g, idx) => {
       if (!g) return;
       const bd = BLDS[g.type];
       if (!bd) return;
+
+      // === 采集器统计 ===
+      if (g.type === 'glucoseCollector') collectorIndices.push(idx);
+
+      // === Boost/传输建筑 ===
       if (bd.isBoost) {
         totalTransport++;
-        if (bd.consReduce) totalConsReduce += bd.consReduce; // 代谢回路减耗
-        return;
+        if (bd.consReduce) totalConsReduce += bd.consReduce;
+        return; // boost 不参与产出/维护
       }
 
-      // 碳源采集器受核心供给上限限制
-      if (bd.corePowered) {
-        collectorCount++;
-        if (collectorCount > maxCollectors) return; // 超出供给上限，不产出
-      }
+      // v2.1: 休眠建筑不生产不消耗（但仍要算维护费，下面单独处理）
+      const isDormant = !!this._dormantCells[idx];
 
-      const bldMult = this.getUpgradeMultiplier(idx); // building level multiplier
-      const beltMult = this.getBeltMultiplierForBuilding(idx); // conveyor belt efficiency
-      // 菌群分工系统：采集菌分配到的个体提升产出
-      const popEffMult = this._popEffMult || 1;
-      const harvestPop = Math.min(this.pop, this._popCap()) * (this.popAlloc.harvest / 100);
-      const popMult = 1 + harvestPop * 0.003 * popEffMult; // 采集个体加成（比旧版0.002更高，但需要主动分配）
-      // 科技树分支加成 — 特定建筑类型的额外乘数
-      let techBonus = 1;
-      let techConsPenalty = 1;
-      if (g.type === 'glucoseCollector' && this._collectorBonus) techBonus += this._collectorBonus;
-      if (g.type === 'energyStation') {
-        if (this._energyBonus) techBonus += this._energyBonus;
-        // v2.0: 快速代谢邻接加成 — 邻接碳源采集器时额外+10%
-        if (this._energyAdjBonus) {
-          const adjCells = this.getAdjacentCells(idx);
-          if (adjCells.some(ni => this.grid[ni]?.type === 'glucoseCollector')) {
-            techBonus += this._energyAdjBonus;
+      // === 产出/消耗计算 ===
+      if (!isDormant) {
+        // 碳源采集器受核心供给上限限制
+        if (bd.corePowered) {
+          collectorCount++;
+          if (collectorCount > maxCollectors) {
+            // 超出供给上限，不产出但仍然要算维护费（下面维护费段会处理）
+            // 也要为资源竞争提供数据
+          } else {
+            // 正常产出路径 — 在下面统一处理
+          }
+        }
+
+        // 只有未超出供给上限的建筑才产出
+        const skipProd = bd.corePowered && collectorCount > maxCollectors;
+        if (!skipProd) {
+          // ★ P0-2: 缓存 getUpgradeMultiplier — 产出和消耗共用同一个
+          const bldMult = this.getUpgradeMultiplier(idx);
+          const beltMult = this.getBeltMultiplierForBuilding(idx);
+
+          // 科技树分支加成
+          let techBonus = 1;
+          let techConsPenalty = 1;
+          if (g.type === 'glucoseCollector' && this._collectorBonus) techBonus += this._collectorBonus;
+          if (g.type === 'energyStation') {
+            if (this._energyBonus) techBonus += this._energyBonus;
+            if (this._energyAdjBonus) {
+              const adjCells = this.getAdjacentCells(idx);
+              if (adjCells.some(ni => this.grid[ni]?.type === 'glucoseCollector')) {
+                techBonus += this._energyAdjBonus;
+              }
+            }
+          }
+          if (g.type === 'nitrogenFixer' && this._nitrogenBonus) techBonus += this._nitrogenBonus;
+          if (g.type === 'proteinFactory' && this._proteinBonus) techBonus += this._proteinBonus;
+
+          const adjResult = this.getAdjacencyBonus(idx);
+          const adjBonus = 1 + adjResult.bonus;
+          const syncBonus = 1 + (this._syncBonuses[idx]?.bonus || 0);
+
+          const mult = this.gEff * popMult * bldMult * beltMult * techBonus * adjBonus * syncBonus * foodPowerLv * globalProdMult * mutGlobalBonus * adjMilestone * variantEnergyMult * catalystProdMult * rankTitleMult;
+          for (let k in bd.prod) {
+            const mutResBonus = 1 + (this._mutActiveEffects.resProdBonus?.[k] || 0);
+            const prodVal = bd.prod[k] * mult * mutResBonus;
+            r[k] = (r[k]||0) + prodVal;
+            breakdown[k].prod += prodVal;
+          }
+          const consMult = bldMult * beltMult * techConsPenalty;
+          for (let k in bd.cons) {
+            const consVal = bd.cons[k] * consMult;
+            r[k] = (r[k]||0) - consVal;
+            breakdown[k].bldCons += consVal;
+          }
+
+          // ★ P0-2: 同时为资源竞争累计 grossProd/grossCons（消除第4次 grid.forEach）
+          for (let k in bd.prod) {
+            grossProd[k] += bd.prod[k] * bldMult;
+          }
+          for (let k in bd.cons) {
+            grossCons[k] += bd.cons[k] * bldMult;
           }
         }
       }
-      if (g.type === 'nitrogenFixer' && this._nitrogenBonus) techBonus += this._nitrogenBonus;
-      if (g.type === 'proteinFactory' && this._proteinBonus) techBonus += this._proteinBonus;
-      // 邻接加成 — 相邻建筑的空间协同效应
-      const adjResult = this.getAdjacencyBonus(idx);
-      const adjBonus = 1 + adjResult.bonus;
-      // ★ 方案F：供给同步加成 — 多输入建筑的供给均衡度奖励
-      const syncBonus = 1 + (this._syncBonuses[idx]?.bonus || 0);
-      const globalProdMult = this._prodMult || 1; // 转生产出加成
-      // ★ Q4：突变全局产出加成
-      const mutGlobalBonus = 1 + (this._mutActiveEffects.globalProdBonus || 0);
-      const mult = this.gEff * popMult * bldMult * beltMult * techBonus * adjBonus * syncBonus * (this._foodPowerLevel || 1) * globalProdMult * mutGlobalBonus;
-      for (let k in bd.prod) {
-        // ★ Q4：突变单资源产出加成
-        const mutResBonus = 1 + (this._mutActiveEffects.resProdBonus?.[k] || 0);
-        const prodVal = bd.prod[k] * mult * mutResBonus;
-        r[k] = (r[k]||0) + prodVal;
-        breakdown[k].prod += prodVal;
-      }
-      // 【修复】消耗乘建筑等级和传送带效率（升级建筑=吞吐量同步提升）
-      const consMult = bldMult * beltMult * techConsPenalty;
-      for (let k in bd.cons) {
-        const consVal = bd.cons[k] * consMult;
-        r[k] = (r[k]||0) - consVal;
-        breakdown[k].bldCons += consVal;
+
+      // === 维护费计算（合并原第3次 grid.forEach）===
+      if (phaseGe2) {
+        if (MAINTENANCE.exempt.includes(g.type)) return;
+        if (bd.isBoost) return;
+        const tier = bd.phase || 1;
+        const baseMaint = MAINTENANCE.baseCost[tier];
+        if (!baseMaint || Object.keys(baseMaint).length === 0) return;
+        const bldLv = this.buildingLevels[idx] || 1;
+        const lvMult = 1 + (bldLv - 1) * BALANCE.maintLevelMult;
+        const portDiscount = getPortEfficiencyDiscount(idx);
+        const dormantMult = isDormant ? BALANCE.maintDormantMult : 1;
+        for (let k in baseMaint) {
+          // maintOverhead/maintReduce/mutMaintMod 在循环后设置 — 这里先用临时标记
+          // 实际上需要先算出 totalConsReduce... 但 totalConsReduce 需要遍历完才知道
+          // 所以维护费需要在遍历后单独处理，或者在遍历中暂存数据
+          // → 改为暂存维护数据，遍历结束后统一应用乘数
+          if (!maint._pending) maint._pending = [];
+          maint._pending.push({ idx, k, base: baseMaint[k], lvMult, portDiscount, dormantMult });
+        }
       }
     });
 
-    // ★ 方案A：建筑维护费 — P2起每个建筑持续消耗维护资源
-    const totalBld = this.totalBuildings();
-    const maint = { total: {}, overhead: 1 };
-    if (this.phase >= 2) {
-      // 管理开销：建筑超过阈值后维护费递增
+    // 记录供给状态供UI显示
+    const activeCollectors = Math.min(collectorIndices.length, maxCollectors);
+    this._coreSupplyUsed = collectorIndices.length;
+    this._coreSupplyMax = maxCollectors;
+    this._coreSupplyActive = activeCollectors;
+
+    // ★ 维护费后处理 — 需要 totalConsReduce 完成后才能算
+    if (phaseGe2) {
       const excess = Math.max(0, totalBld - MAINTENANCE.overheadThreshold);
       maint.overhead = Math.min(1 + excess * MAINTENANCE.overheadRate, MAINTENANCE.maxOverhead);
-      // 代谢回路降低维护费
-      const maintReduce = 1 - Math.min(totalConsReduce * 1.5, 0.4); // 代谢回路减维护(最高-40%)
-      // ★ Q4：突变维护费调整
-      const mutMaintMod = 1 - (this._mutActiveEffects.maintReduce || 0) + (this._mutActiveEffects.maintIncrease || 0);
-      this.grid.forEach((g, idx) => {
-        if (!g) return;
-        const bd = BLDS[g.type];
-        if (!bd) return;
-        // 豁免建筑不收维护费
-        if (MAINTENANCE.exempt.includes(g.type)) return;
-        if (bd.isBoost) return; // boost类建筑已在exempt或本身免维护
-        const tier = bd.phase || 1;
-        const baseMaint = MAINTENANCE.baseCost[tier];
-        if (!baseMaint || Object.keys(baseMaint).length === 0) return; // P1/P5免维护
-        const bldLv = this.buildingLevels[idx] || 1;
-        // 高等级建筑维护费略高（等级带来的规模开销）
-        const lvMult = 1 + (bldLv - 1) * 0.15;
-        // v2.0: 端口效率折扣 — 端口利用率高的建筑维护费更低
-        const portDiscount = getPortEfficiencyDiscount(idx);
-        for (let k in baseMaint) {
-          const cost = baseMaint[k] * maint.overhead * lvMult * maintReduce * Math.max(0.1, mutMaintMod) * portDiscount;
-          r[k] = (r[k]||0) - cost;
-          maint.total[k] = (maint.total[k]||0) + cost;
-          breakdown[k].maint += cost;
+      maintReduce = 1 - Math.min(totalConsReduce * BALANCE.maintConsReduceScale, BALANCE.maintConsReduceCap);
+      mutMaintMod = 1 - (this._mutActiveEffects.maintReduce || 0) + (this._mutActiveEffects.maintIncrease || 0);
+      if (maint._pending) {
+        for (const p of maint._pending) {
+          const cost = p.base * maint.overhead * p.lvMult * maintReduce * Math.max(0.1, mutMaintMod) * p.portDiscount * p.dormantMult;
+          r[p.k] = (r[p.k]||0) - cost;
+          maint.total[p.k] = (maint.total[p.k]||0) + cost;
+          breakdown[p.k].maint += cost;
         }
-      });
+        delete maint._pending;
+      }
     }
+    // v3.0 §4: 远距传送带维护费 — 距离>=3时消耗ATP
+    let beltMaintTotal = 0;
+    const beltsForMaint = this._activeBelts || [];
+    for (const belt of beltsForMaint) {
+      const bk = Math.min(belt.fi, belt.ti) + '-' + Math.max(belt.fi, belt.ti);
+      const dist = this.getBeltDistance(bk);
+      if (dist >= BALANCE.beltMaintMinDist) {
+        const beltMaintCost = BALANCE.beltMaintPerDist * (dist - 2);
+        beltMaintTotal += beltMaintCost;
+      }
+    }
+    if (beltMaintTotal > 0) {
+      r.energy = (r.energy || 0) - beltMaintTotal;
+      maint.total.energy = (maint.total.energy || 0) + beltMaintTotal;
+      breakdown.energy.maint += beltMaintTotal;
+    }
+    this._beltMaintCost = beltMaintTotal;
+
     this._maintenanceCost = maint.total;
     this._maintenanceOverhead = maint.overhead;
 
     // 【修复】物流效率(lEff)只加成正值(产出)，不增加消耗
-    const transportRate = 0.10 + (this._transportBonus || 0); // 自适应物流科技加成
-    // 物流个体加成：分配到物流的个体提升传送带整体效率
+    const transportRate = BALANCE.transportBaseRate + (this._transportBonus || 0);
     const logisticsPop = Math.min(this.pop, this._popCap()) * (this.popAlloc.logistics / 100);
-    const logisticsPopBonus = logisticsPop * 0.0005; // 每个物流个体 +0.05% 物流效率
+    const logisticsPopBonus = logisticsPop * BALANCE.popLogisticsBonus;
     this.lEff = 1 + totalTransport * transportRate + logisticsPopBonus;
     for (let k in r) {
       if (r[k] > 0) {
@@ -7111,16 +9092,15 @@ const G = {
         breakdown[k].logistics += r[k] - before;
       }
       // 代谢回路减少消耗
-      if (r[k] < 0 && totalConsReduce > 0) r[k] *= (1 - Math.min(totalConsReduce, 0.3));
+      if (r[k] < 0 && totalConsReduce > 0) r[k] *= (1 - Math.min(totalConsReduce, BALANCE.consReduceCap));
     }
 
     // QS boost — 基于QS产出速率而非存量，需要维持QS塔运转
-    const qsRate = r.qs || 0; // QS净产出速率
+    const qsRate = r.qs || 0;
     this.qsLv = Math.max(0, Math.floor(this.res.qs || 0));
     if (this.qsLv > 0) {
-      // 加成上限60%(+科技加成)，如果QS净产出为负则加成减半
-      const qsCap = 0.6 + (this._qsCapBonus || 0);
-      const qsBase = Math.min(this.qsLv * 0.03, qsCap);
+      const qsCap = BALANCE.qsBaseCap + (this._qsCapBonus || 0);
+      const qsBase = Math.min(this.qsLv * BALANCE.qsBoostPerLevel, qsCap);
       const qsBoost = qsRate >= 0 ? qsBase : qsBase * 0.5;
       for (let k in r) if (r[k] > 0) r[k] *= (1 + qsBoost);
     }
@@ -7136,18 +9116,16 @@ const G = {
       } else if (pb.type === 'consReduce') {
         for (let k in r) if (r[k] < 0) r[k] *= (1 - pb.value);
       } else if (pb.type === 'logisticsBoost') {
-        // 物流效率加成
         for (let k in r) if (r[k] > 0) r[k] *= (1 + pb.value);
       } else if (pb.type === 'effBoost') {
         for (let k in r) if (r[k] > 0) r[k] *= (1 + pb.value);
       }
     }
 
-    // ★ 方案C：资源竞争 — P3起当某资源供需紧张时全局该资源产出下降
+    // ★ 方案C：资源竞争 — P3起，使用遍历中已累计的 grossProd/grossCons
     const tension = {};
     const penalty = {};
     if (this.phase >= RESOURCE_COMPETITION.startPhase) {
-      // v2.0: P3缓冲期 — 前180秒阈值从95%渐进降到85%
       let effectiveThreshold = RESOURCE_COMPETITION.tensionThreshold;
       if (this.phase === 3 && this._p3EntryTime) {
         const elapsed = (Date.now() - this._p3EntryTime) / 1000;
@@ -7158,41 +9136,20 @@ const G = {
         }
       }
       for (let k in RES) {
-        // 分离该资源的总产出和总消耗（含维护费）
-        // r[k]是净值，需要回溯计算。用简化方式：正值=净产出，负值=净消耗
-        // 更精确的方法：直接用正消耗总量和正产出总量
-        // 我们用维护费+建筑cons估算总消耗
-        let totalProd = 0, totalCons = 0;
-        this.grid.forEach((g, idx) => {
-          if (!g) return;
-          const bd = BLDS[g.type];
-          if (!bd || bd.isBoost) return;
-          if (bd.prod[k]) {
-            const bldMult = this.getUpgradeMultiplier(idx);
-            totalProd += bd.prod[k] * bldMult;
-          }
-          if (bd.cons[k]) {
-            const bldMult = this.getUpgradeMultiplier(idx);
-            totalCons += bd.cons[k] * bldMult;
-          }
-        });
-        // 加上维护费消耗
+        const totalProd = grossProd[k];
+        let totalCons = grossCons[k];
         totalCons += (this._maintenanceCost[k] || 0);
-        // 加上种群食物消耗（葡萄糖）
         if (k === 'glucose') totalCons += this.pop * 0.005;
 
         if (totalProd > 0.01) {
           const ratio = totalCons / totalProd;
           tension[k] = ratio;
           if (ratio > effectiveThreshold) {
-            // 超过阈值→开始惩罚产出
             const severity = Math.min((ratio - effectiveThreshold) / (1 - effectiveThreshold), 1);
             const eff = 1 - severity * (1 - RESOURCE_COMPETITION.minEfficiency);
-            // ★ Q4：突变竞争抵抗
             const mutResist = this._mutActiveEffects.competitionResist || 0;
             const finalEff = Math.min(1, eff + (1 - eff) * mutResist);
             penalty[k] = finalEff;
-            // 对该资源的正产出施加竞争惩罚
             if (r[k] > 0) {
               const before = r[k];
               r[k] *= finalEff;
@@ -7210,7 +9167,7 @@ const G = {
     this._resourceTension = tension;
     this._competitionPenalty = penalty;
 
-    // ★ Q1：追踪种群食物消耗到明细（虽然实际扣减在startLoop，但此处用于UI显示）
+    // ★ Q1：追踪种群食物消耗到明细
     if (this.pop > 0) {
       breakdown.glucose.popFood = this.pop * 0.005;
     }
@@ -7223,9 +9180,26 @@ const G = {
   startResearch(key) {
     if (this.rTech) { this.log('已有研究进行中', 'w'); SFX.buildFail(); return; }
     const t = TECHS[key];
+    // v3.0 §8.5: 创造模式 — 跳过阶段/前置/互斥检查，瞬间完成
+    if (this._creativeMode) {
+      if (this.techs[key]?.done) { this.log('已研究', 'w'); return; }
+      this.techs[key] = { done: true };
+      this.applyTech(key);
+      this.log(`⭐ 瞬间完成研究: ${t.n}`, 'ev');
+      SFX.researchDone();
+      this.renderTechs();
+      return;
+    }
     if (t.phase > this.phase) { this.log('需要先进入阶段 ' + t.phase, 'e'); SFX.buildFail(); return; }
-    // 互斥分支检查 — 如果对立分支已完成，则不能研究
-    if (t.exclusive) {
+    // v3.0 §3: 前置条件检查
+    const prereq = this.getTechPrereqStatus(key);
+    if (prereq.hasPrereq && !prereq.met) {
+      this.log(`🔒 「${t.n}」需要先满足: ${prereq.icon} ${prereq.label} (${prereq.progress}/${prereq.max})`, 'w');
+      SFX.buildFail();
+      return;
+    }
+    // 互斥分支检查 — 如果对立分支已完成，则不能研究（多菌株模式下跳过）
+    if (t.exclusive && !this._multiStrainUnlocked) {
       for (const exKey of t.exclusive) {
         if (this.techs[exKey]?.done) {
           const exTech = TECHS[exKey];
@@ -7251,7 +9225,9 @@ const G = {
     // 研究个体加速：分配到研究的个体越多，研究越快
     const researchPop = Math.min(this.pop, this._popCap()) * (this.popAlloc.research / 100);
     const researchPopBonus = 1 + researchPop * 0.002; // 每个研究个体 +0.2% 研究速度
-    this.rProg += 1 * (this._techTimeMult ? (1 / this._techTimeMult) : 1) * researchPopBonus;  // 转生加成 + 个体加速
+    // v3.0 §8.3: 时间催化剂加速
+    const catalystTimeBoost = this._getCatalystValue('techSpeed') || 1;
+    this.rProg += 1 * (this._techTimeMult ? (1 / this._techTimeMult) : 1) * researchPopBonus * catalystTimeBoost;  // 转生加成 + 个体加速 + 催化剂
     const pct = Math.min(this.rProg / t.time * 100, 100);
     const fill = document.getElementById('techFill-' + this.rTech);
     if (fill) fill.style.width = pct + '%';
@@ -7335,6 +9311,241 @@ const G = {
     if (lv <= 2) return 0.10;  // Lv1-2: +10%
     if (lv <= 4) return 0.15;  // Lv3-4: +15%
     return 0.20;               // Lv5+:  +20%
+  },
+
+  // ===== v3.0 §1: 进化培养任务tick =====
+  _tickEvoTask() {
+    if (!this._evoTask) return;
+    const task = this._evoTask;
+
+    // 经济任务特殊处理：维持N秒正收益
+    if (task.id === 'et1_econ30') {
+      // 每tick检查葡萄糖净速率
+      if ((this.rates?.glucose || 0) > 0) {
+        this._evoEconTimer = (this._evoEconTimer || 0) + 1; // +1帧(约1秒)
+      } else {
+        this._evoEconTimer = Math.max(0, (this._evoEconTimer || 0) - 0.5); // 负收益时缓慢倒退
+      }
+    }
+
+    // 检测任务完成
+    if (task.check(this)) {
+      this.log(`🧬 培养任务完成! ${task.icon} ${task.n} ✓`, 's');
+      SFX.milestone();
+      this.showMilestone('🧬', '培养完成!');
+      // 自动触发升级
+      setTimeout(() => this._completeEvoTask(), 500);
+      return;
+    }
+
+    // 更新升级面板中的培养任务UI（每5帧一次）
+    if (this.animTick % 5 === 0) {
+      this._updateEvoTaskUI();
+    }
+  },
+
+  // 更新培养任务的实时UI（嵌入核心升级面板）
+  _updateEvoTaskUI() {
+    const task = this._evoTask;
+    if (!task) return;
+    const panel = document.getElementById('coreUpgradePanel');
+    if (!panel) return;
+
+    let evoDiv = panel.querySelector('.evo-task-active');
+    if (!evoDiv) {
+      evoDiv = document.createElement('div');
+      evoDiv.className = 'evo-task-active';
+      evoDiv.style.cssText = 'margin-top:8px;padding:8px 10px;border:1px solid rgba(168,85,247,0.3);border-radius:8px;background:rgba(168,85,247,0.05);';
+      const btn = panel.querySelector('.core-upgrade-btn');
+      if (btn) panel.insertBefore(evoDiv, btn);
+      else panel.appendChild(evoDiv);
+    }
+
+    const cur = task.progress(this);
+    const max = task.max;
+    const pct = max > 0 ? Math.min(cur / max * 100, 100) : 0;
+    const elapsed = (Date.now() - this._evoTaskStartTime) / 1000;
+    const canSkip = elapsed >= 120;
+    let skipCost = 20;
+    if (this.prestigeCount > 0) skipCost = Math.ceil(skipCost * 0.5);
+    const typeColors = { '连线':'#f97316', '布局':'#3b82f6', '经济':'#eab308' };
+    const tc = typeColors[task.type] || '#94a3b8';
+
+    evoDiv.innerHTML = `
+      <div style="display:flex;align-items:center;gap:5px;margin-bottom:4px">
+        <span style="font-size:0.85em">🧬</span>
+        <span style="font-size:0.75em;font-weight:700;color:#a855f7;font-family:'Orbitron',monospace">培养任务</span>
+        <span style="font-size:0.7em;color:var(--dim)">${Math.floor(elapsed)}s</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:5px;font-size:0.78em;margin-bottom:4px">
+        <span style="color:${tc};font-weight:700">${task.type}</span>
+        <span style="color:#e2e8f0">${task.icon} ${task.n}</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px">
+        <div style="flex:1;height:5px;background:rgba(255,255,255,0.06);border-radius:3px;overflow:hidden">
+          <div style="width:${pct}%;height:100%;background:${tc};border-radius:3px;transition:width 0.3s"></div>
+        </div>
+        <span style="font-size:0.72em;font-weight:700;color:${tc}">${cur}/${max}</span>
+      </div>
+      ${canSkip ? `<div style="text-align:right;margin-top:4px">
+        <button onclick="G._skipEvoTask()" style="
+          font-size:0.68em;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);
+          color:#ef4444;padding:2px 10px;border-radius:3px;cursor:pointer">
+          跳过 (-${skipCost}🧬)
+        </button>
+      </div>` : `<div style="font-size:0.65em;color:var(--dim);margin-top:3px;text-align:right">
+        ${Math.ceil(120 - elapsed)}s后可跳过
+      </div>`}
+    `;
+  },
+
+  // ===== v3.0 §3: 科技研究前置条件 =====
+  // 获取前置条件的实际目标值（考虑转生减免-25%）
+  _prereqMax(techKey) {
+    const prereq = TECH_PREREQS[techKey];
+    if (!prereq) return 0;
+    const base = prereq.max;
+    // 转生减免: 如果拥有"科研捷径"转生加成（_techTimeMult < 1），前置条件-25%（向下取整，最低1）
+    if (this.prestigeCount > 0 && this._techTimeMult < 1) {
+      return Math.max(Math.floor(base * 0.75), 1);
+    }
+    return base;
+  },
+
+  // 检查科技前置条件状态
+  getTechPrereqStatus(techKey) {
+    const prereq = TECH_PREREQS[techKey];
+    if (!prereq) return { met: true, label: '', progress: 0, max: 0, hasPrereq: false };
+    const max = this._prereqMax(techKey);
+    const cur = prereq.progress(this);
+    const met = prereq.check(this);
+    const reduced = max < prereq.max; // 是否有转生减免
+    return {
+      hasPrereq: true,
+      met,
+      label: prereq.label,
+      icon: prereq.icon,
+      progress: cur,
+      max,
+      baseMax: prereq.max,
+      reduced,
+    };
+  },
+
+  // 检查前置条件变化并触发反馈
+  _checkTechPrereqProgress() {
+    for (const key in TECH_PREREQS) {
+      const t = TECHS[key];
+      if (!t || t.phase > this.phase) continue; // 只检查当前阶段可见的科技
+      if (this.techs[key]?.done) continue; // 已完成不检查
+      const status = this.getTechPrereqStatus(key);
+      if (!status.hasPrereq) continue;
+      const prevKey = '_prereqDone_' + key;
+      const wasMet = this[prevKey] || false;
+      if (status.met && !wasMet) {
+        this[prevKey] = true;
+        this.log(`🔓 「${t.n}」前置条件达标 — ${status.icon} ${status.label} ✓`, 'ev');
+        SFX.milestone();
+        this.renderTechs(); // 刷新科技面板
+      } else if (!status.met && wasMet) {
+        this[prevKey] = false; // 罕见：条件回退
+      }
+    }
+  },
+
+  // ===== v3.0 §2: 探索度系统 =====
+  // 获取当前阶段的探索度状态
+  getExplorationStatus() {
+    const phase = this.phase;
+    const goals = EXPLORATION_GOALS[phase];
+    if (!goals) return { score: 0, required: 0, met: true, items: [] }; // P5没有探索度
+    const items = goals.goals.map(g => ({
+      ...g,
+      done: g.check(this),
+      current: g.progress(this),
+    }));
+    const score = items.filter(i => i.done).length;
+    return {
+      score,
+      required: goals.required,
+      met: score >= goals.required,
+      items,
+    };
+  },
+
+  // 检查探索度变化，触发反馈
+  _checkExplorationProgress() {
+    const status = this.getExplorationStatus();
+    if (!status.items.length) return;
+    const prev = this._prevExplScore || 0;
+    if (status.score > prev) {
+      // 新完成了一个探索度目标
+      const newDone = status.items.filter(i => i.done);
+      const newItem = newDone[newDone.length - 1]; // 最近完成的
+      if (newItem) {
+        this.log(`📊 探索度 +1 — ${newItem.icon} ${newItem.n} ✓ (${status.score}/${status.required})`, 'ev');
+        this.showMilestone('📊', `探索度 ${status.score}/${status.required}`);
+        SFX.milestone();
+      }
+      if (status.met && prev < status.required) {
+        // 刚好达标
+        this.showEvent('📊 探索度达标！', `P${this.phase} 探索度已满足 ${status.score}/${status.required}\n\n满足所有升级条件后，可以推进到下一阶段！`, '#14b8a6');
+        this.log(`📊 P${this.phase} 探索度达标！可以考虑升级核心了`, 's');
+      }
+    }
+    this._prevExplScore = status.score;
+  },
+
+  // ===== v3.0 §6: P3b子阶段探索度 =====
+  getP3bExplorationStatus() {
+    if (this.phase !== 3 || this._p3bUnlocked) return { score: 0, required: 0, met: true, items: [] };
+    const goals = P3B_EXPLORATION_GOALS;
+    const items = goals.goals.map(g => ({
+      ...g,
+      done: g.check(this),
+      current: g.progress(this),
+    }));
+    const score = items.filter(i => i.done).length;
+    return {
+      score,
+      required: goals.required,
+      met: score >= goals.required,
+      items,
+    };
+  },
+
+  _checkP3bUnlock() {
+    if (this.phase !== 3 || this._p3bUnlocked) return;
+    const status = this.getP3bExplorationStatus();
+    const prev = this._p3bExplScore || 0;
+    // 探索度进度变化反馈
+    if (status.score > prev) {
+      const newItem = status.items.filter(i => i.done)[status.items.filter(i => i.done).length - 1];
+      if (newItem) {
+        this.log(`📊 P3b探索度 +1 — ${newItem.icon} ${newItem.n} ✓ (${status.score}/${status.required})`, 'ev');
+        this.showMilestone('📊', `P3b探索度 ${status.score}/${status.required}`);
+        SFX.milestone();
+      }
+    }
+    this._p3bExplScore = status.score;
+    // 达标时解锁P3b
+    if (status.met) {
+      this._p3bUnlocked = true;
+      this.showEvent(
+        '🔓 P3b · 物流进阶 已解锁！',
+        '完成了P3a阶段的探索，解锁了物流进阶建筑：\n\n' +
+        '♻️ 代谢回路 — 循环再利用\n' +
+        '📡 信号中继站 — 远距中继传输\n' +
+        '🫧 发酵液泡 — ATP替代路线\n' +
+        '🔥 生物质转化炉 — 蛋白质→生物质\n' +
+        '💎 噬菌体裂解器 — 高纯DNA提取\n\n' +
+        '这些新工具将大幅提升你的物流能力！',
+        '#60a5fa'
+      );
+      this.log('🔓 P3b 物流进阶阶段已解锁！新建筑可用', 's');
+      SFX.milestone();
+      this.renderBuildings(); // 刷新建筑面板
+    }
   },
 
   canEvolve() {
@@ -7430,6 +9641,11 @@ const G = {
     if (this.wProg >= wt) {
       this.wonderComplete = true;
       this._wonderSprintActive = false;
+      // B+C: 记录最快奇观完成时间（秒）
+      const runTime = this.stats.onlineTime || 0;
+      if (!this._fastestWonder || runTime < this._fastestWonder) {
+        this._fastestWonder = runTime;
+      }
       const overlay = document.getElementById('wonderOverlay');
       if (overlay) overlay.classList.remove('sprint');
       this._hidePopup('wonderOverlay');
@@ -7723,6 +9939,7 @@ const G = {
 
   // 重新计算所有突变效果的缓存
   _recalcMutEffects() {
+    const portBonuses = {}; // v2.1: { buildingType: { extraIn, extraOut } }
     const ef = {
       maintReduce: 0, maintIncrease: 0,
       popGrowthMult: 0, beltEffBonus: 0,
@@ -7768,8 +9985,49 @@ const G = {
           ef.resProdBonus[k] = (ef.resProdBonus[k] || 0) + e.resProdBonus[k];
         }
       }
+      // v2.1 §9.2: 端口突变 — extraOutPort/extraInPort + targetRandom
+      if (e.extraOutPort || e.extraInPort) {
+        if (!this._mutPortTargets) this._mutPortTargets = {};
+        // 首次为此突变随机选一种有端口的建筑类型
+        if (!this._mutPortTargets[slot.id]) {
+          const candidates = Object.keys(PORT_DEFS).filter(t => {
+            const d = PORT_DEFS[t];
+            return d && (d.maxOut > 0 || d.maxIn > 0) && d.role !== 'wonder';
+          });
+          if (candidates.length > 0) {
+            this._mutPortTargets[slot.id] = candidates[Math.floor(Math.random() * candidates.length)];
+          }
+        }
+        const target = this._mutPortTargets[slot.id];
+        if (target) {
+          if (!portBonuses[target]) portBonuses[target] = { extraIn: 0, extraOut: 0 };
+          portBonuses[target].extraOut += (e.extraOutPort || 0);
+          portBonuses[target].extraIn += (e.extraInPort || 0);
+        }
+      }
     }
     this._mutActiveEffects = ef;
+    // v2.1 §9.2 + §9.3: 合并突变端口加成 + 转生端口扩展
+    // 转生管线工程学: _presPortExpand = lv → 随机 lv 种建筑各+1输出端口(每种上限+2)
+    if (this._presPortExpand && this._presPortExpand > 0) {
+      if (!this._presPortTargets || this._presPortTargets.length !== this._presPortExpand) {
+        const candidates = Object.keys(PORT_DEFS).filter(t => {
+          const d = PORT_DEFS[t];
+          return d && d.maxOut > 0 && d.role !== 'wonder';
+        });
+        const targets = [];
+        const shuffled = [...candidates].sort(() => Math.random() - 0.5);
+        for (let i = 0; i < Math.min(this._presPortExpand, shuffled.length); i++) {
+          targets.push(shuffled[i]);
+        }
+        this._presPortTargets = targets;
+      }
+      for (const t of this._presPortTargets) {
+        if (!portBonuses[t]) portBonuses[t] = { extraIn: 0, extraOut: 0 };
+        portBonuses[t].extraOut = Math.min(portBonuses[t].extraOut + 1, 2); // 每种上限+2
+      }
+    }
+    this._mutPortBonuses = portBonuses;
   },
 
   // ★ Q4：渲染变异实验室面板（完整重绘）
@@ -8012,24 +10270,44 @@ const G = {
       };
     }
 
+    // ---- v3.0 §2: 辅助：生成探索度条件 + tooltip ----
+    function explReq() {
+      const es = self.getExplorationStatus();
+      if (!es.items.length) return null; // P5无探索度
+      const met = es.met;
+      const doneList = es.items.filter(i => i.done).map(i => `✓ ${i.icon} ${i.n}`).join('\n');
+      const todoList = es.items.filter(i => !i.done).map(i => `✗ ${i.icon} ${i.n} (${i.current}/${i.max})`).join('\n');
+      const detail = `已完成:\n${doneList || '(无)'}\n\n待完成:\n${todoList || '(全部完成!)'}`;
+      return {
+        label: `📊 探索度 ${es.score}/${es.required}`, met,
+        tipTitle: `📊 P${self.phase} 探索度`, tipTag: '探索度',
+        tipDesc: met ? `已达标 — ${es.score}/${es.required} (任选${es.required})` : `${es.score}/${es.required} — 还需完成 ${es.required - es.score} 项`,
+        tipDetail: detail, tipColor: '#14b8a6'
+      };
+    }
+
     if (this.phase === 1) {
       reqs.push(evoReq(2));
       reqs.push(bldReq('glucoseCollector'));
       reqs.push(bldReq('energyStation'));
       reqs.push(bldReq('simpleExtractor'));
       reqs.push(techReq('pureCulture'));
+      const er = explReq(); if (er) reqs.push(er);
     } else if (this.phase === 2) {
       reqs.push(evoReq(3));
       reqs.push(bldReq('proteinFactory'));
       reqs.push(bldReq('geneExtractor'));
+      const er = explReq(); if (er) reqs.push(er);
     } else if (this.phase === 3) {
       reqs.push(evoReq(4));
       reqs.push(bldReq('biofilmReactor'));
       reqs.push(bldReq('transport'));
+      const er = explReq(); if (er) reqs.push(er);
     } else if (this.phase === 4) {
       reqs.push(evoReq(5));
       reqs.push(bldReq('qsController'));
       reqs.push(techReq('quorumSensing'));
+      const er = explReq(); if (er) reqs.push(er);
     }
     return reqs;
   },
@@ -8037,6 +10315,8 @@ const G = {
   // 检查是否可以升级核心（所有条件达成）
   canPhaseUp() {
     if (this.phase >= 5) return false;
+    // v3.0 §8.5: 创造模式跳过条件
+    if (this._creativeMode) return true;
     const reqs = this.getPhaseUpReqs();
     return reqs.length > 0 && reqs.every(r => r.met);
   },
@@ -8045,6 +10325,201 @@ const G = {
   manualCoreUpgrade() {
     if (!this.canPhaseUp()) return;
 
+    // v3.0 §1: 如果当前已有活跃培养任务且已完成 → 执行升级
+    if (this._evoTask && this._evoTask.check(this)) {
+      this._completeEvoTask();
+      return;
+    }
+    // v3.0 §1: 如果有活跃任务但未完成 → 提示
+    if (this._evoTask) {
+      const t = this._evoTask;
+      this.log(`🧬 培养任务进行中: ${t.icon} ${t.n} (${t.progress(this)}/${t.max})`, 'w');
+      SFX.buildFail();
+      return;
+    }
+    // v3.0 §1: 弹出培养任务选择面板
+    const tasks = EVOLUTION_TASKS[this.phase];
+    if (tasks && tasks.length > 0) {
+      this._showEvoTaskSelection(tasks);
+      return;
+    }
+    // 没有培养任务（兜底：直接升级）
+    this._doPhaseUpgrade();
+  },
+
+  // v3.0 §1: 显示培养任务3选1面板
+  _showEvoTaskSelection(tasks) {
+    // 记录当前基线
+    const base = {
+      belt: (this._activeBelts||[]).length,
+      adj: Object.keys(this._discoveredAdj||{}).length,
+    };
+    const self = this;
+
+    // 检查哪些任务已经满足（秒过）
+    const taskStatuses = tasks.map(t => ({
+      ...t,
+      alreadyMet: t.check(this),
+    }));
+
+    let html = `<div style="text-align:center;margin-bottom:10px">
+      <div style="font-size:1.1em;font-weight:700;color:#a855f7;font-family:'Orbitron',monospace">🧬 进化培养</div>
+      <div style="font-size:0.78em;color:var(--dim);margin-top:3px">选择一个培养条件完成后即可进化</div>
+    </div>`;
+    html += '<div style="display:flex;flex-direction:column;gap:8px">';
+
+    for (let i = 0; i < tasks.length; i++) {
+      const t = tasks[i];
+      const met = taskStatuses[i].alreadyMet;
+      const cur = t.progress(this);
+      const rewardStr = Object.entries(t.reward).map(([k, v]) => `+${v}${RES[k]?.icon||k}`).join(' ');
+      const typeColors = { '连线':'#f97316', '布局':'#3b82f6', '经济':'#eab308' };
+      const tc = typeColors[t.type] || '#94a3b8';
+
+      html += `<div class="evo-task-option${met?' met':''}" data-evo-idx="${i}" style="
+        padding:10px 12px;border:1px solid ${met?'#14b8a6':'rgba(255,255,255,0.08)'};
+        border-radius:8px;cursor:pointer;transition:all 0.2s;
+        background:${met?'rgba(20,184,166,0.08)':'rgba(255,255,255,0.02)'};
+        ">
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
+          <span style="font-size:1.1em">${t.icon}</span>
+          <span style="color:${tc};font-weight:700;font-size:0.78em">${t.type}</span>
+          <span style="font-size:0.82em;color:#e2e8f0;font-weight:600">${t.n}</span>
+          ${met?'<span style="color:#14b8a6;font-weight:700;margin-left:auto">✅ 已满足</span>':''}
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:0.72em;color:var(--dim)">
+          <span>进度: ${cur}/${t.max}</span>
+          <span style="color:#14b8a6">${rewardStr} 奖励</span>
+        </div>
+        ${!met?`<div style="height:3px;background:rgba(255,255,255,0.06);border-radius:2px;margin-top:4px;overflow:hidden">
+          <div style="width:${t.max>0?Math.min(cur/t.max*100,100):0}%;height:100%;background:${tc};border-radius:2px"></div>
+        </div>`:''}
+      </div>`;
+    }
+    html += '</div>';
+
+    // 使用 choicePopup 展示
+    const popup = document.getElementById('choicePopup');
+    if (popup) {
+      popup.innerHTML = `<div class="event-popup-inner" style="max-width:380px">
+        ${html}
+        <div style="text-align:center;margin-top:10px">
+          <button onclick="G._cancelEvoTaskSelection()" style="
+            background:transparent;border:1px solid rgba(255,255,255,0.1);
+            color:var(--dim);padding:4px 16px;border-radius:4px;cursor:pointer;font-size:0.75em">
+            返回
+          </button>
+        </div>
+      </div>`;
+      popup.style.display = 'flex';
+
+      // 绑定任务选择点击
+      popup.querySelectorAll('.evo-task-option').forEach(el => {
+        el.addEventListener('click', () => {
+          const idx = +el.dataset.evoIdx;
+          self._selectEvoTask(tasks[idx], base);
+          popup.style.display = 'none';
+        });
+        el.addEventListener('mouseenter', () => {
+          el.style.borderColor = '#a855f7';
+          el.style.background = 'rgba(168,85,247,0.06)';
+        });
+        el.addEventListener('mouseleave', () => {
+          const met = taskStatuses[+el.dataset.evoIdx].alreadyMet;
+          el.style.borderColor = met ? '#14b8a6' : 'rgba(255,255,255,0.08)';
+          el.style.background = met ? 'rgba(20,184,166,0.08)' : 'rgba(255,255,255,0.02)';
+        });
+      });
+    }
+  },
+
+  _cancelEvoTaskSelection() {
+    const popup = document.getElementById('choicePopup');
+    if (popup) popup.style.display = 'none';
+  },
+
+  // 选择一个培养任务
+  _selectEvoTask(task, base) {
+    this._evoTask = task;
+    this._evoTaskBase = base;
+    this._evoEconTimer = 0;
+    this._evoTaskStartTime = Date.now();
+
+    // 如果任务已经满足 → 直接完成
+    if (task.check(this)) {
+      this.log(`🧬 培养任务已满足: ${task.icon} ${task.n} — 直接完成！`, 's');
+      SFX.milestone();
+      this._completeEvoTask();
+      return;
+    }
+
+    this.log(`🧬 培养任务开始: ${task.icon} ${task.n} (${task.progress(this)}/${task.max})`, 'ev');
+    SFX.researchStart();
+    this.showMilestone('🧬', `培养任务: ${task.n}`);
+    this.updateCoreUpgradeUI();
+  },
+
+  // 完成培养任务 → 执行升级
+  _completeEvoTask() {
+    const task = this._evoTask;
+    if (!task) { this._doPhaseUpgrade(); return; }
+
+    const elapsed = (Date.now() - this._evoTaskStartTime) / 1000;
+    const hasBonus = elapsed <= 60;
+
+    // 给予任务奖励
+    if (task.reward) {
+      for (const [k, v] of Object.entries(task.reward)) {
+        this.res[k] = (this.res[k] || 0) + v;
+      }
+      const rewardStr = Object.entries(task.reward).map(([k, v]) => `+${v}${RES[k]?.icon||k}`).join(' ');
+      this.log(`🎁 培养奖励: ${rewardStr}${hasBonus?' (60秒内完成!)':''}`, 's');
+    }
+    if (hasBonus) {
+      // 额外奖励
+      this.res.energy = (this.res.energy || 0) + 10;
+      this.log('🎉 快速培养奖励: +10⚡', 's');
+    }
+
+    // 清除任务状态
+    this._evoTask = null;
+    this._evoTaskBase = null;
+    this._evoEconTimer = 0;
+    this._evoTaskStartTime = 0;
+
+    // 执行升级
+    this._doPhaseUpgrade();
+  },
+
+  // 跳过培养任务（消耗资源）
+  _skipEvoTask() {
+    const task = this._evoTask;
+    if (!task) return;
+    const elapsed = (Date.now() - this._evoTaskStartTime) / 1000;
+    if (elapsed < 120) {
+      this.log(`🧬 还需等待 ${Math.ceil(120 - elapsed)} 秒才能跳过`, 'w');
+      SFX.buildFail();
+      return;
+    }
+    // 跳过成本: 20 DNA（转生减免50%）
+    let skipCost = 20;
+    if (this.prestigeCount > 0) skipCost = Math.ceil(skipCost * 0.5);
+    if ((this.res.dna || 0) < skipCost) {
+      this.log(`🧬 跳过需要 ${skipCost}🧬，DNA不足`, 'e');
+      SFX.buildFail();
+      return;
+    }
+    this.res.dna -= skipCost;
+    this.log(`🧬 跳过培养任务 — 消耗 ${skipCost}🧬`, 'w');
+    this._evoTask = null;
+    this._evoTaskBase = null;
+    this._evoEconTimer = 0;
+    this._evoTaskStartTime = 0;
+    this._doPhaseUpgrade();
+  },
+
+  // 实际执行阶段升级（原manualCoreUpgrade核心逻辑）
+  _doPhaseUpgrade() {
     // 阶段1→2时: 将自动传送带转化为手动传送带（保留已有连接）
     if (this.phase === 1 && this._computeBelts) {
       const { belts } = this._computeBelts();
@@ -8062,6 +10537,11 @@ const G = {
     }
 
     this.phase++;
+    // v3.0 §2: 重置探索度追踪（新阶段从0开始计）
+    this._prevExplScore = 0;
+    // v3.0 §1: 清除培养任务UI
+    const evoPanel = document.querySelector('.evo-task-active');
+    if (evoPanel) evoPanel.remove();
     // v2.0: 记录P3进入时间（用于资源竞争缓冲期）
     if (this.phase === 3) this._p3EntryTime = Date.now();
 
@@ -8165,8 +10645,25 @@ const G = {
       el.addEventListener('mouseleave', () => GameTooltip.hide());
     });
 
+    // v3.0 §2: 探索度详细面板
+    this._renderExplorationPanel(panel);
+    // v3.0 §6: P3b子阶段探索度面板
+    this._renderP3bExplorationPanel(panel);
+
     // 按钮状态
-    if (allMet) {
+    if (this._evoTask) {
+      // v3.0 §1: 培养任务进行中
+      const task = this._evoTask;
+      if (task.check(this)) {
+        btn.textContent = `🧬 培养完成! 点击升级 ▸ P${nextPhase}`;
+        btn.className = 'core-upgrade-btn ready';
+        btn.disabled = false;
+      } else {
+        btn.textContent = `🧬 培养中: ${task.icon} ${task.progress(this)}/${task.max}`;
+        btn.className = 'core-upgrade-btn';
+        btn.disabled = true;
+      }
+    } else if (allMet) {
       btn.textContent = `升级核心 ▸ P${nextPhase} · ${nextCC ? nextCC.name : ''}`;
       btn.className = 'core-upgrade-btn ready';
       btn.disabled = false;
@@ -8176,6 +10673,112 @@ const G = {
       btn.className = 'core-upgrade-btn locked';
       btn.disabled = true;
     }
+  },
+
+  // v3.0 §2: 渲染探索度详细面板（嵌入核心升级面板底部）
+  _renderExplorationPanel(container) {
+    const es = this.getExplorationStatus();
+    if (!es.items.length) {
+      const old = container.querySelector('.expl-panel');
+      if (old) old.remove();
+      return;
+    }
+    let panel = container.querySelector('.expl-panel');
+    if (!panel) {
+      panel = document.createElement('div');
+      panel.className = 'expl-panel';
+      panel.style.cssText = 'margin-top:8px;border-top:1px solid rgba(255,255,255,0.06);padding-top:6px;';
+      const btn = container.querySelector('.core-upgrade-btn');
+      if (btn) container.insertBefore(panel, btn);
+      else container.appendChild(panel);
+    }
+
+    const pct = es.required > 0 ? Math.min(es.score / es.required * 100, 100) : 100;
+    const barColor = es.met ? '#14b8a6' : '#f59e0b';
+    const headerColor = es.met ? '#14b8a6' : '#94a3b8';
+
+    let html = `<div style="display:flex;align-items:center;gap:6px;margin-bottom:5px;cursor:pointer" onclick="this.parentElement.querySelector('.expl-items').classList.toggle('expl-collapsed')">
+      <span style="font-size:0.72em;font-weight:700;color:${headerColor};font-family:'Orbitron',monospace">📊 P${this.phase} 探索度</span>
+      <div style="flex:1;height:5px;background:rgba(255,255,255,0.06);border-radius:3px;overflow:hidden">
+        <div style="width:${pct}%;height:100%;background:${barColor};border-radius:3px;transition:width 0.5s"></div>
+      </div>
+      <span style="font-size:0.68em;font-weight:700;color:${headerColor}">${es.score}/${es.required}</span>
+      <span style="font-size:0.6em;color:var(--dim)">▾</span>
+    </div>`;
+
+    html += '<div class="expl-items" style="display:flex;flex-direction:column;gap:3px">';
+    for (const item of es.items) {
+      const done = item.done;
+      const cur = item.current;
+      const max = item.max;
+      const color = done ? '#14b8a6' : '#64748b';
+      const textColor = done ? '#14b8a6' : '#94a3b8';
+      const typeColors = { '连线':'#f97316', '远距':'#06d6a0', '技巧':'#a855f7', '布局':'#3b82f6', '建设':'#22c55e', '成长':'#eab308', '挑战':'#ef4444', '探索':'#ec4899', '科技':'#60a5fa', '优化':'#14b8a6', '突变':'#c084fc', '经济':'#fbbf24' };
+      const tc = typeColors[item.type] || '#94a3b8';
+      html += `<div style="display:flex;align-items:center;gap:5px;font-size:0.68em;padding:2px 0;opacity:${done?1:0.85}">
+        <span style="font-size:0.9em;width:14px;text-align:center">${done ? '✅' : '⬜'}</span>
+        <span style="color:${tc};font-size:0.85em;font-weight:700;min-width:28px">${item.type}</span>
+        <span style="color:${textColor};flex:1">${item.icon} ${item.n}</span>
+        ${!done && max > 1 ? `<span style="color:var(--dim);font-size:0.9em">${cur}/${max}</span>` : ''}
+        ${done ? '<span style="color:#14b8a6;font-weight:700">+1</span>' : ''}
+      </div>`;
+    }
+    html += '</div>';
+    panel.innerHTML = html;
+  },
+
+  // v3.0 §6: 渲染P3b子阶段探索度面板
+  _renderP3bExplorationPanel(container) {
+    const panelId = 'p3b-expl-panel';
+    let panel = container.querySelector('.' + panelId);
+    // 只在P3阶段且未解锁P3b时显示
+    if (this.phase !== 3 || this._p3bUnlocked) {
+      if (panel) panel.remove();
+      return;
+    }
+    const es = this.getP3bExplorationStatus();
+    if (!es.items.length) { if (panel) panel.remove(); return; }
+
+    if (!panel) {
+      panel = document.createElement('div');
+      panel.className = panelId;
+      panel.style.cssText = 'margin-top:6px;border-top:1px dashed rgba(96,165,250,0.2);padding-top:6px;';
+      const btn = container.querySelector('.core-upgrade-btn');
+      if (btn) container.insertBefore(panel, btn);
+      else container.appendChild(panel);
+    }
+
+    const pct = es.required > 0 ? Math.min(es.score / es.required * 100, 100) : 100;
+    const barColor = es.met ? '#14b8a6' : '#60a5fa';
+    const headerColor = es.met ? '#14b8a6' : '#60a5fa';
+
+    let html = `<div style="display:flex;align-items:center;gap:6px;margin-bottom:5px;cursor:pointer" onclick="this.parentElement.querySelector('.p3b-items').classList.toggle('expl-collapsed')">
+      <span style="font-size:0.72em;font-weight:700;color:${headerColor};font-family:'Orbitron',monospace">📡 P3b 物流进阶</span>
+      <div style="flex:1;height:5px;background:rgba(255,255,255,0.06);border-radius:3px;overflow:hidden">
+        <div style="width:${pct}%;height:100%;background:${barColor};border-radius:3px;transition:width 0.5s"></div>
+      </div>
+      <span style="font-size:0.68em;font-weight:700;color:${headerColor}">${es.score}/${es.required}</span>
+      <span style="font-size:0.6em;color:var(--dim)">▾</span>
+    </div>`;
+
+    html += '<div class="p3b-items" style="display:flex;flex-direction:column;gap:3px">';
+    const typeColors = { '建设':'#22c55e', '探索':'#ec4899', '突变':'#c084fc', '连线':'#f97316', '布局':'#3b82f6', '远距':'#06d6a0' };
+    for (const item of es.items) {
+      const done = item.done;
+      const cur = item.current;
+      const max = item.max;
+      const textColor = done ? '#14b8a6' : '#94a3b8';
+      const tc = typeColors[item.type] || '#94a3b8';
+      html += `<div style="display:flex;align-items:center;gap:5px;font-size:0.68em;padding:2px 0;opacity:${done?1:0.85}">
+        <span style="font-size:0.9em;width:14px;text-align:center">${done ? '✅' : '⬜'}</span>
+        <span style="color:${tc};font-size:0.85em;font-weight:700;min-width:28px">${item.type}</span>
+        <span style="color:${textColor};flex:1">${item.icon} ${item.n}</span>
+        ${!done && max > 1 ? `<span style="color:var(--dim);font-size:0.9em">${cur}/${max}</span>` : ''}
+        ${done ? '<span style="color:#14b8a6;font-weight:700">+1</span>' : ''}
+      </div>`;
+    }
+    html += '</div>';
+    panel.innerHTML = html;
   },
 
   updatePhase() {
@@ -8203,7 +10806,8 @@ const G = {
     if (adjHint) {
       const unlocked = this.getUnlockedAdjacencyCount();
       const total = ADJACENCY_RULES.length;
-      adjHint.innerHTML = `<span style="color:var(--cyan);font-size:0.72em">🔗 已解锁 ${unlocked}/${total} 条邻接规则</span>`;
+      const discovered = Object.keys(this._discoveredAdj || {}).length;
+      adjHint.innerHTML = `<span style="color:var(--cyan);font-size:0.72em">🔗 已解锁 ${unlocked}/${total} 条邻接规则 | <a href="#" onclick="G.showAdjGuide();return false" style="color:#14b8a6;text-decoration:underline">图鉴 (${discovered}/${unlocked})</a></span>`;
     }
   },
 
@@ -8303,6 +10907,35 @@ const G = {
     this._loopId = setInterval(() => {
       if (this.paused) return;
 
+      // v3.0 §8: 变体运行时效果
+      // speedrun 变体计时器
+      if (this._variantTimeLimit) {
+        this._variantTimer++;
+        if (this._variantTimer >= this._variantTimeLimit) {
+          // 超时后每60秒效率-5%
+          const overtime = this._variantTimer - this._variantTimeLimit;
+          if (overtime > 0 && overtime % 3600 === 0) { // 60秒 (3600 tick)
+            this.gEff = Math.max(0.2, this.gEff - 0.05);
+            this.log(`⏱️ 竞速试炼! 超时 ${Math.floor(overtime/60)} 分钟，效率-5% → ${formatNum(this.gEff*100, 1)}%`, 'w');
+            this.showEvent('⏱️ 超时惩罚', `效率已下降至 ${formatNum(this.gEff*100, 1)}%\n\n时间就是生命！`, '#06b6d4');
+          }
+        }
+      }
+      // toxic 变体资源衰减
+      if (this._variantToxic) {
+        if (this._variantTimer % (this._toxicInterval || 3600) === 0) { // 默认60秒
+          const resources = Object.keys(RES).filter(k => this.res[k] > 0);
+          if (resources.length > 0) {
+            const targetRes = resources[Math.floor(Math.random() * resources.length)];
+            const decayAmount = this.res[targetRes] * 0.1; // -10%
+            this.res[targetRes] = Math.max(0, this.res[targetRes] - decayAmount);
+            this._toxicTarget = targetRes;
+            this.log(`☠️ 毒素蔓延! ${RES[targetRes]?.icon||targetRes}${RES[targetRes]?.n||targetRes} -10%`, 'w');
+            this.showEvent('☠️ 毒素蔓延', `${RES[targetRes]?.icon||targetRes}${RES[targetRes]?.n||targetRes} 被污染了！\n\n保持多元化生产对抗毒素。`, '#84cc16');
+          }
+        }
+      }
+
       for (let s = 0; s < this.spd; s++) {
         this.updateRates();
 
@@ -8311,12 +10944,16 @@ const G = {
           this.res[k] = (this.res[k]||0) + this.rates[k];
           if (this.res[k] < 0) this.res[k] = 0;
         }
+        // v3.0 §8.5: 创造模式资源锁定
+        if (this._creativeMode) {
+          for (const k in RES) this.res[k] = 99999;
+        }
 
         // Population from buildings — 有上限且消耗葡萄糖
         const bCount = this.totalBuildings();
         const popCap = this._popCap();
         if (this.pop < popCap) {
-          const growth = bCount * 0.03 * this.gEff;
+          const growth = bCount * BALANCE.popGrowthRate * this.gEff;
           this.pop = Math.min(this.pop + growth, popCap);
         }
         // 种群消耗葡萄糖 (每100个体消耗0.5葡萄糖/s) + 功率水平系统
@@ -8415,6 +11052,10 @@ const G = {
         // ★ Q4：变异实验室tick
         this._tickMutBrewing();
         this._checkMutLabUnlock();
+        // v3.0 §8.3: 催化剂倒计时
+        this._tickCatalysts();
+        // v2.1 §8.2：培养皿P3+配方分散解锁检查
+        this._checkPetriP3Unlock();
         this.rt++;
       }
 
@@ -8468,9 +11109,19 @@ const G = {
       this.stats.onlineTime++;
       this.updateStats();
       if (this.animTick % 5 === 0) this.renderStats();
+      if (this.animTick % 5 === 0) this._renderCatalystPanel(); // v3.0 §8.3
+      if (this.animTick % 60 === 0) this._renderCreativeBadge(); // v3.0 §8.5
       if (this.animTick % 3 === 0) this.updateCellRates();
       // ★ 方案F：供给同步加成每3帧计算一次
       if (this.animTick % 3 === 0) this.computeSyncBonuses();
+      // v3.0 §2: 探索度检查（每10帧一次）
+      if (this.animTick % 10 === 0) this._checkExplorationProgress();
+      // v3.0 §3: 科技前置条件检查（每15帧一次）
+      if (this.animTick % 15 === 0) this._checkTechPrereqProgress();
+      // v3.0 §6: P3b子阶段解锁检查（每12帧一次）
+      if (this.animTick % 12 === 0) this._checkP3bUnlock();
+      // v3.0 §1: 进化培养任务检测
+      this._tickEvoTask();
 
       // Evolution button
       document.getElementById('evoBtn').disabled = !this.canEvolve();
@@ -8863,12 +11514,28 @@ const G = {
                 (bonusPct > 0 ? ` <span style="color:#22c55e">+${bonusPct}%产出</span>` : ' <span style="color:var(--dim)">需≥50%触发加成</span>');
             }
           }
+          // v3.0 §4+§5: 距离衰减信息（含中继减半）
+          const isRelayBelt = this._isBeltViaRelay(newKey);
+          const distEffFactor = this._distanceEfficiency(cellDist, isRelayBelt);
+          const distEffPct = Math.round(distEffFactor * 100);
+          const relayHops = this._countRelayHops(newKey);
+          const relayStr = isRelayBelt ? ` <span style="color:#60a5fa">📡 中继·衰减减半</span>` : '';
+          const relayHopStr = relayHops > 0 ? `<br><span style="color:#60a5fa">📡 中继跳数: ${relayHops} (-${relayHops*5}%固定损耗)</span>` : '';
+          const distEffStr = distEffFactor < 1 ? ` <span style="color:var(--orange)">📉 距离衰减: ${distEffPct}%</span>` : '';
+          const beltMaintStr = cellDist >= BALANCE.beltMaintMinDist ? `<br><span style="color:var(--orange)">🔧 远距维护: -${(BALANCE.beltMaintPerDist * (cellDist - 2)).toFixed(1)}⚡/s</span>` : '';
+          // v3.0 §7: 传输量/负载信息
+          const loadData = this._beltLoadCache?.[newKey];
+          const flowTotal = loadData?.totalFlow || 0;
+          const loadLabel = flowTotal <= 0.01 ? '空闲' : flowTotal < 0.5 ? '低载' : flowTotal < 2.0 ? '正常' : '满载';
+          const loadColor = flowTotal <= 0.01 ? '#64748b' : flowTotal < 0.5 ? '#eab308' : flowTotal < 2.0 ? '#22c55e' : '#f97316';
+          const loadStr = `<br><span style="color:${loadColor}">📊 传输量: ${flowTotal.toFixed(1)}/s (${loadLabel})</span>`;
           document.getElementById('ttDesc').innerHTML =
             `${fromName} → ${toName}` +
             `<br><span style="color:${effColor}">⚡ 传输效率: ${effPct}%</span> · <span style="color:var(--color-info)">📦 容量: ${cap}/s</span>` +
-            `<br><span style="color:${distColor}">${distLabel} (距离${cellDist}格)</span>` +
+            `<br><span style="color:${distColor}">${distLabel} (距离${cellDist}格)</span>${distEffStr}${relayStr}` +
+            beltMaintStr + relayHopStr + loadStr +
             syncLine +
-            `<br><span style="color:#7a9aba;font-size:0.9em">💡 建筑放得越近，传送带越短，资源传输更快更稳定！</span>` +
+            `<br><span style="color:#7a9aba;font-size:0.9em">💡 距离越近效率越高；远距连线可获取额外邻接加成</span>` +
             `<br><span style="color:var(--dim);font-size:0.85em">点击可升级/撤销传送带</span>`;
           tt.classList.add('show');
           tt.style.left = Math.min(e.clientX + 14, window.innerWidth - 260) + 'px';
@@ -9123,11 +11790,21 @@ const G = {
             if (fromPort) {
               const usage = getPortUsage(link.fi);
               const techExtra = this._extraOutPorts || 0;
-              if (usage.out >= fromPort.maxOut + techExtra) continue; // 输出端口已满
+              const mpbF = this._mutPortBonuses?.[fromType];
+              const mutExtraOut = mpbF ? mpbF.extraOut : 0;
+              // v3.0 §9.2: 特化端口加成
+              const specF = this._specCache?.perBuilding?.[link.fi];
+              const specExtraOutF = (specF?.extraOutPort || 0) + (specF?.extraPorts || 0);
+              if (usage.out >= fromPort.maxOut + techExtra + mutExtraOut + specExtraOutF) continue; // 输出端口已满
             }
             if (toPort) {
               const usage = getPortUsage(link.ti);
-              if (usage.in >= toPort.maxIn) continue; // 输入端口已满
+              const mpbT = this._mutPortBonuses?.[toType];
+              const mutExtraIn = mpbT ? mpbT.extraIn : 0;
+              // v3.0 §9.2: 特化端口加成
+              const specT = this._specCache?.perBuilding?.[link.ti];
+              const specExtraInT = specT?.extraPorts || 0;
+              if (usage.in >= toPort.maxIn + mutExtraIn + specExtraInT) continue; // 输入端口已满
             }
           }
 
@@ -9215,6 +11892,8 @@ const G = {
       // 缓存usedEdges给proximity使用
       this._beltEdges = usedEdges;
       this._activeBelts = belts;
+      // v3.0 §7: 传送带负载缓存 — 预计算每条传送带的总流量和需求
+      const _beltLoadCache = {};  // beltKey → { totalFlow, totalDemand, loadRatio }
 
       for (const belt of belts) {
         const c1 = getCellCenter(belt.fi, gridEl, gRect);
@@ -9255,9 +11934,20 @@ const G = {
         const beltKey = Math.min(belt.fi, belt.ti) + '-' + Math.max(belt.fi, belt.ti);
         const beltLv = this.getBeltLevel(beltKey);
         const beltEff = this.getBeltEfficiency(beltKey);
-        const lvScale = 0.7 + beltLv * 0.15; // Lv1=0.85, Lv5=1.45
-        const trackW = (isMulti ? 10 : 8) * lvScale;  // 轨道宽度随等级增长（加粗）
+        // v3.0 §4: 距离影响线条粗细
+        const beltDist = this.getBeltDistance(beltKey);
+        // v3.0 §5: 中继连线标识
+        const isRelayBelt = this._isBeltViaRelay(beltKey);
+        const distScale = beltDist <= 1 ? 1.0 : beltDist <= 2 ? 0.92 : beltDist <= 3 ? 0.8 : 0.65;
+        const lvScale = (0.7 + beltLv * 0.15) * distScale;
+        const trackW = (isMulti ? 10 : 8) * lvScale;  // 轨道宽度随等级增长（加粗），远距变细
         const innerW = (isMulti ? 7 : 5) * lvScale;
+
+        // v3.0 §7.1: 传输量影响线条粗细
+        const loadInfo = this._beltLoadCache?.[beltKey];
+        const totalFlow = loadInfo?.totalFlow || 0;
+        // 负载级别: 0=空闲, 1=低载, 2=正常, 3=满载
+        const loadLevel = totalFlow <= 0.01 ? 0 : totalFlow < 0.5 ? 1 : totalFlow < 2.0 ? 2 : 3;
 
         // 判断是否需要 L 形拐弯（非直线方向）
         const adx = Math.abs(dx), ady = Math.abs(dy);
@@ -9281,6 +11971,43 @@ const G = {
         const segments = isOrthogonal
           ? [[sx, sy, ex, ey]]
           : [[sx, sy, mx, my], [mx, my, ex, ey]];
+
+        // ★ v2.1: 休眠建筑 — 传送带灰色渲染，停止货物传输
+        const fiDormant = this._dormantCells[belt.fi];
+        const tiDormant = this._dormantCells[belt.ti];
+        if (fiDormant || tiDormant) {
+          const pulse = 0.2 + Math.sin(Date.now() / 800) * 0.08;
+          // 灰色虚线轨道
+          ctx.lineWidth = 5;
+          ctx.strokeStyle = `rgba(80,90,100,${pulse})`;
+          ctx.setLineDash([5, 5]);
+          ctx.lineDashOffset = -(Date.now() / 300) % 10;
+          ctx.lineCap = 'butt';
+          ctx.lineJoin = 'miter';
+          drawLPath(); ctx.stroke();
+          ctx.lineWidth = 2.5;
+          ctx.strokeStyle = `rgba(40,50,60,${pulse + 0.1})`;
+          ctx.setLineDash([3, 3]);
+          drawLPath(); ctx.stroke();
+          ctx.setLineDash([]);
+          // 两端灰色小方块
+          const tSz = 2.5;
+          ctx.fillStyle = `rgba(80,90,100,${pulse + 0.15})`;
+          ctx.fillRect(sx - tSz, sy - tSz, tSz*2, tSz*2);
+          ctx.fillRect(ex - tSz, ey - tSz, tSz*2, tSz*2);
+          // 悬停高亮仍可操作
+          if (this._hoverBeltKey === beltKey) {
+            ctx.save();
+            ctx.lineWidth = 8;
+            ctx.strokeStyle = 'rgba(249,115,22,0.25)';
+            ctx.setLineDash([]);
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            drawLPath(); ctx.stroke();
+            ctx.restore();
+          }
+          continue; // 跳过正常渲染和粒子
+        }
 
         // ★ 无效传送带（没有 FLOW_MAP 对应关系）→ 灰色虚线渲染
         if (belt.invalid) {
@@ -9563,6 +12290,27 @@ const G = {
           ctx.restore();
         }
 
+        // -- v3.0 §5: 中继连线蓝色脉冲光晕 --
+        if (isRelayBelt) {
+          ctx.save();
+          const relayPulse = 0.15 + Math.sin(t / 400) * 0.08;
+          ctx.lineWidth = trackW + 4;
+          ctx.strokeStyle = `rgba(96,165,250,${relayPulse})`;
+          ctx.lineCap = 'round';
+          ctx.lineJoin = 'round';
+          ctx.setLineDash([]);
+          drawLPath(); ctx.stroke();
+          // 中继标识小圆点在中点
+          const midSeg = segments[Math.floor(segments.length / 2)];
+          const rmx = (midSeg[0] + midSeg[2]) / 2;
+          const rmy = (midSeg[1] + midSeg[3]) / 2;
+          ctx.fillStyle = `rgba(96,165,250,${0.4 + Math.sin(t / 300) * 0.2})`;
+          ctx.beginPath();
+          ctx.arc(rmx, rmy, 3, 0, Math.PI*2);
+          ctx.fill();
+          ctx.restore();
+        }
+
         // -- 11) 悬停高亮光晕（鼠标靠近时发光提示可点击） --
         if (this._hoverBeltKey === beltKey) {
           ctx.save();
@@ -9636,6 +12384,52 @@ const G = {
           ctx.globalAlpha = 1;
         }
 
+        // v3.0 §7.2: 瓶颈高亮 — 当传送带上次流量极低但需求端需要时
+        if (loadLevel === 0 && !belt.invalid) {
+          // 空闲传送带：渲染虚线叠加提示
+          const idlePulse = 0.08 + Math.sin(t / 600) * 0.04;
+          ctx.save();
+          ctx.lineWidth = trackW * 0.5;
+          ctx.strokeStyle = `rgba(100,116,139,${idlePulse})`;
+          ctx.setLineDash([3, 5]);
+          ctx.lineDashOffset = -(t / 200) % 8;
+          drawLPath(); ctx.stroke();
+          ctx.setLineDash([]);
+          ctx.restore();
+        }
+
+        // v3.0 §7.3: 距离标识 — 远距传送带中点显示距离数字
+        if (beltDist >= 2 && !belt.invalid) {
+          const distMidX = isOrthogonal ? (sx+ex)/2 : mx;
+          const distMidY = isOrthogonal ? (sy+ey)/2 : my;
+          // 距离圆形标签（在传送带法线方向偏移）
+          const dSeg = segments[Math.floor(segments.length / 2)];
+          const dsdx = dSeg[2] - dSeg[0], dsdy = dSeg[3] - dSeg[1];
+          const dsLen = Math.sqrt(dsdx*dsdx + dsdy*dsdy);
+          const dnx = dsLen > 1 ? -dsdy/dsLen : 0;
+          const dny = dsLen > 1 ? dsdx/dsLen : -1;
+          const dLabelX = distMidX + dnx * (trackW/2 + 8);
+          const dLabelY = distMidY + dny * (trackW/2 + 8);
+          // 背景圆
+          const distColor = isRelayBelt ? '#60a5fa' : beltDist >= 3 ? '#f97316' : '#14b8a6';
+          const distAlpha = 0.6 + Math.sin(t / 500) * 0.15;
+          ctx.globalAlpha = distAlpha;
+          ctx.fillStyle = 'rgba(8,14,24,0.85)';
+          ctx.beginPath();
+          ctx.arc(dLabelX, dLabelY, 6, 0, Math.PI*2);
+          ctx.fill();
+          ctx.strokeStyle = distColor + '80';
+          ctx.lineWidth = 0.8;
+          ctx.stroke();
+          // 距离数字
+          ctx.font = 'bold 7px "Share Tech Mono", monospace';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillStyle = distColor;
+          ctx.fillText(beltDist + '', dLabelX, dLabelY);
+          ctx.globalAlpha = 1;
+        }
+
         // 收集活跃传送带用于粒子（使用L形路径中间点作为控制点）
         const cpx = isOrthogonal ? (sx+ex)/2 : mx;
         const cpy = isOrthogonal ? (sy+ey)/2 : my;
@@ -9652,12 +12446,7 @@ const G = {
               // 确定 from 建筑的格子索引（fi 不一定是 from 端）
               const fromGrid = this.grid[belt.fi];
               const actualFromIdx = (fromGrid && fromGrid.type === flow.from) ? belt.fi : belt.ti;
-              const bldMult = this.getUpgradeMultiplier(actualFromIdx);
-              const beltMult2 = this.getBeltMultiplierForBuilding(actualFromIdx);
-              const _hPop = Math.min(this.pop, this._popCap()) * (this.popAlloc.harvest / 100);
-              const fullMult = this.gEff * (1 + _hPop * 0.003 * (this._popEffMult || 1)) * bldMult * beltMult2 * this.lEff * (this._prodMult || 1);
-              const qsBoost = this.qsLv > 0 ? (1 + Math.min(this.qsLv * 0.03, 0.6)) : 1;
-              const baseRate = fromBd.prod[flow.res] * fullMult * qsBoost;
+              const baseRate = this._calcBuildingFlowRate(actualFromIdx, flow.res);
               // 计算该 from 建筑同种资源输出到几条传送带
               let outputBeltCount = 0;
               for (const b2 of belts) {
@@ -9680,12 +12469,7 @@ const G = {
               for (const res of Object.keys(fiBd.prod || {})) {
                 const rc = RES[res]?.c;
                 if (rc === targetColor) {
-                  const bldMult = this.getUpgradeMultiplier(belt.fi);
-                  const beltMult2 = this.getBeltMultiplierForBuilding(belt.fi);
-                  const _hPop2 = Math.min(this.pop, this._popCap()) * (this.popAlloc.harvest / 100);
-                  const fullMult = this.gEff * (1 + _hPop2 * 0.003 * (this._popEffMult || 1)) * bldMult * beltMult2 * this.lEff * (this._prodMult || 1);
-                  const qsBoost = this.qsLv > 0 ? (1 + Math.min(this.qsLv * 0.03, 0.6)) : 1;
-                  flowRate = fiBd.prod[res] * fullMult * qsBoost;
+                  flowRate = this._calcBuildingFlowRate(belt.fi, res);
                   found = true;
                   break;
                 }
@@ -9696,12 +12480,7 @@ const G = {
               for (const res of Object.keys(tiBd.prod || {})) {
                 const rc = RES[res]?.c;
                 if (rc === targetColor) {
-                  const bldMult = this.getUpgradeMultiplier(belt.ti);
-                  const beltMult2 = this.getBeltMultiplierForBuilding(belt.ti);
-                  const _hPop3 = Math.min(this.pop, this._popCap()) * (this.popAlloc.harvest / 100);
-                  const fullMult = this.gEff * (1 + _hPop3 * 0.003 * (this._popEffMult || 1)) * bldMult * beltMult2 * this.lEff * (this._prodMult || 1);
-                  const qsBoost = this.qsLv > 0 ? (1 + Math.min(this.qsLv * 0.03, 0.6)) : 1;
-                  flowRate = tiBd.prod[res] * fullMult * qsBoost;
+                  flowRate = this._calcBuildingFlowRate(belt.ti, res);
                   break;
                 }
               }
@@ -9729,6 +12508,16 @@ const G = {
           });
         }
       }
+
+      // v3.0 §7: 计算每条传送带的负载比率
+      for (const f of activeFlows) {
+        const k = f.beltKey;
+        if (!k) continue;
+        if (!_beltLoadCache[k]) _beltLoadCache[k] = { totalFlow: 0 };
+        _beltLoadCache[k].totalFlow += (f.flowRate || 0);
+      }
+      // 缓存到实例变量给tooltip等使用
+      this._beltLoadCache = _beltLoadCache;
 
       return activeFlows;
     };
@@ -10387,9 +13176,9 @@ const G = {
     const popFoodRow = document.getElementById('rowPopFood');
     if (popFoodRow) {
       if (this.pop > 0) {
-        const foodCost = this.pop * 0.005;
+        const foodCost = this.pop * BALANCE.popFoodCost;
         document.getElementById('statPopFood').textContent = formatRate(-foodCost) + '🟢';
-        document.getElementById('statPopFood').style.color = this.res.glucose >= this.pop * 0.005 ? '#8a6a3a' : '#ef4444';
+        document.getElementById('statPopFood').style.color = this.res.glucose >= this.pop * BALANCE.popFoodCost ? '#8a6a3a' : '#ef4444';
       } else {
         document.getElementById('statPopFood').textContent = '—';
         document.getElementById('statPopFood').style.color = 'var(--dim)';
@@ -10458,7 +13247,8 @@ const G = {
         if (mc.glucose) parts.push(`-${formatNum(mc.glucose, 1)}🟢`);
         if (mc.protein) parts.push(`-${formatNum(mc.protein, 1)}🧪`);
         const overheadPct = Math.round((this._maintenanceOverhead - 1) * 100);
-        maintEl.textContent = parts.length > 0 ? parts.join(' ') + (overheadPct > 0 ? ` (+${overheadPct}%开销)` : '') : '无';
+        const beltMaintStr = this._beltMaintCost > 0 ? ` (含远距管线-${formatNum(this._beltMaintCost, 1)}⚡)` : '';
+        maintEl.textContent = parts.length > 0 ? parts.join(' ') + (overheadPct > 0 ? ` (+${overheadPct}%开销)` : '') + beltMaintStr : '无';
         // 颜色：维护费越高越红
         const totalMaint = Object.values(mc).reduce((a,b) => a + b, 0);
         maintEl.style.color = totalMaint > 3 ? '#ef4444' : totalMaint > 1.5 ? '#f97316' : totalMaint > 0.5 ? '#eab308' : '#22c55e';
@@ -10554,6 +13344,9 @@ const G = {
         localStorage.setItem('bioHighScore', String(score));
       }
 
+      // v1.0.2: 检查评级首次达成奖励
+      this._checkRatingRewards(score);
+
       // 显示历史最高分（只有重置过至少一次才有意义）
       const highScore = Math.max(score, parseInt(localStorage.getItem('bioHighScore') || '0', 10));
       const resets = parseInt(localStorage.getItem('bioResetCount') || '0', 10);
@@ -10618,7 +13411,11 @@ const G = {
       }
       const allReady = readyPct >= 100;
       html += `<span style="color:${allReady ? 'var(--green)' : 'var(--red)'}">资源 ${allReady ? '✓ 就绪' : readyPct.toFixed(0) + '%'}</span>`;
-      evoStatus.innerHTML = html;
+      // ★ P1-2: 只在内容变化时才写入 innerHTML（避免每帧重解析）
+      if (evoStatus._prevHtml !== html) {
+        evoStatus.innerHTML = html;
+        evoStatus._prevHtml = html;
+      }
     }
 
     // Evolution button text
@@ -10638,12 +13435,17 @@ const G = {
     this.updateRedDots();
 
     // 建筑按钮可购买状态实时刷新（轻量 DOM 操作，不重建）
-    document.querySelectorAll('#buildList .action-btn[data-b]').forEach(btn => {
+    // ★ P1-2: 缓存 querySelectorAll 结果，避免每帧查 DOM
+    if (!this._buildBtnCache || this._buildBtnCacheDirty) {
+      this._buildBtnCache = Array.from(document.querySelectorAll('#buildList .action-btn[data-b]'));
+      this._buildBtnCacheDirty = false;
+    }
+    for (const btn of this._buildBtnCache) {
       const key = btn.dataset.b;
-      if (!key || btn.classList.contains('locked')) return;
+      if (!key || btn.classList.contains('locked')) continue;
       const canAfford = this.checkRes(this.scaledCost(key));
       btn.classList.toggle('cant-afford', !canAfford);
-    });
+    }
   },
 
   // ===== SECTION TOGGLE (折叠/展开) =====
@@ -10850,11 +13652,12 @@ const G = {
     // colonyStatusBar 现在是隐藏的兼容占位符，不需要操作
     // empireOverview 始终可见，无需条件控制
 
-    // 2. 排行榜 + 迷你排行榜：进化 >= Lv.2 直接用 display 控制
+    // 2. 排行榜 + 迷你排行榜：进化 >= Lv.2 或转生过即解锁
     const miniLb = document.getElementById('miniLeaderboard');
     const lbWrap = document.getElementById('lbBtnWrap');
     const lbHint = document.getElementById('lbLockedHint');
-    if (evoLv2) {
+    const lbUnlocked = evoLv2 || (this.prestigeCount || 0) >= 1;
+    if (lbUnlocked) {
       if (miniLb) miniLb.style.display = '';
       if (lbWrap) lbWrap.style.display = '';
       if (lbHint) lbHint.classList.add('hidden');
@@ -10994,7 +13797,7 @@ const G = {
     // 箭头浮层（在按钮右侧）
     const arrow = document.createElement('div');
     arrow.className = 'guide-arrow-float';
-    arrow.textContent = '◀ 点这里';
+    arrow.textContent = '👈 点这里';
     arrow.style.left = (rect.right + 6) + 'px';
     arrow.style.top = (rect.top + rect.height / 2 - 8) + 'px';
     document.body.appendChild(arrow);
@@ -11551,7 +14354,10 @@ const G = {
 
   // ===== CONTROLS =====
   toggleSpeed() {
-    this.spd = this.spd >= 4 ? 1 : this.spd * 2;
+    const maxSpd = this._unlockedMilestones?.turbo ? 4 : 2;
+    let next = this.spd * 2;
+    if (next > maxSpd) next = 1;
+    this.spd = next;
     document.getElementById('spdDisplay').textContent = this.spd + '×';
     const btn = document.getElementById('spdBtn');
     btn.classList.remove('spd-2', 'spd-4');
@@ -11588,7 +14394,8 @@ const G = {
 
   save(silent) {
     // 阶段1-2不保存存档（让新手快速体验，到阶段3才开始持久化）
-    if (this.phase < 3) {
+    // 但转生玩家（prestigeCount >= 1）始终可以保存，避免转生后P1→P3期间关页面丢进度
+    if (this.phase < 3 && !(this.prestigeCount >= 1)) {
       if (!silent) this.log('▸ 阶段3前进度不保存 — 加油升阶！', 'w');
       return;
     }
@@ -11621,6 +14428,17 @@ const G = {
         _competitionEnabled: this._competitionEnabled,
         _competitionTutorialShown: this._competitionTutorialShown,
         _portFullShown: this._portFullShown,
+        // v3.0 §4: 远距首次弹窗标志
+        _firstDist2Shown: this._firstDist2Shown,
+        _firstDist3Shown: this._firstDist3Shown,
+        _firstDist4Shown: this._firstDist4Shown,
+        // v3.0 §2: 探索度
+        _prevExplScore: this._prevExplScore || 0,
+        // v3.0 §1: 培养任务
+        _evoTaskId: this._evoTask?.id || null,
+        _evoTaskBase: this._evoTaskBase,
+        _evoEconTimer: this._evoEconTimer || 0,
+        _evoTaskStartTime: this._evoTaskStartTime || 0,
         _nitrogenBonus: this._nitrogenBonus,
         _proteinBonus: this._proteinBonus,
         _transportBonus: this._transportBonus,
@@ -11641,17 +14459,27 @@ const G = {
         _petriBuff: this._petriBuff || null,
         _petriCount: this._petriCount || 0,
         _petriActiveZone: this._petriActiveZone || null,
+        _petriP3Unlocked: this._petriP3Unlocked || false, // v2.1 §8.2
         // ★ Q4：变异实验室
         _mutLabUnlocked: this._mutLabUnlocked || false,
         _mutSlots: this._mutSlots || [],
         _mutBrewing: this._mutBrewing || null,
         _mutOffers: this._mutOffers || [],
         _mutHistory: this._mutHistory || [],
+        _mutPortTargets: this._mutPortTargets || {},  // v2.1 §9.2
+        _presPortTargets: this._presPortTargets || [], // v2.1 §9.3
+        _discoveredAdj: this._discoveredAdj || {},     // v2.1 §10.4
+        _dormantCells: this._dormantCells || {},       // v2.1 建筑休眠
+        _p3bUnlocked: this._p3bUnlocked || false,     // v3.0 §6 P3b子阶段
+        _p3bExplScore: this._p3bExplScore || 0,        // v3.0 §6
+        _specializations: this._specializations || {},  // v3.0 §9.2 建筑特化
         _mutCategoryLock: this._mutCategoryLock || null,
         _mutBrewCount: this._mutBrewCount || 0,
         // ★ 终局高潮系统
         _afterglowActive: this._afterglowActive || false,
         _wonderSprintActive: this._wonderSprintActive || false,
+        // v3.0 §8.3: 催化剂状态
+        _catalysts: this._catalysts || {},
       };
       localStorage.setItem('bioSphereV3', JSON.stringify(s));
       if (!silent) this.log('▸ 已保存', 's');
@@ -11718,16 +14546,16 @@ const G = {
         }
       }
       this.techs = s.techs || this.techs;
-      this.pop = s.pop || 0;
-      this.gEff = s.gEff || 1;
-      this.eL = s.eL || 1;
-      this.eP = s.eP || 0;
-      this.phase = s.phase || 1;
-      this.rt = s.rt || 0;
+      this.pop = s.pop ?? 0;
+      this.gEff = s.gEff ?? 1;
+      this.eL = s.eL ?? 1;
+      this.eP = s.eP ?? 0;
+      this.phase = s.phase ?? 1;
+      this.rt = s.rt ?? 0;
       this.rTech = s.rTech;
-      this.rProg = s.rProg || 0;
+      this.rProg = s.rProg ?? 0;
       this.wBuild = s.wBuild;
-      this.wProg = s.wProg || 0;
+      this.wProg = s.wProg ?? 0;
       this.wonderComplete = s.wonderComplete || false;
       this._wonderEventsTriggered = s._wonderEventsTriggered || [];  // ★ 改进2：恢复奇观事件记录
       this.achievements = s.achievements || {};
@@ -11740,50 +14568,79 @@ const G = {
       this.beltLevels = s.beltLevels || {};
       this.manualBelts = s.manualBelts || {};
       this.removedBelts = s.removedBelts || {};
-      // 科技树分支状态恢复
-      if (s._collectorBonus) this._collectorBonus = s._collectorBonus;
-      if (s._energyBonus) this._energyBonus = s._energyBonus;
-      if (s._energyAdjBonus) this._energyAdjBonus = s._energyAdjBonus;
-      if (s._extraOutPorts) this._extraOutPorts = s._extraOutPorts;
-      if (s._beltCapBonus) this._beltCapBonus = s._beltCapBonus;
-      if (s._p3EntryTime) this._p3EntryTime = s._p3EntryTime;
+      // 科技树分支状态恢复 — P2-1: 使用 'in' 检查避免 falsy 值丢失
+      if ('_collectorBonus' in s) this._collectorBonus = s._collectorBonus;
+      if ('_energyBonus' in s) this._energyBonus = s._energyBonus;
+      if ('_energyAdjBonus' in s) this._energyAdjBonus = s._energyAdjBonus;
+      if ('_extraOutPorts' in s) this._extraOutPorts = s._extraOutPorts;
+      if ('_beltCapBonus' in s) this._beltCapBonus = s._beltCapBonus;
+      if ('_p3EntryTime' in s) this._p3EntryTime = s._p3EntryTime;
       // v2.0: 恢复教学flag
-      if (s._p2PortTutorialPending) this._p2PortTutorialPending = s._p2PortTutorialPending;
-      if (s._p3LogisticsTutorialPending) this._p3LogisticsTutorialPending = s._p3LogisticsTutorialPending;
-      if (s._adjPreviewShown) this._adjPreviewShown = s._adjPreviewShown;
-      if (s._competitionEnabled) this._competitionEnabled = s._competitionEnabled;
-      if (s._competitionTutorialShown) this._competitionTutorialShown = s._competitionTutorialShown;
-      if (s._portFullShown) this._portFullShown = s._portFullShown;
-      if (s._nitrogenBonus) this._nitrogenBonus = s._nitrogenBonus;
-      if (s._proteinBonus) this._proteinBonus = s._proteinBonus;
-      if (s._transportBonus) this._transportBonus = s._transportBonus;
-      if (s._popCapBonus) this._popCapBonus = s._popCapBonus;
-      if (s._popEffMult) this._popEffMult = s._popEffMult;
-      if (s._qsDecayMult) this._qsDecayMult = s._qsDecayMult;
-      if (s._qsCapBonus) this._qsCapBonus = s._qsCapBonus;
-      if (s._evoBoostMult) this._evoBoostMult = s._evoBoostMult;
+      if ('_p2PortTutorialPending' in s) this._p2PortTutorialPending = s._p2PortTutorialPending;
+      if ('_p3LogisticsTutorialPending' in s) this._p3LogisticsTutorialPending = s._p3LogisticsTutorialPending;
+      if ('_adjPreviewShown' in s) this._adjPreviewShown = s._adjPreviewShown;
+      if ('_competitionEnabled' in s) this._competitionEnabled = s._competitionEnabled;
+      if ('_competitionTutorialShown' in s) this._competitionTutorialShown = s._competitionTutorialShown;
+      if ('_portFullShown' in s) this._portFullShown = s._portFullShown;
+      // v3.0 §4: 远距首次弹窗标志
+      if ('_firstDist2Shown' in s) this._firstDist2Shown = s._firstDist2Shown;
+      if ('_firstDist3Shown' in s) this._firstDist3Shown = s._firstDist3Shown;
+      if ('_firstDist4Shown' in s) this._firstDist4Shown = s._firstDist4Shown;
+      // v3.0 §2: 探索度
+      if ('_prevExplScore' in s) this._prevExplScore = s._prevExplScore;
+      // v3.0 §1: 培养任务恢复
+      if (s._evoTaskId) {
+        const tasks = EVOLUTION_TASKS[this.phase];
+        if (tasks) {
+          const found = tasks.find(t => t.id === s._evoTaskId);
+          if (found) {
+            this._evoTask = found;
+            this._evoTaskBase = s._evoTaskBase || {};
+            this._evoEconTimer = s._evoEconTimer || 0;
+            this._evoTaskStartTime = s._evoTaskStartTime || Date.now();
+          }
+        }
+      }
+      if ('_nitrogenBonus' in s) this._nitrogenBonus = s._nitrogenBonus;
+      if ('_proteinBonus' in s) this._proteinBonus = s._proteinBonus;
+      if ('_transportBonus' in s) this._transportBonus = s._transportBonus;
+      if ('_popCapBonus' in s) this._popCapBonus = s._popCapBonus;
+      if ('_popEffMult' in s) this._popEffMult = s._popEffMult;
+      if ('_qsDecayMult' in s) this._qsDecayMult = s._qsDecayMult;
+      if ('_qsCapBonus' in s) this._qsCapBonus = s._qsCapBonus;
+      if ('_evoBoostMult' in s) this._evoBoostMult = s._evoBoostMult;
       // Achievement milestones & power tracking
       this._claimedMilestones = s._claimedMilestones || {};
       this._everLowPower = s._everLowPower || false;
       this._recoveredFromCrisis = s._recoveredFromCrisis || false;
       this._everMaintDeficit = s._everMaintDeficit || false;
       // Population allocation
-      if (s.popAlloc) this.popAlloc = s.popAlloc;
+      if ('popAlloc' in s) this.popAlloc = s.popAlloc;
       // Petri experiment
       this._petriCooldown = s._petriCooldown || 0;
       this._petriBuff = s._petriBuff || null;
       this._petriCount = s._petriCount || 0;
       this._petriActiveZone = s._petriActiveZone || null;
+      this._petriP3Unlocked = s._petriP3Unlocked || false; // v2.1 §8.2
       // ★ Q4：变异实验室状态恢复
       this._mutLabUnlocked = s._mutLabUnlocked || false;
       this._mutSlots = s._mutSlots || [];
       this._mutBrewing = s._mutBrewing || null;
       this._mutOffers = s._mutOffers || [];
       this._mutHistory = s._mutHistory || [];
+      this._mutPortTargets = s._mutPortTargets || {};  // v2.1 §9.2
+      this._presPortTargets = s._presPortTargets || []; // v2.1 §9.3
+      this._discoveredAdj = s._discoveredAdj || {};     // v2.1 §10.4
+      this._dormantCells = s._dormantCells || {};       // v2.1 建筑休眠
+      this._p3bUnlocked = s._p3bUnlocked || false;     // v3.0 §6
+      this._p3bExplScore = s._p3bExplScore || 0;        // v3.0 §6
+      this._specializations = s._specializations || {};  // v3.0 §9.2
       this._mutCategoryLock = s._mutCategoryLock || null;
       this._mutBrewCount = s._mutBrewCount || 0;
       // ★ 终局高潮系统状态恢复
       this._wonderSprintActive = s._wonderSprintActive || false;
+      // v3.0 §8.3: 催化剂恢复
+      this._catalysts = s._catalysts || {};
       if (s._afterglowActive) {
         // 存档时余晖仍然激活，恢复后继续显示（缩短剩余时间）
         setTimeout(() => this._startAfterglow(), 500);
@@ -11796,7 +14653,18 @@ const G = {
       this._updateEmpireTitle(achieveCount);
       // ★ Q4：恢复突变效果缓存
       this._recalcMutEffects();
+      // v3.0 §9.2: 恢复特化效果缓存
+      this._recalcSpecEffects();
       if (this._mutLabUnlocked) this._renderMutLabPanel();
+      // v3.0 §6: 旧存档兼容 — 如果已拥有P3b建筑则自动解锁P3b
+      if (this.phase >= 3 && !this._p3bUnlocked) {
+        for (let i = 0; i < this.grid.length; i++) {
+          if (this.grid[i] && P3B_BUILDINGS.has(this.grid[i].type)) {
+            this._p3bUnlocked = true;
+            break;
+          }
+        }
+      }
       // 旧存档迁移：如果网格尺寸发生变化，传送带key中的索引也需要更新
       if (savedGrid.length !== savedLen && savedGrid.length > 0) {
         const migOldCols = s.gridCols || Math.round(Math.sqrt(savedGrid.length));
@@ -12064,10 +14932,13 @@ const G = {
     this.screenShake(4);
 
     this.cancelUpgrade();
-    this.renderGrid();
-    this.renderBuildings(); // 刷新建造列表中的升级按钮状态
-    this.updateRates();
-    this.updateUI();
+    this.refreshAll();
+
+    // v3.0 §9.2: 升级到Lv3时触发特化选择
+    const bldType = this.grid[idx]?.type;
+    if (lv === 3 && bldType && SPECIALIZATIONS[bldType] && !this._specializations?.[idx]) {
+      setTimeout(() => this._showSpecializationChoice(idx, bldType), 300);
+    }
   },
 
   cancelUpgrade() {
@@ -12127,10 +14998,7 @@ const G = {
         if (g && g.type === buildingKey) instances.push(i);
       });
       this._renderBldTypeList(buildingKey, bd, instances);
-      this.renderGrid();
-      this.renderBuildings();
-      this.updateRates();
-      this.updateUI();
+      this.refreshAll();
 
       // 如果全部满级了
       const allMax = instances.every(i => (this.buildingLevels[i] || 1) >= 5);
@@ -12153,11 +15021,72 @@ const G = {
     return this.beltLevels[beltKey] || 1;
   },
 
-  // 传送带效率（产出乘数）
+  // v3.0 §4: 传送带距离（曼哈顿距离）
+  getBeltDistance(beltKey) {
+    const [a, b] = beltKey.split('-').map(Number);
+    const SZ = this.gridSize;
+    const r1 = Math.floor(a / SZ), c1 = a % SZ;
+    const r2 = Math.floor(b / SZ), c2 = b % SZ;
+    return Math.abs(r1 - r2) + Math.abs(c1 - c2);
+  },
+
+  // v3.0 §4: 距离效率衰减因子
+  // dist=1: 100%, dist=2: 92%, dist=3: 80%, dist=4: 65%
+  _distanceEfficiency(dist, viaRelay) {
+    // v3.0 §8.5: 创造模式无距离衰减
+    if (this._creativeMode) return 1.0;
+    if (dist <= 1) return 1.0;
+    const map = { 2: 0.92, 3: 0.80, 4: 0.65 };
+    const base = map[dist] || Math.max(0.1, 1.0 - 0.12 * (dist - 1));
+    // v3.0 §5: 中继衰减减半 — 经过中继的传送带距离惩罚减半
+    if (viaRelay) {
+      const penalty = 1.0 - base; // 衰减量
+      return 1.0 - penalty * 0.5; // 衰减减半
+    }
+    return base;
+  },
+
+  // 传送带效率（产出乘数）— v3.0: 包含距离衰减
   getBeltEfficiency(beltKey) {
     const lv = this.getBeltLevel(beltKey);
     const effMap = { 1: 0.75, 2: 0.9, 3: 1.0, 4: 1.2, 5: 1.5 };
-    return effMap[lv] || 0.75;
+    const baseEff = effMap[lv] || 0.75;
+    // v3.0 §4: 距离衰减
+    const dist = this.getBeltDistance(beltKey);
+    // v3.0 §5: 检查是否经过中继
+    const viaRelay = this._isBeltViaRelay(beltKey);
+    const distFactor = this._distanceEfficiency(dist, viaRelay);
+    // v3.0 §5: 中继链固定损耗（5%每跳）
+    const relayHops = this._countRelayHops(beltKey);
+    // v3.0 §9.2: relay_amp 特化 — 中继衰减可降至0%
+    const relayDecayRate = this._specCache?.relayDecayOverride !== null && this._specCache?.relayDecayOverride !== undefined
+      ? (1 - this._specCache.relayDecayOverride) // 0%衰减 → 乘数1.0
+      : 0.95; // 默认5%衰减
+    const relayPenalty = relayHops > 0 ? Math.pow(relayDecayRate, relayHops) : 1.0;
+    // v3.0 §9.2: transport_speed 特化 — 全局传送带效率加成
+    const specEffBonus = 1 + (this._specCache?.beltEffBonus || 0);
+    // v3.0 §8.3: 物流催化剂加成
+    const catalystBeltBonus = 1 + this._getCatalystValue('beltEff');
+    return baseEff * distFactor * relayPenalty * specEffBonus * catalystBeltBonus;
+  },
+
+  // v3.0 §5: 检查传送带是否涉及中继站
+  _isBeltViaRelay(beltKey) {
+    const parts = beltKey.split('-');
+    const a = +parts[0], b = +parts[1];
+    const ga = this.grid[a], gb = this.grid[b];
+    return (ga && BLDS[ga.type]?.isRelay) || (gb && BLDS[gb.type]?.isRelay);
+  },
+
+  // v3.0 §5: 计算经过的中继跳数（0=不经过中继，1=一端是中继，2=双端都是中继）
+  _countRelayHops(beltKey) {
+    const parts = beltKey.split('-');
+    const a = +parts[0], b = +parts[1];
+    const ga = this.grid[a], gb = this.grid[b];
+    let hops = 0;
+    if (ga && BLDS[ga.type]?.isRelay) hops++;
+    if (gb && BLDS[gb.type]?.isRelay) hops++;
+    return hops;
   },
 
   // 传送带容量上限（每秒资源吞吐量）
@@ -12200,12 +15129,14 @@ const G = {
   getBeltMultiplierForBuilding(idx) {
     const g = this.grid[idx];
     if (!g) return 1;
+    // v2.1: 休眠建筑不参与物流
+    if (this._dormantCells[idx]) return 0;
     const type = g.type;
     const bd = BLDS[type];
     if (!bd) return 1;
 
     // 检查此建筑是否需要输入（是某个 FLOW 的 to 端）
-    const needsInput = FLOW_MAP.some(f => f.to === type);
+    const needsInput = FLOW_TYPES_TO.has(type);
 
     // 找所有方向正确的输入传送带（对端是 from，本端是 to）
     let totalEff = 0;
@@ -12222,9 +15153,9 @@ const G = {
       const otherType = otherG.type;
 
       // ★ 方向性检查：只有对端→本端方向匹配 FLOW_MAP 的才算有效输入
-      const isValidInput = FLOW_MAP.some(f => f.from === otherType && f.to === type);
+      const isValidInput = FLOW_PAIR.has(otherType + '|' + type);
       // 也计算输出方向（本端→对端），用于维持对称性让双方都不停产
-      const isValidOutput = FLOW_MAP.some(f => f.from === type && f.to === otherType);
+      const isValidOutput = FLOW_PAIR.has(type + '|' + otherType);
 
       if (!isValidInput && !isValidOutput) continue;
 
@@ -12444,6 +15375,13 @@ const G = {
 
   // ===== MANUAL BELT CONNECTION =====
   startBeltConnect() {
+    // v3.0 §8: 纯粹主义变体 — 禁止传送带
+    if (this._variantNoBelts) {
+      this.log('🔥 纯粹主义! 禁止使用传送带 — 只能依赖邻接布局', 'w');
+      this.showCursorTooltip('🔥 变体限制: 禁止传送带');
+      SFX.buildFail();
+      return;
+    }
     this.closeBeltActionMenu();
     if (this._petriMode) this.cancelPetriMode();
     this._beltConnectMode = true;
@@ -12459,6 +15397,9 @@ const G = {
     // ★ Q2：显示传送带模式浮动标签
     this._showBeltModeBanner();
     this._startBeltIdleTimer();
+    
+    // v3.0 §8: 蓝图系统 — 在传送带模式中显示蓝图按钮
+    this._showBeltBlueprintButtons();
   },
 
   cancelBeltConnect() {
@@ -12471,9 +15412,155 @@ const G = {
     // 移除高亮
     document.querySelectorAll('.cell.belt-connect-from').forEach(c => c.classList.remove('belt-connect-from'));
     document.querySelectorAll('.cell.belt-connect-target').forEach(c => c.classList.remove('belt-connect-target', 'belt-target-valid', 'belt-target-invalid'));
+    document.querySelectorAll('.belt-dist-badge').forEach(b => b.remove()); // v3.0 §4
     // ★ Q2：移除浮动标签和闲置计时器
     this._hideBeltModeBanner();
     this._stopBeltIdleTimer();
+    
+    // v3.0 §8: 蓝图系统 — 退出传送带模式时隐藏蓝图按钮
+    this._hideBeltBlueprintButtons();
+  },
+
+  // v3.0 §8: 蓝图系统 — 在传送带模式中显示蓝图按钮
+  _showBeltBlueprintButtons() {
+    if (!this._unlockedMilestones?.blueprint) return; // 蓝图里程碑未解锁
+    
+    const banner = document.getElementById('beltModeBanner');
+    if (!banner) return;
+    
+    // 在浮动标签中添加蓝图按钮
+    const blueprintHtml = `
+      <div style="margin-top:8px;display:flex;gap:4px;justify-content:center">
+        <button class="belt-blueprint-btn" onclick="G.saveBeltBlueprint()" title="保存当前传送带布局">
+          <span style="font-size:0.9em">💾</span> 保存
+        </button>
+        <button class="belt-blueprint-btn" onclick="G.showBlueprintList()" title="加载已保存的传送带布局">
+          <span style="font-size:0.9em">🗺️</span> 加载
+        </button>
+      </div>
+    `;
+    
+    // 如果已有蓝图按钮区域，先移除
+    const existing = banner.querySelector('.belt-blueprint-buttons');
+    if (existing) existing.remove();
+    
+    const btnContainer = document.createElement('div');
+    btnContainer.className = 'belt-blueprint-buttons';
+    btnContainer.innerHTML = blueprintHtml;
+    banner.appendChild(btnContainer);
+  },
+
+  // v3.0 §8: 蓝图系统 — 隐藏蓝图按钮
+  _hideBeltBlueprintButtons() {
+    const banner = document.getElementById('beltModeBanner');
+    if (!banner) return;
+    
+    const existing = banner.querySelector('.belt-blueprint-buttons');
+    if (existing) existing.remove();
+  },
+
+  // v3.0 §8: 蓝图系统 — 保存当前传送带布局
+  saveBeltBlueprint() {
+    if (!this._unlockedMilestones?.blueprint) return;
+    
+    const name = prompt('为这个传送带布局命名：', `布局${this._blueprints.length + 1}`);
+    if (!name) return;
+    
+    // 保存当前传送带状态
+    const blueprint = {
+      name: name,
+      belts: [...(this._activeBelts || [])], // 当前活跃传送带
+      grid_snapshot: this.grid.map(g => g ? { type: g.type } : null), // 建筑快照
+      timestamp: Date.now()
+    };
+    
+    this._blueprints.push(blueprint);
+    this.log(`🗺️ 蓝图已保存: "${name}" (${blueprint.belts.length}条传送带)`, 's');
+    this.showEvent('💾 蓝图保存', `传送带布局 "${name}" 已保存！\\n\\n可在加载时快速重建物流网络。`, '#3b82f6');
+    SFX.build();
+  },
+
+  // v3.0 §8: 蓝图系统 — 显示蓝图列表
+  showBlueprintList() {
+    if (!this._unlockedMilestones?.blueprint) return;
+    if (this._blueprints.length === 0) {
+      this.log('🗺️ 暂无保存的蓝图，请先使用「保存」功能', 'w');
+      return;
+    }
+    
+    const overlay = document.createElement('div');
+    overlay.id = 'blueprintListOverlay';
+    overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.92);z-index:10000;display:flex;align-items:center;justify-content:center;animation:fadeIn 0.3s';
+    
+    let html = `<div style="background:#1a1a2e;border:1px solid rgba(59,130,246,0.3);border-radius:12px;padding:20px;max-width:400px;width:95%;max-height:70vh;overflow-y:auto;box-shadow:0 0 40px rgba(59,130,246,0.15)">`;
+    html += `<div style="text-align:center;margin-bottom:16px">`;
+    html += `<div style="font-size:1.3em">🗺️</div>`;
+    html += `<div style="font-size:1em;font-weight:700;color:#3b82f6;margin-top:4px">传送带蓝图</div>`;
+    html += `<div style="font-size:0.72em;color:#94a3b8;margin-top:4px">选择蓝图加载，快速重建物流网络</div>`;
+    html += `</div>`;
+    
+    this._blueprints.forEach((bp, idx) => {
+      const date = new Date(bp.timestamp).toLocaleString();
+      html += `<div class="blueprint-item" data-index="${idx}" style="
+        background:rgba(59,130,246,0.08);border:1px solid rgba(59,130,246,0.3);border-radius:8px;
+        padding:12px;margin-bottom:8px;cursor:pointer;transition:all 0.2s"
+        onmouseover="this.style.borderColor='#3b82f6';this.style.boxShadow='0 0 12px rgba(59,130,246,0.2)'"
+        onmouseout="this.style.borderColor='rgba(59,130,246,0.3)';this.style.boxShadow='none'">
+        <div style="font-weight:700;color:#3b82f6;font-size:0.9em">${bp.name}</div>
+        <div style="font-size:0.75em;color:#94a3b8">${bp.belts.length}条传送带 • ${date}</div>
+      </div>`;
+    });
+    
+    html += `<div style="margin-top:12px;text-align:center">`;
+    html += `<button class="belt-blueprint-btn" onclick="this.parentElement.parentElement.remove()" style="
+      background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);color:#ef4444;
+      padding:6px 12px;border-radius:4px;cursor:pointer;font-size:0.8em">
+      取消
+    </button>`;
+    html += `</div>`;
+    html += `</div>`;
+    
+    overlay.innerHTML = html;
+    document.body.appendChild(overlay);
+    
+    // 绑定蓝图点击事件
+    overlay.querySelectorAll('.blueprint-item').forEach(item => {
+      item.onclick = () => {
+        const idx = parseInt(item.dataset.index);
+        this.loadBeltBlueprint(idx);
+        overlay.remove();
+      };
+    });
+  },
+
+  // v3.0 §8: 蓝图系统 — 加载蓝图
+  loadBeltBlueprint(idx) {
+    if (!this._unlockedMilestones?.blueprint || !this._blueprints[idx]) return;
+    
+    const bp = this._blueprints[idx];
+    
+    // 确认加载（会清除当前传送带）
+    if (!confirm(`确定要加载蓝图 "${bp.name}"？\\n\\n当前所有传送带将被清除，替换为蓝图中的布局。`)) return;
+    
+    // 清除当前传送带
+    this._activeBelts = [];
+    this.manualBelts = {};
+    this.removedBelts = {};
+    
+    // 应用蓝图中的传送带
+    bp.belts.forEach(belt => {
+      this._activeBelts.push(belt);
+      const key = `${belt.from}-${belt.to}`;
+      this.manualBelts[key] = { from: belt.from, to: belt.to, level: belt.level || 1 };
+    });
+    
+    this.log(`🗺️ 蓝图已加载: "${bp.name}" (${bp.belts.length}条传送带)`, 's');
+    this.showEvent('🗺️ 蓝图加载', `传送带布局 "${bp.name}" 已加载！\\n\\n${bp.belts.length}条传送带已重建。`, '#3b82f6');
+    
+    // 刷新渲染
+    this._chainsDirty = true;
+    this.refreshAll({ buildings: false });
+    SFX.wonderDone();
   },
 
   handleBeltConnectClick(idx) {
@@ -12514,8 +15601,10 @@ const G = {
       const fr = Math.floor(fromIdx / SZ), fc = fromIdx % SZ;
       const tr = Math.floor(idx / SZ), tc = idx % SZ;
       const dist = Math.abs(fr - tr) + Math.abs(fc - tc);
-      if (dist > 4) {
-        this.log('📏 距离太远！最多4格', 'w');
+      // v3.0 §9.2: 特化距离加成
+      const maxBeltDist = 4 + (this._specCache?.extraBeltRange || 0);
+      if (dist > maxBeltDist) {
+        this.log(`📏 距离太远！最多${maxBeltDist}格`, 'w');
         return true;
       }
       // 检查是否已存在（先刷新缓存确保数据最新）
@@ -12533,7 +15622,8 @@ const G = {
       if (!hasAvailablePort(fromIdx, 'out')) {
         const fromBldName = BLDS[this.grid[fromIdx].type]?.n || '建筑';
         const fromDef = PORT_DEFS[this.grid[fromIdx].type];
-        const maxOut = (fromDef?.maxOut || 0) + (this._extraOutPorts || 0);
+        const mpbF = this._mutPortBonuses?.[this.grid[fromIdx].type];
+        const maxOut = (fromDef?.maxOut || 0) + (this._extraOutPorts || 0) + (mpbF?.extraOut || 0);
         this.log(`⚠️ ${fromBldName} 输出端口已满 (${maxOut}/${maxOut})`, 'w');
         return true;
       }
@@ -12575,10 +15665,7 @@ const G = {
       // 检查 FLOW_MAP 是否有有效资源链路
       const fromType = this.grid[fromIdx].type;
       const toType = this.grid[idx].type;
-      const hasValidFlow = FLOW_MAP.some(f =>
-        (f.from === fromType && f.to === toType) ||
-        (f.from === toType && f.to === fromType)
-      );
+      const hasValidFlow = FLOW_PAIR.has(fromType + '|' + toType) || FLOW_PAIR.has(toType + '|' + fromType);
 
       if (colors.length === 0) {
         // 没有匹配资源，用通用样式
@@ -12604,17 +15691,44 @@ const G = {
           '#f97316');
         SFX.buildFail();
       } else {
-        this.log(`✅ 已连接: ${fromBld?.emoji||''}${fromBld?.n||''} → ${toBld?.emoji||''}${toBld?.n||''}`, 's');
-        this.showCursorTooltip(`✅ 已连接！`, 's');
+        // v3.0 §4+§5: 计算距离和中继效率
+        const isRelay = BLDS[this.grid[fromIdx].type]?.isRelay || BLDS[this.grid[idx].type]?.isRelay;
+        const distEffPct = Math.round(this._distanceEfficiency(dist, isRelay) * 100);
+        const relayTag = isRelay ? ' 📡中继' : '';
+        const distInfo = dist >= 2 ? ` (距离${dist}格·${distEffPct}%效率${relayTag})` : (isRelay ? ' (📡中继·衰减减半)' : '');
+        this.log(`✅ 已连接: ${fromBld?.emoji||''}${fromBld?.n||''} → ${toBld?.emoji||''}${toBld?.n||''}${distInfo}`, 's');
+        this.showCursorTooltip(`✅ 已连接！${distInfo}`, 's');
         SFX.build();
         // ★ 方案A：连接爆发特效 + 连击系统
         this.beltConnectBurst(fromIdx, idx);
         this.addBeltCombo();
+
+        // v3.0 §4: 远距统计追踪
+        if (dist > (this.stats.maxBeltDist || 0)) {
+          this.stats.maxBeltDist = dist;
+        }
+        if (dist >= 2) {
+          this.stats.longBeltCount = (this.stats.longBeltCount || 0) + 1;
+          // 首次远距成就弹窗
+          const firstDistKey = '_firstDist' + dist + 'Shown';
+          if (!this[firstDistKey]) {
+            this[firstDistKey] = true;
+            const msgs = {
+              2: { title: '🔗 远程传输', text: '突破了物理限制！\n首次建立2格距离的传送带\n\n💡 远距传送带效率稍低，但可以连接到更远的建筑获取邻接加成', color: '#14b8a6' },
+              3: { title: '🔗 远程物流', text: '化学信号跨越三格！\n首次建立3格距离的传送带\n\n⚠️ 3格距离需要0.3⚡/s维护费\n💡 虚拟邻接加成不受距离衰减影响', color: '#06d6a0' },
+              4: { title: '🔗 物流大师', text: '极限距离的精密控制！\n首次建立4格距离的传送带\n\n⚠️ 4格距离需要0.6⚡/s维护费\n💡 远距连线虽然传输效率低，但邻接加成很赚', color: '#fbbf24' },
+            };
+            if (msgs[dist]) {
+              this.showEvent(msgs[dist].title, msgs[dist].text, msgs[dist].color);
+            }
+          }
+        }
       }
       // ★ 连续连接模式：不退出，重置起点让用户继续连接下一条
       // 清除当前高亮
       document.querySelectorAll('.cell.belt-connect-from').forEach(c => c.classList.remove('belt-connect-from'));
       document.querySelectorAll('.cell.belt-connect-target').forEach(c => c.classList.remove('belt-connect-target', 'belt-target-valid', 'belt-target-invalid'));
+      document.querySelectorAll('.belt-dist-badge').forEach(b => b.remove()); // v3.0 §4
       // 重置起点但保持连接模式
       this._beltConnectFrom = null;
       document.getElementById('buildHint').textContent = '🔗 连接成功！继续选择下一个起点（ESC/右键退出）';
@@ -12635,8 +15749,12 @@ const G = {
           const def = PORT_DEFS[type];
           if (!def) return false;
           const techExtra = this._extraOutPorts || 0;
-          const totalOut = def.maxOut + techExtra;
-          return (getUsedPorts(idx, 'in') >= def.maxIn && getUsedPorts(idx, 'out') >= totalOut);
+          const mpb = this._mutPortBonuses?.[type];
+          // v3.0 §9.2: 特化端口加成
+          const specB = this._specCache?.perBuilding?.[idx];
+          const totalOut = def.maxOut + techExtra + (mpb?.extraOut || 0) + (specB?.extraOutPort || 0) + (specB?.extraPorts || 0);
+          const totalIn = def.maxIn + (mpb?.extraIn || 0) + (specB?.extraPorts || 0);
+          return (getUsedPorts(idx, 'in') >= totalIn && getUsedPorts(idx, 'out') >= totalOut);
         };
         if (checkPortFull(fromIdx, fromType) || checkPortFull(toIdx, toType)) {
           this._portFullShown = true;
@@ -12664,12 +15782,24 @@ const G = {
         if (!cell) continue;
         const toType = this.grid[i].type;
         // 检查 FLOW_MAP 中是否有有效的资源链路（双向都算）
-        const hasValidFlow = FLOW_MAP.some(f =>
-          (f.from === fromType && f.to === toType) ||
-          (f.from === toType && f.to === fromType)
-        );
+        const hasValidFlow = FLOW_PAIR.has(fromType + '|' + toType) || FLOW_PAIR.has(toType + '|' + fromType);
         if (hasValidFlow) {
           cell.classList.add('belt-connect-target', 'belt-target-valid');
+          // v3.0 §4+§5: 显示距离效率标签（中继衰减减半）
+          const isRelay = BLDS[fromType]?.isRelay || BLDS[toType]?.isRelay;
+          if (dist >= 2 || isRelay) {
+            const distEff = Math.round(this._distanceEfficiency(dist, isRelay) * 100);
+            let badge = cell.querySelector('.belt-dist-badge');
+            if (!badge) {
+              badge = document.createElement('div');
+              badge.className = 'belt-dist-badge';
+              badge.style.cssText = 'position:absolute;top:1px;right:1px;font-size:9px;z-index:20;pointer-events:none;padding:1px 3px;border-radius:3px;' +
+                (isRelay ? 'background:rgba(96,165,250,0.8);color:#fff' : dist >= 3 ? 'background:rgba(249,115,22,0.8);color:#fff' : 'background:rgba(20,184,166,0.8);color:#fff');
+              cell.style.position = 'relative';
+              cell.appendChild(badge);
+            }
+            badge.textContent = isRelay ? `📡${dist}格·${distEff}%` : `${dist}格·${distEff}%`;
+          }
         } else {
           cell.classList.add('belt-connect-target', 'belt-target-invalid');
         }
@@ -12867,6 +15997,22 @@ const G = {
   },
 
   // ===== PETRI DISH EXPERIMENT =====
+
+  // v2.1 §8.2: 检查P3+配方分散解锁条件
+  _checkPetriP3Unlock() {
+    if (this._petriP3Unlocked) return;
+    if (this.phase < 3) return;
+    // 条件：建造2个生物膜反应器 + 拥有菌丝运输网
+    if (this.bldCount('biofilmReactor') >= 2 && this.bldCount('transport') >= 1) {
+      this._petriP3Unlocked = true;
+      this.log('🧫 培养皿实验·高阶配方解锁！生物膜矩阵+菌丝网络为实验打开了新可能', 's');
+      this.showMilestone('🧫', '高阶配方解锁！');
+      this.showEvent('🧫 培养皿·高阶配方', '生物膜反应器的密集培养与菌丝运输网的渗透效应，\n解锁了全新的P3+实验配方！\n\n尝试在实验区域中放置P3建筑来触发新配方。', '#14b8a6');
+      SFX.achieve();
+      this.updatePetriUI();
+    }
+  },
+
   startPetriMode() {
     if (this.phase < 2) { this.log('需要进入阶段2后解锁培养皿实验', 'w'); SFX.buildFail(); return; }
     if (this._petriCooldown > 0) { this.log(`🧫 实验冷却中 (${this._petriCooldown}s)`, 'w'); SFX.buildFail(); return; }
@@ -12929,8 +16075,10 @@ const G = {
   // 匹配最佳配方
   _matchPetriRecipe(scan) {
     // 按优先级排序：高阶段 > 低阶段，特殊条件 > 通用
+    // v2.1 §8.2: P3+配方需要分散解锁条件（2×生物膜反应器+菌丝运输网）
+    const maxPhase = (this.phase >= 3 && !this._petriP3Unlocked) ? 2 : this.phase;
     const sorted = [...PETRI_RECIPES]
-      .filter(r => r.phase <= this.phase)
+      .filter(r => r.phase <= maxPhase)
       .sort((a, b) => {
         // 优先高阶段
         if (b.phase !== a.phase) return b.phase - a.phase;
@@ -12994,11 +16142,14 @@ const G = {
   // 应用配方效果
   _applyPetriRecipe(recipe) {
     const b = recipe.buff;
+    // v3.0 §8.3: 幸运催化剂增幅效果值+30%
+    const luckBonus = this._getCatalystValue('petriBuff');
+    const buffValue = luckBonus > 0 ? b.value * (1 + luckBonus) : b.value;
     if (b.type === 'instant_random') {
       // 混沌培养：随机资源暴击
       const resKeys = Object.keys(RES).filter(k => RES[k].phase <= this.phase);
       const rk = resKeys[Math.floor(Math.random() * resKeys.length)];
-      const amount = Math.floor((this.res[rk] || 0) * b.value * 0.1 + 10);
+      const amount = Math.floor((this.res[rk] || 0) * buffValue * 0.1 + 10);
       this.res[rk] = (this.res[rk] || 0) + amount;
       this.log(`🌀 混沌培养！${RES[rk].icon || rk} +${amount}`, 's');
       this.showEvent('🧫 实验完成！', `🌀 混沌培养\n${RES[rk]?.n || rk} 暴击！+${amount}`, '#f59e0b');
@@ -13009,15 +16160,18 @@ const G = {
         name: b.name,
         icon: b.icon,
         type: b.type,
-        value: b.value,
+        value: buffValue,
         remaining: b.duration,
         total: b.duration,
         color: b.color,
       };
-      this.log(`🧫 ${b.icon} ${b.name} 激活！持续 ${b.duration}s`, 's');
-      const buffDesc = this._petriBuffDesc(b);
-      this.showEvent('🧫 实验完成！', `${b.icon} ${b.name}\n${buffDesc}\n持续 ${b.duration} 秒`, b.color);
+      const luckTag = luckBonus > 0 ? ' 🍀+30%' : '';
+      this.log(`🧫 ${b.icon} ${b.name} 激活！${luckTag} 持续 ${b.duration}s`, 's');
+      const buffDesc = this._petriBuffDesc({ ...b, value: buffValue });
+      this.showEvent('🧫 实验完成！', `${b.icon} ${b.name}${luckTag}\n${buffDesc}\n持续 ${b.duration} 秒`, b.color);
     }
+    // v3.0 §8.3: 实验后消耗幸运催化
+    this._consumeLuckCatalyst();
     // 一次性资源奖励
     if (recipe.reward) {
       for (const [k, v] of Object.entries(recipe.reward)) {
@@ -13118,6 +16272,21 @@ const G = {
       </div>`;
     }
 
+    // v2.1 §8.2: P3+配方解锁状态提示
+    if (this.phase >= 3 && !this._petriP3Unlocked) {
+      const hasReactor = this.bldCount('biofilmReactor');
+      const hasTransport = this.bldCount('transport');
+      html += `<div style="border:1px solid #14b8a620;border-radius:4px;padding:6px;margin-top:4px;background:#14b8a608;font-size:0.72em">
+        <div style="color:#14b8a6;font-weight:600;margin-bottom:3px">🔒 高阶配方（P3+）未解锁</div>
+        <div style="color:var(--dim)">
+          ${hasReactor >= 2 ? '✅' : '❌'} 生物膜反应器 ×2 <span style="color:${hasReactor >= 2 ? '#22c55e' : 'var(--dim)'}">(${hasReactor}/2)</span><br>
+          ${hasTransport >= 1 ? '✅' : '❌'} 菌丝运输网 ×1 <span style="color:${hasTransport >= 1 ? '#22c55e' : 'var(--dim)'}">(${hasTransport}/1)</span>
+        </div>
+      </div>`;
+    } else if (this.phase >= 3 && this._petriP3Unlocked) {
+      html += `<div style="font-size:0.65em;color:#14b8a6;margin-top:4px">✅ P3+高阶配方已解锁</div>`;
+    }
+
     // 实验次数
     if (this._petriCount > 0) {
       html += `<div style="font-size:0.65em;color:var(--dim);margin-top:4px;text-align:right">累计实验: ${this._petriCount}次</div>`;
@@ -13143,13 +16312,255 @@ const G = {
     if (centerCell) centerCell.classList.add('petri-center');
   },
 
+  // ===== v3.0 §8.3: 催化剂消耗品系统 =====
+  _isCatalystActive(effectType) {
+    for (const cat of CATALYSTS) {
+      if (cat.effect === effectType) {
+        const end = this._catalysts[cat.id];
+        if (end && (end === -1 || end > this.rt)) return true;
+      }
+    }
+    return false;
+  },
+
+  _getCatalystValue(effectType) {
+    for (const cat of CATALYSTS) {
+      if (cat.effect === effectType) {
+        const end = this._catalysts[cat.id];
+        if (end && (end === -1 || end > this.rt)) return cat.value;
+      }
+    }
+    return 0;
+  },
+
+  useCatalyst(catId) {
+    const cat = CATALYSTS.find(c => c.id === catId);
+    if (!cat) return;
+    if (this.prestigeCurrency < cat.cost) {
+      this.log(`⚠️ 进化因子不足（需${cat.cost}，当前${this.prestigeCurrency}）`, 'w');
+      SFX.buildFail();
+      return;
+    }
+    // 不叠加，刷新持续时间
+    this.prestigeCurrency -= cat.cost;
+    if (cat.duration === -1) {
+      // 幸运催化：持续到下次培养皿实验
+      this._catalysts[catId] = -1;
+    } else {
+      this._catalysts[catId] = this.rt + cat.duration * 60; // duration秒 × 60tick/秒
+    }
+    this.log(`${cat.icon} 催化剂激活: ${cat.n} — ${cat.desc}`, 'ev');
+    this.showCursorTooltip(`${cat.icon} ${cat.n} 已激活！`);
+    SFX.researchDone();
+    this.stats.catalystUseCount = (this.stats.catalystUseCount || 0) + 1;
+    this._renderCatalystPanel();
+    // 持久化进化因子到prestige数据
+    this._saveCatalystPrestige();
+  },
+
+  _saveCatalystPrestige() {
+    try {
+      const pd = localStorage.getItem('bioSpherePrestige');
+      if (!pd) return;
+      const pData = JSON.parse(pd);
+      pData.pc = this.prestigeCurrency;
+      localStorage.setItem('bioSpherePrestige', JSON.stringify(pData));
+    } catch(e) {}
+  },
+
+  _tickCatalysts() {
+    let changed = false;
+    for (const cat of CATALYSTS) {
+      const end = this._catalysts[cat.id];
+      if (!end) continue;
+      if (end === -1) continue; // 幸运催化不按时间过期
+      if (this.rt >= end) {
+        delete this._catalysts[cat.id];
+        this.log(`${cat.icon} ${cat.n} 效果已结束`, '');
+        changed = true;
+      }
+    }
+    if (changed) this._renderCatalystPanel();
+  },
+
+  // 幸运催化在培养皿实验后消耗
+  _consumeLuckCatalyst() {
+    if (this._catalysts.luckBoost) {
+      delete this._catalysts.luckBoost;
+      this.log('🍀 幸运催化已消耗', '');
+      this._renderCatalystPanel();
+    }
+  },
+
+  _renderCatalystPanel() {
+    const sec = document.getElementById('catalystSection');
+    if (!sec) return;
+    // 仅转生5+次且催化剂里程碑已解锁时显示
+    if (!this._unlockedMilestones?.catalyst) {
+      sec.style.display = 'none';
+      return;
+    }
+    sec.style.display = '';
+
+    const hint = document.getElementById('catalystHint');
+    if (hint) hint.textContent = `${PRESTIGE.currencyIcon}${this.prestigeCurrency}`;
+
+    const panel = document.getElementById('catalystContent');
+    if (!panel) return;
+
+    let html = '';
+    // 活跃效果
+    const activeList = CATALYSTS.filter(c => {
+      const end = this._catalysts[c.id];
+      return end && (end === -1 || end > this.rt);
+    });
+    if (activeList.length > 0) {
+      html += `<div style="margin-bottom:8px;padding:6px 8px;background:rgba(249,115,22,0.06);border:1px solid rgba(249,115,22,0.15);border-radius:6px">`;
+      html += `<div style="font-size:0.68em;color:#f97316;font-weight:600;margin-bottom:4px">活跃效果</div>`;
+      for (const cat of activeList) {
+        const end = this._catalysts[cat.id];
+        let timeStr;
+        if (end === -1) {
+          timeStr = '持续到下次实验';
+        } else {
+          const remain = Math.max(0, Math.ceil((end - this.rt) / 60));
+          const pct = Math.min(100, (end - this.rt) / (cat.duration * 60) * 100);
+          timeStr = `${remain}秒`;
+          html += `<div style="display:flex;align-items:center;gap:6px;margin:2px 0">`;
+          html += `<span style="font-size:0.8em">${cat.icon}</span>`;
+          html += `<span style="font-size:0.72em;color:${cat.color};font-weight:600;min-width:52px">${cat.n}</span>`;
+          html += `<div style="flex:1;height:4px;background:rgba(255,255,255,0.06);border-radius:2px;overflow:hidden">`;
+          html += `<div style="width:${pct}%;height:100%;background:${cat.color};border-radius:2px;transition:width 1s linear"></div></div>`;
+          html += `<span style="font-size:0.65em;color:var(--dim);min-width:32px;text-align:right">${timeStr}</span>`;
+          html += `</div>`;
+          continue;
+        }
+        html += `<div style="display:flex;align-items:center;gap:6px;margin:2px 0">`;
+        html += `<span style="font-size:0.8em">${cat.icon}</span>`;
+        html += `<span style="font-size:0.72em;color:${cat.color};font-weight:600">${cat.n}</span>`;
+        html += `<span style="font-size:0.65em;color:var(--dim);margin-left:auto">${timeStr}</span>`;
+        html += `</div>`;
+      }
+      html += `</div>`;
+    }
+
+    // 催化剂列表
+    for (const cat of CATALYSTS) {
+      const canBuy = this.prestigeCurrency >= cat.cost;
+      const isActive = this._catalysts[cat.id] && (this._catalysts[cat.id] === -1 || this._catalysts[cat.id] > this.rt);
+      const durText = cat.duration === -1 ? '持续到下次实验' : `${cat.duration}秒`;
+      html += `<div style="display:flex;align-items:center;gap:8px;padding:5px 8px;margin:3px 0;border-radius:6px;
+        background:${isActive ? `rgba(249,115,22,0.04)` : 'rgba(255,255,255,0.02)'};
+        border:1px solid ${isActive ? 'rgba(249,115,22,0.2)' : canBuy ? `${cat.color}30` : 'rgba(255,255,255,0.04)'};
+        cursor:${canBuy && !isActive ? 'pointer' : 'default'};opacity:${canBuy || isActive ? '1' : '0.5'}"
+        ${canBuy && !isActive ? `onclick="G.useCatalyst('${cat.id}')"` : ''}>
+        <span style="font-size:1em">${cat.icon}</span>
+        <div style="flex:1">
+          <div style="font-size:0.75em;font-weight:600;color:${cat.color}">${cat.n}</div>
+          <div style="font-size:0.65em;color:var(--dim)">${cat.desc} · ${durText}</div>
+        </div>
+        <div style="font-size:0.68em;color:${canBuy ? '#f97316' : 'var(--dim)'};font-weight:600;white-space:nowrap">
+          ${isActive ? '<span style="color:#22c55e">✓ 活跃</span>' : `${cat.cost}${PRESTIGE.currencyIcon}`}
+        </div>
+      </div>`;
+    }
+
+    panel.innerHTML = html;
+  },
+
+  // ===== v3.0 §8.5: 创造模式（转生15次解锁）=====
+  enterCreativeMode() {
+    if (!this._creativeAvailable) {
+      this.log('⚠️ 创造模式需转生15次解锁', 'w');
+      return;
+    }
+    if (this._creativeMode) {
+      this.log('已在创造模式中', 'w');
+      return;
+    }
+    // 确认弹窗
+    this.showEvent('⭐ 创造模式', '进入创造模式后：\n\n✅ 无限资源，免费建造\n✅ 科技瞬间完成\n✅ 无需进化条件\n✅ 传送带无距离限制\n\n⚠️ 成就和转生进度不计入\n⚠️ 需要转生退出创造模式', '#fbbf24');
+    setTimeout(() => {
+      if (!confirm('确定进入创造模式？\n\n✅ 无限资源、免费建造、科技瞬间完成\n⚠️ 不计入成就和转生进度\n⚠️ 当前世进度将重置')) return;
+      this._creativeMode = true;
+      // 重置当前世
+      localStorage.removeItem('bioSphereV3');
+      // 保存创造模式标记到prestige data
+      try {
+        const pd = localStorage.getItem('bioSpherePrestige');
+        if (pd) {
+          const pData = JSON.parse(pd);
+          pData.creativeMode = true;
+          localStorage.setItem('bioSpherePrestige', JSON.stringify(pData));
+        }
+      } catch(e) {}
+      location.reload();
+    }, 500);
+  },
+
+  exitCreativeMode() {
+    if (!this._creativeMode) return;
+    if (!confirm('退出创造模式？\n\n创造模式下的进度将被清除。')) return;
+    this._creativeMode = false;
+    localStorage.removeItem('bioSphereV3');
+    try {
+      const pd = localStorage.getItem('bioSpherePrestige');
+      if (pd) {
+        const pData = JSON.parse(pd);
+        delete pData.creativeMode;
+        localStorage.setItem('bioSpherePrestige', JSON.stringify(pData));
+      }
+    } catch(e) {}
+    location.reload();
+  },
+
+  _applyCreativeMode() {
+    if (!this._creativeMode) return;
+    // 资源锁定99999
+    for (const k in RES) {
+      this.res[k] = 99999;
+    }
+  },
+
+  _isCreativeCheckRes() {
+    // 创造模式下跳过资源检查
+    return this._creativeMode;
+  },
+
+  _renderCreativeBadge() {
+    // 顶栏金色标识
+    let badge = document.getElementById('creativeBadge');
+    if (this._creativeMode) {
+      if (!badge) {
+        badge = document.createElement('div');
+        badge.id = 'creativeBadge';
+        badge.style.cssText = 'position:fixed;top:0;left:50%;transform:translateX(-50%);z-index:9999;padding:4px 16px;background:linear-gradient(135deg,rgba(251,191,36,0.15),rgba(251,191,36,0.05));border:1px solid rgba(251,191,36,0.3);border-top:none;border-radius:0 0 8px 8px;font-size:0.72em;color:#fbbf24;font-weight:700;letter-spacing:1px;pointer-events:auto;cursor:pointer';
+        badge.textContent = '⭐ 创造模式 — 自由实验中';
+        badge.title = '点击退出创造模式';
+        badge.onclick = () => this.exitCreativeMode();
+        document.body.appendChild(badge);
+      }
+    } else if (badge) {
+      badge.remove();
+    }
+    // 创造模式入口按钮
+    const btn = document.getElementById('creativeEntryBtn');
+    if (btn) {
+      btn.style.display = this._creativeAvailable && !this._creativeMode ? '' : 'none';
+    }
+  },
+
   // ===== PRESTIGE SYSTEM =====
   canPrestige() {
-    return this.phase >= 4 || this.wonderComplete;
+    // B+C方案：首通必须完成P5奇观；转生1次后解锁"P4快速转生"
+    if (this.wonderComplete) return true;           // 奇观完成 → 随时可转
+    if (this.phase >= 5) return true;               // 已在P5 → 可转（即使奇观未完成）
+    if (this.phase >= 4 && this.prestigeCount >= 1) return true; // 老玩家P4可快转
+    return false;
   },
 
   getPrestigeGain() {
-    return PRESTIGE.calcGain(this);
+    return Math.floor(PRESTIGE.calcGain(this) * this.getVariantScoreBonus());
   },
 
   showPrestigePanel() {
@@ -13264,31 +16675,165 @@ const G = {
   },
 
   doPrestige() {
+    // v3.0 §8.5: 创造模式禁止转生
+    if (this._creativeMode) {
+      this.log('⭐ 创造模式中无法转生。请先退出创造模式。', 'w');
+      SFX.buildFail();
+      return;
+    }
     if (!this.canPrestige()) return;
     const gain = this.getPrestigeGain();
-    // 显示更丰富的转生信息
     const nextCount = this.prestigeCount + 1;
     let extraInfo = '';
     const nextPassive = PRESTIGE.passiveBonuses.find(pb => pb.count === nextCount);
     if (nextPassive) extraInfo = `\n🌟 新被动解锁: ${nextPassive.n} — ${nextPassive.d}`;
     const pcBonus = PRESTIGE.prestigeCountBonus(nextCount);
     extraInfo += `\n🌀 轮回之力: 全局效率 +${formatNum(pcBonus * 100, 1)}%`;
-    if (!confirm(`确定要转生？\n\n获得 +${formatNum(gain)} ${PRESTIGE.currencyIcon}${PRESTIGE.currencyName}${extraInfo}\n\n所有进度将重置（转生加成和货币保留）`)) return;
+    // v3.0 §8: 检查新里程碑解锁
+    const newMilestone = PRESTIGE_MILESTONES.find(m => m.count === nextCount);
+    if (newMilestone) extraInfo += `\n🏆 里程碑解锁: ${newMilestone.icon} ${newMilestone.name} — ${newMilestone.desc}`;
+
+    // B+C: P4快速转生时提醒P5奖励
+    let wonderHint = '';
+    if (!this.wonderComplete && this.phase < 5) {
+      wonderHint = '\n\n💡 提示: 推进到P5完成奇观可获得5×进化因子！';
+    } else if (!this.wonderComplete && this.phase >= 5) {
+      wonderHint = '\n\n💡 提示: 完成奇观后转生可获得5×进化因子！';
+    } else if (this.wonderComplete) {
+      wonderHint = '\n\n☀️ 奇观加成: 进化因子 ×5！';
+    }
+
+    if (!confirm(`确定要转生？\n\n获得 +${formatNum(gain)} ${PRESTIGE.currencyIcon}${PRESTIGE.currencyName}${extraInfo}${wonderHint}\n\n所有进度将重置（转生加成和货币保留）`)) return;
+
+    // ★ 转生前保存当世最高分到 Supabase（修复：之前转生后分数归零导致排行榜无意义）
+    this._saveHighScoreBeforePrestige();
 
     this.prestigeCurrency += gain;
     this.prestigeCount++;
 
-    // Save prestige data and reset
+    // B+C: 追踪带奇观完成的转生次数
+    const wonderPrestigeCount = (this._wonderPrestigeCount || 0) + (this.wonderComplete ? 1 : 0);
+    const fastestWonder = this._fastestWonder || null;
+
+    // v3.0 §8.6: 记录变体通关
+    const completedVariants = { ...(this._completedVariants || {}) };
+    if (this._activeVariant) {
+      completedVariants[this._activeVariant] = true;
+    }
+
+    // v3.0 §8: 更新里程碑
+    const milestones = { ...(this._unlockedMilestones || {}) };
+    for (const m of PRESTIGE_MILESTONES) {
+      if (this.prestigeCount >= m.count) milestones[m.id] = true;
+    }
+
+    // v3.0 §8: 变体选择（转生次数≥2后解锁）
+    if (this.prestigeCount >= 2) {
+      this._pendingPrestigeData = {
+        pc: this.prestigeCurrency,
+        pcount: this.prestigeCount,
+        pbonuses: [...this.prestigeBonuses],
+        infLevels: { ...this.infiniteBonusLevels },
+        milestones,
+        blueprints: this._blueprints || [],
+        completedVariants,
+        wonderPrestigeCount,
+        fastestWonder,
+        ratingRewardsClaimed: this._ratingRewardsClaimed || {},
+      };
+      this._showVariantChoice();
+      return; // 等玩家选择后再重载
+    }
+
+    // 无变体的普通转生
     const pData = {
       pc: this.prestigeCurrency,
       pcount: this.prestigeCount,
       pbonuses: [...this.prestigeBonuses],
       infLevels: { ...this.infiniteBonusLevels },
+      milestones,
+      blueprints: this._blueprints || [],
+      completedVariants,
+      wonderPrestigeCount,
+      fastestWonder,
+      ratingRewardsClaimed: this._ratingRewardsClaimed || {},
+      variant: null,
     };
     localStorage.removeItem('bioSphereV3');
     localStorage.setItem('bioSpherePrestige', JSON.stringify(pData));
     SFX.wonderDone();
     location.reload();
+  },
+
+  // v3.0 §8: 变体选择面板
+  _showVariantChoice() {
+    const overlay = document.createElement('div');
+    overlay.id = 'variantChoiceOverlay';
+    overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.92);z-index:10000;display:flex;align-items:center;justify-content:center;animation:fadeIn 0.3s';
+
+    let html = `<div style="background:#1a1a2e;border:1px solid rgba(168,85,247,0.3);border-radius:12px;padding:20px;max-width:440px;width:95%;max-height:85vh;overflow-y:auto;box-shadow:0 0 40px rgba(168,85,247,0.15)">`;
+    html += `<div style="text-align:center;margin-bottom:12px">`;
+    html += `<div style="font-size:1.3em">🌀</div>`;
+    html += `<div style="font-size:1em;font-weight:700;color:#a855f7;margin-top:4px">第${this.prestigeCount}世 — 选择变体规则</div>`;
+    html += `<div style="font-size:0.72em;color:#94a3b8;margin-top:4px">变体增加挑战难度，但进化因子获得量大幅提升</div>`;
+    html += `</div>`;
+
+    // 普通选项（无变体）
+    html += `<button class="var-choice-btn" data-variant="none" style="
+      width:100%;background:linear-gradient(135deg,rgba(34,197,94,0.08),rgba(34,197,94,0.03));
+      border:1px solid rgba(34,197,94,0.3);border-radius:8px;padding:10px 12px;margin-bottom:6px;
+      cursor:pointer;text-align:left;color:#e2e8f0;transition:all 0.2s;display:block"
+      onmouseover="this.style.borderColor='#22c55e';this.style.boxShadow='0 0 12px rgba(34,197,94,0.2)'"
+      onmouseout="this.style.borderColor='rgba(34,197,94,0.3)';this.style.boxShadow='none'">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:2px">
+        <span style="font-size:1.1em">🌿</span>
+        <span style="font-weight:700;color:#22c55e;font-size:0.88em">标准模式</span>
+        <span style="font-size:0.7em;color:#94a3b8;margin-left:auto">×1.0 进化因子</span>
+      </div>
+      <div style="font-size:0.72em;color:#94a3b8">无额外限制，正常游戏体验</div>
+    </button>`;
+
+    // 变体选项
+    for (const v of PRESTIGE_VARIANTS) {
+      html += `<button class="var-choice-btn" data-variant="${v.id}" style="
+        width:100%;background:linear-gradient(135deg,${v.color}10,${v.color}05);
+        border:1px solid ${v.color}40;border-radius:8px;padding:10px 12px;margin-bottom:6px;
+        cursor:pointer;text-align:left;color:#e2e8f0;transition:all 0.2s;display:block"
+        onmouseover="this.style.borderColor='${v.color}';this.style.boxShadow='0 0 12px ${v.color}30'"
+        onmouseout="this.style.borderColor='${v.color}40';this.style.boxShadow='none'">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:2px">
+          <span style="font-size:1.1em">${v.icon}</span>
+          <span style="font-weight:700;color:${v.color};font-size:0.88em">${v.name}</span>
+          <span style="font-size:0.7em;color:${v.color};margin-left:auto">×${v.scoreBonus} 进化因子</span>
+        </div>
+        <div style="font-size:0.72em;color:#94a3b8;margin-bottom:2px">${v.desc}</div>
+        <div style="font-size:0.68em;color:#64748b;font-style:italic">💡 ${v.hint}</div>
+      </button>`;
+    }
+    html += `</div>`;
+
+    overlay.innerHTML = html;
+    document.body.appendChild(overlay);
+
+    overlay.querySelectorAll('.var-choice-btn').forEach(btn => {
+      btn.onclick = () => {
+        const variantId = btn.dataset.variant;
+        const pData = this._pendingPrestigeData;
+        pData.variant = variantId === 'none' ? null : variantId;
+        localStorage.removeItem('bioSphereV3');
+        localStorage.setItem('bioSpherePrestige', JSON.stringify(pData));
+        overlay.remove();
+        SFX.wonderDone();
+        location.reload();
+      };
+    });
+  },
+
+  // v3.0 §8: 完成变体后的分数加成
+  getVariantScoreBonus() {
+    if (!this._activeVariant) return 1;
+    const v = PRESTIGE_VARIANTS.find(v => v.id === this._activeVariant);
+    return v ? v.scoreBonus : 1;
   },
 
   closePrestige() {
@@ -13306,6 +16851,25 @@ const G = {
       this.prestigeCount = pData.pcount || 0;
       this.prestigeBonuses = pData.pbonuses || [];
       this.infiniteBonusLevels = pData.infLevels || {};
+
+      // v3.0 §8: 恢复变体、里程碑、蓝图
+      this._activeVariant = pData.variant || null;
+      this._unlockedMilestones = pData.milestones || {};
+      this._blueprints = pData.blueprints || [];
+      this._completedVariants = pData.completedVariants || {};
+      this._ratingRewardsClaimed = pData.ratingRewardsClaimed || {};
+      // B+C: 恢复奇观转生计数和最快奇观时间
+      this._wonderPrestigeCount = pData.wonderPrestigeCount || 0;
+      this._fastestWonder = pData.fastestWonder || null;
+      // 确保里程碑根据当前转生次数更新
+      for (const m of PRESTIGE_MILESTONES) {
+        if (this.prestigeCount >= m.count) this._unlockedMilestones[m.id] = true;
+      }
+      // v3.0 §8: 里程碑效果
+      if (this._unlockedMilestones.multiStrain) this._multiStrainUnlocked = true;
+      if (this._unlockedMilestones.creative) this._creativeAvailable = true;
+      // v3.0 §8.5: 恢复创造模式
+      if (pData.creativeMode) this._creativeMode = true;
 
       // Apply owned fixed bonuses
       for (const idx of this.prestigeBonuses) {
@@ -13328,12 +16892,54 @@ const G = {
       const pcBonus = PRESTIGE.prestigeCountBonus(this.prestigeCount);
       if (pcBonus > 0) this.gEff += pcBonus;
 
+      // v3.0 §8: 应用变体运行时效果
+      if (this._activeVariant) {
+        const variant = PRESTIGE_VARIANTS.find(v => v.id === this._activeVariant);
+        if (variant) {
+          if (variant.rules.energyMult) this._variantEnergyMult = variant.rules.energyMult;
+          if (variant.rules.maxBuildings) this._variantMaxBuildings = variant.rules.maxBuildings;
+          if (variant.rules.noBelts) this._variantNoBelts = true;
+          if (variant.rules.randomPlacement) this._variantRandomPlace = true;
+          if (variant.rules.timeLimit) this._variantTimeLimit = variant.rules.timeLimit;
+          if (variant.rules.toxicDecay) this._variantToxic = true;
+        }
+      }
+
       if (this.prestigeCount > 0) {
         this.log(`🌀 转生加成已应用 (第${this.prestigeCount}世)`, 'ev');
         const pcPct = formatNum(pcBonus * 100, 1);
         if (pcBonus > 0) this.log(`🌀 轮回之力: 全局效率 +${pcPct}%`, 'ev');
         document.querySelector('.topbar')?.classList.add('has-prestige');
+        // v3.0 §8: 变体信息
+        if (this._activeVariant) {
+          const v = PRESTIGE_VARIANTS.find(vr => vr.id === this._activeVariant);
+          if (v) {
+            this.log(`${v.icon} 变体模式: ${v.name} — ${v.desc}`, 'ev');
+            this.showEvent(`${v.icon} ${v.name}`, `本世变体规则:\\n\\n${v.desc}\\n\\n${v.hint}\\n\\n🌀 进化因子获得量 ×${v.scoreBonus}`, v.color);
+          }
+        }
+        // v3.0 §8.4: 多菌株模式日志
+        if (this._multiStrainUnlocked) {
+          this.log('🌐 多菌株模式: 科技互斥限制已取消！', 'ev');
+        }
+        // v3.0 §8: 里程碑解锁通知
+        for (const m of PRESTIGE_MILESTONES) {
+          if (m.count === this.prestigeCount) {
+            setTimeout(() => {
+              this.showEvent(`${m.icon} 里程碑解锁!`, m.unlockDesc, m.color);
+              this.showMilestone(m.icon, m.name);
+              SFX.milestone();
+            }, 2000);
+          }
+        }
       }
+      // v3.0 §8.5: 创造模式 badge + 日志
+      this._renderCreativeBadge();
+      if (this._creativeMode) {
+        this.log('⭐ 创造模式已激活 — 无限资源，自由实验', 'ev');
+      }
+      // v3.0: 同步速度按钮tooltip（turbo里程碑）
+      this._syncSpeedUI();
     } catch(e){}
   },
 };
