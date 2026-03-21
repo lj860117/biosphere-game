@@ -59,6 +59,11 @@
   --r-xs:2px;--r-sm:3px;--r-md:4px;--r-lg:10px;--r-xl:12px;
   /* 布局尺寸 */
   --sidebar-w:380px;--logo-size:36px;--popup-min-w:300px;--popup-max-w:420px;--scrollbar-w:5px;
+  /* 阶段动态色 — 通过JS在阶段切换时更新，实现"世界随文明进化而变色" */
+  --phase-primary:#22c55e;
+  --phase-glow:rgba(34,197,94,0.3);
+  --phase-bg-tint:rgba(34,197,94,0.02);
+  --phase-border:rgba(34,197,94,0.35);
 }
 html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;background:var(--bg);color:var(--text)}
 
@@ -124,7 +129,7 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
   background:linear-gradient(90deg,rgba(6,10,20,0.98),rgba(10,16,30,0.98));
   border-bottom:1px solid var(--bdr);position:relative;
 }
-.topbar::after{content:'';position:absolute;bottom:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--cyan)30,transparent)}
+.topbar::after{content:'';position:absolute;bottom:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--phase-primary) 30%,transparent);transition:background 1.5s ease}
 .logo{
   width:var(--logo-size);height:var(--logo-size);border-radius:50%;flex-shrink:0;
   background:radial-gradient(circle at 35% 35%,var(--cyan),#003a3a);
@@ -184,9 +189,10 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 /* === LEFT: RESOURCES + ACTIONS === */
 .sidebar{
   width:var(--sidebar-w);flex-shrink:0;padding:var(--sp-xl);
-  background:var(--panel);border-right:1px solid var(--bdr);
+  background:var(--panel);border-right:1px solid color-mix(in srgb, var(--phase-primary) 15%, var(--bdr));
   font-size:1.15em;
   display:flex;flex-direction:column;overflow:hidden;
+  transition:border-right-color 1.5s ease;
 }
 .sidebar::-webkit-scrollbar{width:var(--scrollbar-w)}
 .sidebar::-webkit-scrollbar-thumb{background:#1a3050;border-radius:var(--r-sm)}
@@ -789,15 +795,16 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 /* === CENTER: PETRI DISH === */
 .center{
   flex:1;display:flex;flex-direction:column;position:relative;overflow:hidden;
-  /* 荧光绿渐变外边框 — 核心操作区视觉聚焦 */
-  border:2px solid rgba(6,214,160,0.35);
+  /* 阶段动态边框 — 随文明进化变色 */
+  border:2px solid var(--phase-border);
   border-radius:6px;margin:var(--sp-2xs);
-  box-shadow:0 0 18px rgba(6,214,160,0.08),inset 0 0 30px rgba(6,214,160,0.03);
+  box-shadow:0 0 18px var(--phase-glow),inset 0 0 30px var(--phase-bg-tint);
   animation:dishBorderGlow 4s ease-in-out infinite;
+  transition:border-color 1.5s ease,box-shadow 1.5s ease;
 }
 @keyframes dishBorderGlow{
-  0%,100%{border-color:rgba(6,214,160,0.25);box-shadow:0 0 12px rgba(6,214,160,0.05),inset 0 0 20px rgba(6,214,160,0.02)}
-  50%{border-color:rgba(6,214,160,0.5);box-shadow:0 0 24px rgba(6,214,160,0.12),inset 0 0 40px rgba(6,214,160,0.05)}
+  0%,100%{filter:brightness(0.85)}
+  50%{filter:brightness(1.15)}
 }
 .dish-header{
   display:flex;justify-content:space-between;align-items:center;
@@ -830,6 +837,19 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
   box-shadow:0 0 4px rgba(0,0,0,0.3);
 }
 .cell:hover{background:rgba(6,214,160,0.03);border-color:rgba(40,70,90,0.5)}
+/* Phase C 视觉叙事：空格子培养基纹理 — "营养丰富的培养基"而非"空白格子" */
+.cell:not(.occupied){
+  background:
+    radial-gradient(circle at 30% 40%, rgba(6,214,160,0.03) 0%, transparent 60%),
+    radial-gradient(circle at 70% 65%, rgba(6,214,160,0.02) 0%, transparent 45%),
+    rgba(8,14,24,0.6);
+}
+.cell:not(.occupied):hover{
+  background:
+    radial-gradient(circle at 30% 40%, rgba(6,214,160,0.06) 0%, transparent 60%),
+    radial-gradient(circle at 70% 65%, rgba(6,214,160,0.04) 0%, transparent 45%),
+    rgba(6,214,160,0.03);
+}
 .cell.occupied{cursor:default;border-width:1.5px}
 .cell.occupied:hover{border-width:2px}
 /* 选中格子 — 橙色高亮边框 + 轻微缩放 */
@@ -2788,6 +2808,90 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
   pointer-events:none;animation:firework 1.5s ease-out forwards;
 }
 
+/* ===== Phase E: 成就视觉仪式 (Achievement Ceremony) ===== */
+/* 史诗级(diamond) — 全屏暗化遮罩 + 中央大图标 + 光环扩散 */
+.achievement-epic-overlay{
+  position:fixed;inset:0;z-index:10015;
+  background:radial-gradient(circle at center,transparent 20%,rgba(0,0,0,0.85) 70%);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  pointer-events:none;
+  animation:achvEpicIn 0.5s ease-out;
+}
+@keyframes achvEpicIn{
+  0%{opacity:0}
+  100%{opacity:1}
+}
+.achievement-epic-icon{
+  font-size:5em;
+  animation:achvIconPop 0.8s cubic-bezier(0.68,-0.55,0.27,1.55);
+  filter:drop-shadow(0 0 30px var(--phase-glow,rgba(168,85,247,0.6)));
+}
+@keyframes achvIconPop{
+  0%{transform:scale(0);opacity:0}
+  50%{transform:scale(1.3)}
+  100%{transform:scale(1);opacity:1}
+}
+.achievement-epic-ring{
+  position:absolute;
+  width:200px;height:200px;
+  border:2px solid var(--phase-primary,#a855f7);
+  border-radius:50%;
+  animation:achvRingExpand 1.5s ease-out forwards;
+}
+@keyframes achvRingExpand{
+  0%{transform:scale(0);opacity:1}
+  100%{transform:scale(3);opacity:0}
+}
+.achievement-epic-title{
+  font-family:'Orbitron',monospace;
+  font-size:1.5em;font-weight:900;
+  color:#fbbf24;
+  text-shadow:0 0 20px rgba(251,191,36,0.5);
+  margin-top:20px;
+  animation:achvTitleIn 0.6s ease-out 0.3s both;
+}
+@keyframes achvTitleIn{
+  0%{opacity:0;transform:translateY(20px)}
+  100%{opacity:1;transform:translateY(0)}
+}
+.achievement-epic-desc{
+  font-family:'Rajdhani',sans-serif;
+  font-size:0.85em;color:var(--dim);
+  margin-top:8px;letter-spacing:1px;
+  animation:achvTitleIn 0.5s ease-out 0.5s both;
+}
+/* 重要级(gold) — 横幅展开 + 金色粒子 */
+.achieve-popup.tier-gold{
+  border-color:#fbbf24;
+  box-shadow:0 0 40px rgba(251,191,36,0.4),0 0 80px rgba(251,191,36,0.15);
+  animation:achieveDropIn .4s cubic-bezier(.17,.67,.35,1.1),achvGoldPulse 1.5s ease-in-out 0.4s infinite;
+}
+@keyframes achvGoldPulse{
+  0%,100%{box-shadow:0 0 30px rgba(251,191,36,0.3),0 0 60px rgba(251,191,36,0.1)}
+  50%{box-shadow:0 0 50px rgba(251,191,36,0.5),0 0 100px rgba(251,191,36,0.2)}
+}
+.achieve-popup.tier-diamond{
+  border-color:#a855f7;
+  box-shadow:0 0 60px rgba(168,85,247,0.5),0 0 120px rgba(168,85,247,0.2);
+  animation:achieveDropIn .4s cubic-bezier(.17,.67,.35,1.1),achvDiamondPulse 1.2s ease-in-out 0.4s infinite;
+}
+@keyframes achvDiamondPulse{
+  0%,100%{box-shadow:0 0 50px rgba(168,85,247,0.4),0 0 100px rgba(168,85,247,0.15)}
+  50%{box-shadow:0 0 80px rgba(168,85,247,0.6),0 0 150px rgba(168,85,247,0.3)}
+}
+/* 成就金色粒子 */
+.achv-particle{
+  position:fixed;z-index:10016;pointer-events:none;
+  width:5px;height:5px;border-radius:50%;
+  background:#fbbf24;
+  box-shadow:0 0 6px rgba(251,191,36,0.8);
+  animation:achvParticleFly var(--dur,1.2s) ease-out forwards;
+}
+@keyframes achvParticleFly{
+  0%{opacity:1;transform:translate(0,0) scale(1)}
+  100%{opacity:0;transform:translate(var(--dx,0),var(--dy,0)) scale(0)}
+}
+
 /* ===== BUILDING TYPE SELECTOR POPUP ===== */
 .bld-type-selector{
   position:fixed;z-index:10005;top:50%;left:50%;transform:translate(-50%,-50%) scale(0.9);
@@ -3367,6 +3471,79 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
   100%{opacity:0;transform:translate(var(--dx,0),var(--dy,0)) scale(0)}
 }
 
+/* ===== Phase D: 阶段升级视觉仪式 ===== */
+.phase-ceremony-overlay{
+  position:fixed;inset:0;z-index:10020;
+  background:rgba(0,0,0,0);
+  display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  pointer-events:none;
+  transition:background 0.4s ease;
+}
+.phase-ceremony-overlay.active{
+  background:rgba(0,0,0,0.85);
+  pointer-events:all;
+}
+/* 新阶段名称 */
+.phase-ceremony-title{
+  font-family:'Orbitron',monospace;
+  font-size:2.4em;font-weight:900;
+  color:var(--phase-primary);
+  text-shadow:0 0 30px var(--phase-glow),0 0 60px var(--phase-glow);
+  letter-spacing:6px;
+  opacity:0;transform:scale(0.5);filter:blur(10px);
+  transition:opacity 0.5s ease-out,transform 0.5s ease-out,filter 0.5s ease-out;
+}
+.phase-ceremony-overlay.title-in .phase-ceremony-title{
+  opacity:1;transform:scale(1);filter:blur(0);
+}
+/* 阶段描述 */
+.phase-ceremony-desc{
+  font-family:'Rajdhani',sans-serif;
+  font-size:0.95em;font-weight:600;
+  color:var(--dim);letter-spacing:2px;
+  margin-top:12px;
+  opacity:0;transform:translateY(10px);
+  transition:opacity 0.4s ease 0.2s,transform 0.4s ease 0.2s;
+}
+.phase-ceremony-overlay.title-in .phase-ceremony-desc{
+  opacity:1;transform:translateY(0);
+}
+/* 核心菌落进化光效 */
+.core-evolving{
+  animation:coreEvolve 1.5s ease-in-out !important;
+}
+@keyframes coreEvolve{
+  0%{transform:scale(1);filter:brightness(1)}
+  25%{transform:scale(1.5);filter:brightness(2) saturate(2)}
+  40%{transform:scale(1.5);filter:brightness(3) saturate(0)}
+  60%{transform:scale(1.3);filter:brightness(2) saturate(2)}
+  100%{transform:scale(1);filter:brightness(1)}
+}
+/* 仪式光粒子 */
+.ceremony-particle{
+  position:fixed;z-index:10021;pointer-events:none;
+  width:4px;height:4px;border-radius:50%;
+  background:var(--phase-primary);
+  box-shadow:0 0 8px var(--phase-glow);
+  animation:ceremonyParticle var(--dur,1.5s) ease-out forwards;
+}
+@keyframes ceremonyParticle{
+  0%{opacity:1;transform:translate(0,0) scale(1)}
+  100%{opacity:0;transform:translate(var(--dx,0),var(--dy,0)) scale(0)}
+}
+/* 全屏色调闪烁 */
+.ceremony-flash{
+  position:fixed;inset:0;z-index:10022;pointer-events:none;
+  background:var(--phase-glow);
+  opacity:0;
+  animation:ceremonyFlash 0.3s ease-out forwards;
+}
+@keyframes ceremonyFlash{
+  0%{opacity:0.4}
+  100%{opacity:0}
+}
+
 /* === P0: 尊重用户减弱动画偏好 === */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
@@ -3382,6 +3559,18 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 <body>
 <!-- 游戏术语 Tooltip -->
 <div id="gameTooltip"></div>
+<!-- Phase D: 阶段升级仪式遮罩 -->
+<div class="phase-ceremony-overlay" id="phaseCeremony">
+  <div class="phase-ceremony-title" id="ceremonTitle"></div>
+  <div class="phase-ceremony-desc" id="ceremonDesc"></div>
+</div>
+<!-- Phase E: 史诗成就遮罩 -->
+<div class="achievement-epic-overlay" id="achvEpicOverlay" style="display:none">
+  <div class="achievement-epic-ring" id="achvEpicRing"></div>
+  <div class="achievement-epic-icon" id="achvEpicIcon"></div>
+  <div class="achievement-epic-title" id="achvEpicTitle"></div>
+  <div class="achievement-epic-desc" id="achvEpicDesc"></div>
+</div>
 <div class="app">
   <!-- TOP BAR -->
   <div class="topbar">

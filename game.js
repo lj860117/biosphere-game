@@ -826,6 +826,25 @@ const PHASES = [
   { id:5, name:'奇观', color:'var(--purple)', desc:'建造终极生物奇观！', icon:'🏛️' },
 ];
 
+// ===== PHASE COLORS — 阶段色彩演变系统（Phase A 视觉叙事） =====
+const PHASE_COLORS = {
+  1: { primary:'#22c55e', glow:'rgba(34,197,94,0.3)',  tint:'rgba(34,197,94,0.02)',  border:'rgba(34,197,94,0.35)' },
+  2: { primary:'#f97316', glow:'rgba(249,115,22,0.3)', tint:'rgba(249,115,22,0.02)', border:'rgba(249,115,22,0.35)' },
+  3: { primary:'#3b82f6', glow:'rgba(59,130,246,0.3)', tint:'rgba(59,130,246,0.02)', border:'rgba(59,130,246,0.35)' },
+  4: { primary:'#eab308', glow:'rgba(234,179,8,0.3)',  tint:'rgba(234,179,8,0.02)',  border:'rgba(234,179,8,0.35)' },
+  5: { primary:'#a855f7', glow:'rgba(168,85,247,0.3)', tint:'rgba(168,85,247,0.02)', border:'rgba(168,85,247,0.35)' },
+};
+
+/** 将阶段色彩应用到 CSS 变量 — 界面色调在1.5秒内平滑过渡 */
+function setPhaseColors(phase) {
+  const c = PHASE_COLORS[phase] || PHASE_COLORS[1];
+  const root = document.documentElement;
+  root.style.setProperty('--phase-primary', c.primary);
+  root.style.setProperty('--phase-glow', c.glow);
+  root.style.setProperty('--phase-bg-tint', c.tint);
+  root.style.setProperty('--phase-border', c.border);
+}
+
 // ===== CORE COLONY — 主建筑，随阶段进化外观升级 =====
 // ★ 帝国核心为碳源采集器提供能量供给，不同阶段供给不同数量
 const CORE_COLONY = {
@@ -2746,6 +2765,7 @@ const G = {
     this._initPlayer();    // 初始化玩家 ID 和昵称
     this._restoreSectionStates(); // 恢复折叠状态
     this.buildUI();        // 再渲染 UI（renderGrid 会基于正确的数据）
+    setPhaseColors(this.phase); // ★ Phase A 视觉叙事：初始化阶段色彩
     this.updateSectionUnlocks(); // 初始解锁检查（不触发飘字）
     this._updateSaveHint();      // 更新"不保存"提示
     this._gameReady = true;      // 标记游戏就绪（之后的解锁才触发飘字）
@@ -6921,16 +6941,24 @@ const G = {
 
         // 等级化屏幕震动和飘字
         if (tier === 'diamond') {
-          this.screenShake(10);
+          this.screenShake(12);
           this.showGoldenFloat('💎 ' + rewardParts.join(' '));
           // 钻石级全屏闪光
           const flash = document.createElement('div');
           flash.className = 'milestone-flash';
+          flash.style.background = 'radial-gradient(circle,rgba(168,85,247,0.2),transparent 70%)';
           document.body.appendChild(flash);
           setTimeout(() => flash.remove(), 1500);
+          // 延迟第二波震动（史诗感）
+          setTimeout(() => this.screenShake(8), 600);
         } else if (tier === 'gold') {
           this.screenShake(8);
           this.showGoldenFloat('🏆 ' + rewardParts.join(' '));
+          // 金色全屏微闪
+          const flash = document.createElement('div');
+          flash.className = 'milestone-flash';
+          document.body.appendChild(flash);
+          setTimeout(() => flash.remove(), 1200);
         } else {
           this.screenShake(6);
           this.showGoldenFloat('🏆 ' + rewardParts.join(' '));
@@ -7142,12 +7170,85 @@ const G = {
         if (tier === 'gold') el.classList.add('tier-gold');
         if (tier === 'diamond') el.classList.add('tier-diamond');
         el.classList.add('show');
+
+        // === Phase E: 成就视觉仪式 ===
+        if (tier === 'gold' || tier === 'diamond') {
+          // 金色粒子爆发（gold 12颗，diamond 20颗）
+          const count = tier === 'diamond' ? 20 : 12;
+          const rect = el.getBoundingClientRect();
+          const cx = rect.left + rect.width / 2;
+          const cy = rect.top + rect.height / 2;
+          for (let i = 0; i < count; i++) {
+            const p = document.createElement('div');
+            p.className = 'achv-particle';
+            const angle = (Math.PI * 2 * i) / count + (Math.random() - 0.5) * 0.5;
+            const dist = 60 + Math.random() * 80;
+            p.style.cssText = `left:${cx}px;top:${cy}px;--dx:${Math.cos(angle)*dist}px;--dy:${Math.sin(angle)*dist}px;--dur:${0.8+Math.random()*0.6}s;`;
+            if (tier === 'diamond') {
+              p.style.background = '#a855f7';
+              p.style.boxShadow = '0 0 8px rgba(168,85,247,0.9)';
+              p.style.width = '6px';
+              p.style.height = '6px';
+            }
+            document.body.appendChild(p);
+            setTimeout(() => p.remove(), 1600);
+          }
+        }
+
+        // diamond 专属：全屏史诗仪式
+        if (tier === 'diamond') {
+          this._showEpicAchievement(name, desc);
+        }
       },
       hide: () => {
         const el = document.getElementById('achievePopup');
         el.classList.remove('show', 'tier-gold', 'tier-diamond');
       }
     });
+  },
+
+  // Phase E: 史诗成就全屏仪式
+  _showEpicAchievement(name, desc) {
+    const overlay = document.getElementById('achvEpicOverlay');
+    const icon = document.getElementById('achvEpicIcon');
+    const title = document.getElementById('achvEpicTitle');
+    const descEl = document.getElementById('achvEpicDesc');
+    const ring = document.getElementById('achvEpicRing');
+    if (!overlay) return;
+
+    icon.textContent = '💎';
+    title.textContent = name;
+    descEl.textContent = desc;
+
+    // 重置动画
+    overlay.style.display = '';
+    ring.style.animation = 'none';
+    void ring.offsetWidth;
+    ring.style.animation = '';
+
+    icon.style.animation = 'none';
+    void icon.offsetWidth;
+    icon.style.animation = '';
+
+    // 延迟触发第二波光环
+    setTimeout(() => {
+      const ring2 = document.createElement('div');
+      ring2.className = 'achievement-epic-ring';
+      ring2.style.position = 'absolute';
+      overlay.appendChild(ring2);
+      setTimeout(() => ring2.remove(), 1500);
+    }, 400);
+
+    // 4秒后淡出
+    setTimeout(() => {
+      overlay.style.transition = 'opacity 0.5s ease';
+      overlay.style.opacity = '0';
+      setTimeout(() => {
+        overlay.style.display = 'none';
+        overlay.style.opacity = '';
+        overlay.style.transition = '';
+      }, 500);
+    }, 3500);
   },
 
   // ===== SCREEN SHAKE =====
@@ -10519,6 +10620,7 @@ const G = {
   },
 
   // 实际执行阶段升级（原manualCoreUpgrade核心逻辑）
+  // ★ Phase D 视觉叙事：阶段升级仪式序列（~3秒）
   _doPhaseUpgrade() {
     // 阶段1→2时: 将自动传送带转化为手动传送带（保留已有连接）
     if (this.phase === 1 && this._computeBelts) {
@@ -10557,37 +10659,104 @@ const G = {
       }, 180000);
     }
     const p = PHASES[this.phase - 1];
-    // 进入阶段3时停止帮助按钮脉冲
-    if (this.phase >= 3) this._stopHelpPulse();
-    this.showMilestone(p.icon, '进入阶段 ' + p.id + ': ' + p.name);
-    this.log('◆ 进入阶段 ' + p.id + ': ' + p.name + ' — ' + p.desc, 's');
-    SFX.phaseUp();
-    SFX.updateBGMPhase(this.phase);
-    // 核心菌落升级提示
     const cc = CORE_COLONY[this.phase];
-    if (cc) {
-      this.log(`◆ 核心菌落进化: ${cc.name} ${cc.emoji}`, 's');
-      this.showEvent('核心进化: ' + cc.name, cc.desc + '\n\n你的帝国中枢变得更加强大！', cc.color);
+
+    // ===== Phase D 仪式序列 =====
+    const overlay = document.getElementById('phaseCeremony');
+    const titleEl = document.getElementById('ceremonTitle');
+    const descEl = document.getElementById('ceremonDesc');
+    const wasPaused = this.paused;
+
+    // 0.0s — 暂停游戏，启动遮罩淡入
+    if (!wasPaused) this.togglePause();
+    SFX.phaseUp();
+    overlay.classList.add('active');
+
+    // 0.5s — 核心菌落开始进化动画
+    setTimeout(() => {
+      const coreIcon = document.querySelector('.core-colony-icon');
+      if (coreIcon) coreIcon.classList.add('core-evolving');
+      SFX.updateBGMPhase(this.phase);
+    }, 500);
+
+    // 1.0s — 色彩切换（Phase A）+ 光粒子爆发
+    setTimeout(() => {
+      setPhaseColors(this.phase);
+      // 光粒子爆发
+      const cx = window.innerWidth / 2, cy = window.innerHeight / 2;
+      for (let i = 0; i < 24; i++) {
+        const angle = (i / 24) * Math.PI * 2 + (Math.random() - 0.5) * 0.3;
+        const dist = 80 + Math.random() * 160;
+        const pt = document.createElement('div');
+        pt.className = 'ceremony-particle';
+        pt.style.left = cx + 'px';
+        pt.style.top = cy + 'px';
+        pt.style.setProperty('--dx', Math.cos(angle) * dist + 'px');
+        pt.style.setProperty('--dy', Math.sin(angle) * dist + 'px');
+        pt.style.setProperty('--dur', (1.0 + Math.random() * 0.8) + 's');
+        document.body.appendChild(pt);
+        setTimeout(() => pt.remove(), 2000);
+      }
+    }, 1000);
+
+    // 1.5s — 屏震 + 核心进化音效
+    setTimeout(() => {
       this.screenShake(8);
-      setTimeout(() => SFX.coreUpgrade(), 600);
-    }
-    this.updatePhase();
-    this.renderResources();
-    this.renderBuildings();
-    this.renderTechs();
+      if (cc) setTimeout(() => SFX.coreUpgrade(), 200);
+    }, 1500);
 
-    // 阶段升级后更新小手引导（阶段2+自动隐藏）
-    this._updateGuideHand();
-    this.renderGrid();
-    this.renderCoreColony(true);
-    this.updateCoreUpgradeUI();
+    // 1.8s — 阶段名称+描述显示
+    setTimeout(() => {
+      titleEl.textContent = p.icon + ' ' + p.name + '纪元';
+      descEl.textContent = p.desc;
+      overlay.classList.add('title-in');
+    }, 1800);
 
-    // 进入阶段3: 首次触发存档保存 + 提示玩家
-    if (this.phase === 3) {
-      this.save(true);
-      this.log('💾 进度已开始自动保存！', 's');
-      this._updateSaveHint();
-    }
+    // 2.5s — 全屏色调闪烁
+    setTimeout(() => {
+      const flash = document.createElement('div');
+      flash.className = 'ceremony-flash';
+      document.body.appendChild(flash);
+      setTimeout(() => flash.remove(), 400);
+    }, 2500);
+
+    // 3.0s — 仪式结束：清理遮罩，恢复游戏，执行所有后续逻辑
+    setTimeout(() => {
+      overlay.classList.remove('active', 'title-in');
+      titleEl.textContent = '';
+      descEl.textContent = '';
+      // 移除核心进化动画
+      const coreIcon = document.querySelector('.core-colony-icon');
+      if (coreIcon) coreIcon.classList.remove('core-evolving');
+      // 恢复游戏
+      if (!wasPaused && this.paused) this.togglePause();
+
+      // ===== 原有后续逻辑 =====
+      // 进入阶段3时停止帮助按钮脉冲
+      if (this.phase >= 3) this._stopHelpPulse();
+      this.showMilestone(p.icon, '进入阶段 ' + p.id + ': ' + p.name);
+      this.log('◆ 进入阶段 ' + p.id + ': ' + p.name + ' — ' + p.desc, 's');
+      // 核心菌落升级提示
+      if (cc) {
+        this.log(`◆ 核心菌落进化: ${cc.name} ${cc.emoji}`, 's');
+        this.showEvent('核心进化: ' + cc.name, cc.desc + '\n\n你的帝国中枢变得更加强大！', cc.color);
+      }
+      this.updatePhase();
+      this.renderResources();
+      this.renderBuildings();
+      this.renderTechs();
+      // 阶段升级后更新小手引导（阶段2+自动隐藏）
+      this._updateGuideHand();
+      this.renderGrid();
+      this.renderCoreColony(true);
+      this.updateCoreUpgradeUI();
+      // 进入阶段3: 首次触发存档保存 + 提示玩家
+      if (this.phase === 3) {
+        this.save(true);
+        this.log('💾 进度已开始自动保存！', 's');
+        this._updateSaveHint();
+      }
+    }, 3000);
   },
 
   // 旧的自动检查（现在仅用于内部条件判断，不再自动升级）
@@ -11648,6 +11817,62 @@ const G = {
       }
     };
 
+    // ★ Phase C 视觉叙事：培养基生命感 — 营养粒子漂浮系统
+    const NUTRIENT_COLORS = {
+      1: ['#22c55e', '#06d6a0'],
+      2: ['#f97316', '#22c55e', '#ec4899'],
+      3: ['#3b82f6', '#22c55e', '#10b981'],
+      4: ['#eab308', '#3b82f6', '#22c55e'],
+      5: ['#a855f7', '#eab308', '#22c55e'],
+    };
+    const NUTRIENT_COUNT = { 1:20, 2:40, 3:70, 4:100, 5:150 };
+    let _nutrientParticles = [];
+    let _nutrientPhase = 0; // 上次初始化时的阶段
+
+    const initNutrients = (w, h) => {
+      const count = NUTRIENT_COUNT[this.phase] || 20;
+      const pool = NUTRIENT_COLORS[this.phase] || NUTRIENT_COLORS[1];
+      _nutrientParticles = [];
+      for (let i = 0; i < count; i++) {
+        _nutrientParticles.push({
+          x: Math.random() * w,
+          y: Math.random() * h,
+          sz: 0.8 + Math.random() * 1.8,
+          spd: 0.05 + Math.random() * 0.25,
+          ang: Math.random() * Math.PI * 2,
+          alpha: 0.06 + Math.random() * 0.12,
+          color: pool[Math.floor(Math.random() * pool.length)],
+        });
+      }
+      _nutrientPhase = this.phase;
+    };
+
+    const drawNutrients = () => {
+      const w = bgCanvas.width, h = bgCanvas.height;
+      // 阶段变化时重新初始化
+      if (_nutrientPhase !== this.phase || _nutrientParticles.length === 0) {
+        initNutrients(w, h);
+      }
+      for (const p of _nutrientParticles) {
+        // 布朗运动更新
+        p.x += Math.cos(p.ang) * p.spd;
+        p.y += Math.sin(p.ang) * p.spd;
+        p.ang += (Math.random() - 0.5) * 0.15;
+        // 边界循环
+        if (p.x < -5) p.x = w + 5;
+        if (p.x > w + 5) p.x = -5;
+        if (p.y < -5) p.y = h + 5;
+        if (p.y > h + 5) p.y = -5;
+        // 绘制
+        bgCtx.beginPath();
+        bgCtx.arc(p.x, p.y, p.sz, 0, Math.PI * 2);
+        bgCtx.fillStyle = p.color;
+        bgCtx.globalAlpha = p.alpha;
+        bgCtx.fill();
+      }
+      bgCtx.globalAlpha = 1;
+    };
+
     // ===== CONVEYOR BELT SYSTEM v2 — 不重叠规则 =====
     const SZ = this.gridSize;
 
@@ -12384,7 +12609,7 @@ const G = {
           ctx.globalAlpha = 1;
         }
 
-        // v3.0 §7.2: 瓶颈高亮 — 当传送带上次流量极低但需求端需要时
+        // v3.0 §7.2: 负载级别视觉反馈
         if (loadLevel === 0 && !belt.invalid) {
           // 空闲传送带：渲染虚线叠加提示
           const idlePulse = 0.08 + Math.sin(t / 600) * 0.04;
@@ -12395,6 +12620,65 @@ const G = {
           ctx.lineDashOffset = -(t / 200) % 8;
           drawLPath(); ctx.stroke();
           ctx.setLineDash([]);
+          ctx.restore();
+        }
+
+        // Phase B §1: 低载传送带 — 稀疏流动虚线暗示微弱流动
+        if (loadLevel === 1 && !belt.invalid) {
+          ctx.save();
+          const lowPulse = 0.10 + Math.sin(t / 500) * 0.05;
+          ctx.lineWidth = trackW * 0.4;
+          ctx.strokeStyle = mainColor + Math.round(lowPulse * 255).toString(16).padStart(2, '0');
+          ctx.setLineDash([2, 8]);
+          ctx.lineDashOffset = -(t / 160) % 10;
+          drawLPath(); ctx.stroke();
+          ctx.setLineDash([]);
+          ctx.restore();
+        }
+
+        // Phase B §2: 满载传送带 — 金黄光晕 + 加速流动虚线 + 脉冲扩散
+        if (loadLevel === 3 && !belt.invalid) {
+          ctx.save();
+          // (a) 金黄色宽幅光晕底层
+          const fullPulse = 0.25 + Math.sin(t / 300) * 0.10;
+          ctx.lineWidth = trackW + 8;
+          ctx.strokeStyle = `rgba(234,179,8,${fullPulse * 0.35})`;
+          ctx.lineCap = 'round';
+          ctx.lineJoin = 'round';
+          ctx.setLineDash([]);
+          drawLPath(); ctx.stroke();
+
+          // (b) 内层明亮金色带面叠加
+          ctx.lineWidth = trackW - 2;
+          ctx.strokeStyle = `rgba(251,191,36,${fullPulse * 0.18})`;
+          drawLPath(); ctx.stroke();
+
+          // (c) 快速流动虚线（速度是空闲的3倍）
+          ctx.lineWidth = trackW * 0.5;
+          ctx.strokeStyle = `rgba(251,191,36,${0.20 + fullPulse * 0.15})`;
+          ctx.setLineDash([4, 3]);
+          ctx.lineDashOffset = -(t / 50) % 7;  // 比空闲快4倍
+          drawLPath(); ctx.stroke();
+          ctx.setLineDash([]);
+
+          // (d) 满载脉冲光点 — 沿路径快速行进的高亮光斑
+          const pulsePeriod = 800;
+          const pulseT = (t % pulsePeriod) / pulsePeriod;
+          for (const seg of segments) {
+            const sdx3 = seg[2] - seg[0], sdy3 = seg[3] - seg[1];
+            const slen3 = Math.sqrt(sdx3*sdx3 + sdy3*sdy3);
+            if (slen3 < 5) continue;
+            const gpx = seg[0] + sdx3 * pulseT;
+            const gpy = seg[1] + sdy3 * pulseT;
+            const grd = ctx.createRadialGradient(gpx, gpy, 0, gpx, gpy, trackW * 0.8);
+            grd.addColorStop(0, `rgba(251,191,36,${0.45 + fullPulse * 0.2})`);
+            grd.addColorStop(0.5, 'rgba(234,179,8,0.12)');
+            grd.addColorStop(1, 'rgba(234,179,8,0)');
+            ctx.fillStyle = grd;
+            ctx.beginPath();
+            ctx.arc(gpx, gpy, trackW * 0.8, 0, Math.PI*2);
+            ctx.fill();
+          }
           ctx.restore();
         }
 
@@ -12557,14 +12841,31 @@ const G = {
         const ux = dLen > 0 ? dirX/dLen : 1;
         const uy = dLen > 0 ? dirY/dLen : 0;
 
-        // 货物箱尺寸
-        const boxW = p.sz * 2.2;
-        const boxH = p.sz * 1.6;
+        // Phase B: 根据负载级别调整货物箱视觉
+        const beltLoad = this._beltLoadCache?.[p.beltKey];
+        const pFlow = beltLoad?.totalFlow || 0;
+        const pLoadLv = pFlow <= 0.01 ? 0 : pFlow < 0.5 ? 1 : pFlow < 2.0 ? 2 : 3;
+        // 满载时货物放大1.3x，低载时缩小0.85x
+        const loadScale = pLoadLv === 3 ? 1.3 : pLoadLv <= 1 ? 0.85 : 1.0;
+        const boxW = p.sz * 2.2 * loadScale;
+        const boxH = p.sz * 1.6 * loadScale;
         const alpha = 0.7 + Math.sin(p.t * Math.PI) * 0.2;
 
         ctx.save();
         ctx.translate(px, py);
         ctx.rotate(Math.atan2(uy, ux));
+
+        // Phase B: 满载货物金色光晕
+        if (pLoadLv === 3) {
+          const glowR = boxW * 2.5;
+          const grd = ctx.createRadialGradient(0, 0, boxW * 0.5, 0, 0, glowR);
+          grd.addColorStop(0, 'rgba(251,191,36,0.18)');
+          grd.addColorStop(1, 'rgba(251,191,36,0)');
+          ctx.fillStyle = grd;
+          ctx.beginPath();
+          ctx.arc(0, 0, glowR, 0, Math.PI*2);
+          ctx.fill();
+        }
 
         // 货箱阴影
         ctx.fillStyle = 'rgba(0,0,0,0.3)';
@@ -12572,12 +12873,12 @@ const G = {
 
         // 货箱主体
         ctx.globalAlpha = alpha;
-        ctx.fillStyle = p.color + 'CC';
+        ctx.fillStyle = pLoadLv === 3 ? '#fbbf24CC' : p.color + 'CC'; // 满载时金黄色
         ctx.fillRect(-boxW, -boxH, boxW*2, boxH*2);
 
         // 货箱边框
-        ctx.strokeStyle = p.color;
-        ctx.lineWidth = 0.8;
+        ctx.strokeStyle = pLoadLv === 3 ? '#fbbf24' : p.color;
+        ctx.lineWidth = pLoadLv === 3 ? 1.2 : 0.8;
         ctx.globalAlpha = alpha * 0.8;
         ctx.strokeRect(-boxW, -boxH, boxW*2, boxH*2);
 
@@ -12585,12 +12886,12 @@ const G = {
         ctx.beginPath();
         ctx.moveTo(-boxW, 0);
         ctx.lineTo(boxW, 0);
-        ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+        ctx.strokeStyle = pLoadLv === 3 ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.15)';
         ctx.lineWidth = 0.5;
         ctx.stroke();
 
         // 货箱顶部高光
-        ctx.fillStyle = 'rgba(255,255,255,0.08)';
+        ctx.fillStyle = pLoadLv === 3 ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.08)';
         ctx.fillRect(-boxW, -boxH, boxW*2, boxH);
 
         ctx.globalAlpha = 1;
@@ -13074,6 +13375,8 @@ const G = {
       resize();
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       drawBg();
+      // ★ Phase C 视觉叙事：培养基营养粒子
+      drawNutrients();
 
       // 先画临近弱连接
       drawProximityLinks();
