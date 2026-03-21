@@ -3584,6 +3584,7 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
               <div class="csb-group" id="lbBtnWrap" style="display:none;gap:8px">
                 <button onclick="G.showLeaderboard()" class="lb-btn" style="font-size:0.72em;padding:3px 10px">🏆 排行榜</button>
                 <button onclick="G.showPrestigePanel()" class="lb-btn" id="prestigeEntryBtn" style="font-size:0.72em;padding:3px 10px;border-color:rgba(168,85,247,0.3);color:#a855f7;background:rgba(168,85,247,0.06);display:none">🌀 转生</button>
+                <button onclick="G.enterCreativeMode()" class="lb-btn" id="creativeEntryBtn" style="font-size:0.72em;padding:3px 10px;border-color:rgba(251,191,36,0.3);color:#fbbf24;background:rgba(251,191,36,0.06);display:none">⭐ 创造</button>
               </div>
               <div class="empire-lb-locked" id="lbLockedHint">
                 <span style="font-size:0.72em;color:var(--dim);opacity:0.5">🔒 进化≥Lv.2 后解锁排行榜</span>
@@ -3660,6 +3661,19 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
         </div>
         <div class="sec-body">
           <div id="mutLabContent"></div>
+        </div>
+      </div>
+
+      <!-- v3.0 §8.3: 催化剂系统（转生5次解锁） -->
+      <div class="section" id="catalystSection" style="display:none">
+        <div class="section-title">
+          🧪 催化剂
+          <span class="hint" id="catalystHint"></span>
+          <button class="sec-toggle" onclick="G.toggleSection('catalystSection')" aria-expanded="true">▾</button>
+          <span class="sec-collapsed-hint">▸ 点击展开</span>
+        </div>
+        <div class="sec-body">
+          <div id="catalystContent"></div>
         </div>
       </div>
 

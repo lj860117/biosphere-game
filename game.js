@@ -692,7 +692,9 @@ function hasAvailablePort(idx, direction) {
     if (specBld.extraPorts) specExtra += specBld.extraPorts; // relay_hub: 双向+N
   }
   const max = direction === 'in' ? def.maxIn : def.maxOut;
-  return getUsedPorts(idx, direction) < (max + techExtra + mutExtra + specExtra);
+  // v3.0 §8.3: 端口催化剂 +1
+  const catalystExtra = G._isCatalystActive?.('portExtra') ? 1 : 0;
+  return getUsedPorts(idx, direction) < (max + techExtra + mutExtra + specExtra + catalystExtra);
 }
 
 /**
@@ -1597,6 +1599,24 @@ const ACHIEVE = [
   // 转生
   { id:'firstPrestige', n:'♻️ 轮回初始', d:'完成第一次转生', tier:'gold', check: s => s.prestigeCount >= 1, reward:{ energy:100, dna:30 } },
   { id:'prestige3', n:'♻️ 三度轮回', d:'转生3次', tier:'diamond', check: s => s.prestigeCount >= 3, reward:{ energy:200, dna:50, protein:30 } },
+  // v3.0 §8.6: 转生成就链
+  { id:'prestige5', n:'🧪 炼金术士', d:'转生5次(催化剂解锁)', tier:'diamond', check: s => s.prestigeCount >= 5, reward:{ energy:250, dna:60 } },
+  { id:'prestige10', n:'🌐 多菌株先驱', d:'转生10次', tier:'diamond', check: s => s.prestigeCount >= 10, reward:{ energy:400, dna:80, protein:50 } },
+  { id:'prestige15', n:'⭐ 造物主', d:'转生15次(创造模式)', tier:'diamond', check: s => s.prestigeCount >= 15, reward:{ energy:600, dna:120, protein:80 } },
+  // 变体通关成就
+  { id:'variant_purist', n:'🔥 纯粹通关', d:'纯粹主义变体下转生', tier:'gold', check: s => s._completedVariants?.purist, reward:{ energy:200, dna:40 } },
+  { id:'variant_energy', n:'⚡ 节能大师', d:'能量危机变体下转生', tier:'gold', check: s => s._completedVariants?.energyCrisis, reward:{ energy:150, dna:30 } },
+  { id:'variant_minimal', n:'🔬 极简通关', d:'极简主义变体下转生', tier:'gold', check: s => s._completedVariants?.minimalist, reward:{ energy:180, dna:35 } },
+  { id:'variant_chaos', n:'🎲 混沌征服', d:'混沌培养皿变体下转生', tier:'gold', check: s => s._completedVariants?.chaos, reward:{ energy:120, dna:25 } },
+  { id:'variant_speed', n:'⏱️ 极速通关', d:'竞速试炼变体下转生', tier:'diamond', check: s => s._completedVariants?.speedrun, reward:{ energy:220, dna:45 } },
+  { id:'variant_toxic', n:'☠️ 毒素幸存者', d:'毒素蔓延变体下转生', tier:'gold', check: s => s._completedVariants?.toxic, reward:{ energy:140, dna:28 } },
+  { id:'variant_all', n:'🏅 全变体大师', d:'完成所有6种变体', tier:'diamond', check: s => { const cv = s._completedVariants || {}; return PRESTIGE_VARIANTS.every(v => cv[v.id]); }, reward:{ energy:1000, dna:200, protein:100 } },
+  // 蓝图成就
+  { id:'blueprint_save', n:'💾 首个蓝图', d:'保存第一个传送带蓝图', tier:'bronze', check: s => (s._blueprints||[]).length >= 1, reward:{ energy:30 } },
+  { id:'blueprint_5', n:'🗺️ 蓝图收藏家', d:'保存5个蓝图', tier:'silver', check: s => (s._blueprints||[]).length >= 5, reward:{ energy:80, dna:15 } },
+  // 催化剂成就
+  { id:'catalyst_use', n:'🧪 首次催化', d:'使用第一个催化剂', tier:'bronze', check: s => (s.stats.catalystUseCount || 0) >= 1, reward:{ energy:50 } },
+  { id:'catalyst_10', n:'🧪 催化专家', d:'累计使用10个催化剂', tier:'silver', check: s => (s.stats.catalystUseCount || 0) >= 10, reward:{ energy:120, dna:25 } },
   // ★ Q4：变异实验室成就
   { id:'mutFirst', n:'🧬 初次突变', d:'激活第一个突变', tier:'bronze', check: s => s._mutSlots.length >= 1, reward:{ energy:50, dna:15 } },
   { id:'mutSlotsFull', n:'🧬 突变满载', d:'填满所有基础突变槽(3个)', tier:'silver', check: s => s._mutSlots.length >= 3, reward:{ energy:100, dna:25, protein:15 } },
@@ -1626,7 +1646,7 @@ const ACHV_CATEGORIES = {
   'survival': { name:'生存', icon:'🛡️', ids:['powerCrisis','neverLowPower'] },
   'economy':  { name:'经济', icon:'📊', ids:['maintSurvivor','maintBalancer','maintRecovery','efficientEmpire','noCompetition'] },
   'speed':    { name:'速度', icon:'⏱️', ids:['speedPhase2','speedBuild8'] },
-  'prestige': { name:'转生', icon:'♻️', ids:['firstPrestige','prestige3'] },
+  'prestige': { name:'转生', icon:'♻️', ids:['firstPrestige','prestige3','prestige5','prestige10','prestige15','variant_purist','variant_energy','variant_minimal','variant_chaos','variant_speed','variant_toxic','variant_all','blueprint_save','blueprint_5','catalyst_use','catalyst_10'] },
   'mutation': { name:'变异', icon:'🧬', ids:['mutFirst','mutSlotsFull','mutRare','mutEpic','mutLegend','mutCollect10','mutBrew10'] },
   'adjacency': { name:'邻接', icon:'🔗', ids:['adj5','adj15','adj30','adjAll'] },
 };
@@ -2468,6 +2488,11 @@ const PRESTIGE_VARIANTS = [
 // ===== v3.0 §8: 转生里程碑 =====
 const PRESTIGE_MILESTONES = [
   {
+    count: 2, id: 'turbo', name: '⚡ 超频模式', icon: '⚡', color: '#facc15',
+    desc: '解锁4×加速 — 快进到下一个决策点',
+    unlockDesc: '4×超频加速已解锁！在右上角切换速度档位。',
+  },
+  {
     count: 3, id: 'blueprint', name: '🗺️ 布局蓝图', icon: '🗺️', color: '#3b82f6',
     desc: '保存/加载传送带布局 — 快速重建物流网络',
     unlockDesc: '传送带蓝图系统解锁！可保存/加载物流布局。',
@@ -2487,6 +2512,16 @@ const PRESTIGE_MILESTONES = [
     desc: '无限资源 — 自由测试最优物流网络',
     unlockDesc: '创造模式解锁！可以无限资源自由实验。',
   },
+];
+
+// ===== v3.0 §8.3: 催化剂消耗品系统（转生5次解锁）=====
+const CATALYSTS = [
+  { id:'beltBoost',  n:'物流催化', icon:'🚀', color:'#3b82f6', cost:3, duration:120, desc:'传送带效率+30%', effect:'beltEff',  value:0.30 },
+  { id:'prodBoost',  n:'产出催化', icon:'📈', color:'#22c55e', cost:4, duration:90,  desc:'全局产出+25%',   effect:'prodMult', value:0.25 },
+  { id:'adjBoost',   n:'邻接催化', icon:'🔗', color:'#06d6a0', cost:3, duration:60,  desc:'邻接加成+50%',   effect:'adjMult',  value:0.50 },
+  { id:'portBoost',  n:'端口催化', icon:'🔌', color:'#a855f7', cost:5, duration:180, desc:'全局+1端口',     effect:'portExtra', value:1 },
+  { id:'timeBoost',  n:'时间催化', icon:'⏩', color:'#eab308', cost:2, duration:120, desc:'科技研究速度×2', effect:'techSpeed', value:2 },
+  { id:'luckBoost',  n:'幸运催化', icon:'🍀', color:'#84cc16', cost:3, duration:-1,  desc:'培养皿实验buff+30%', effect:'petriBuff', value:0.30 },
 ];
 
 // ===== GAME STATE =====
@@ -2545,12 +2580,13 @@ const G = {
   _specCache: { extraBeltRange: 0, beltEffBonus: 0, relayDecayOverride: null, relayExtraPorts: 0, perBuilding: {} },
   // v3.0 §8: 转生变体
   _activeVariant: null,    // 当前激活的变体ID (如 'purist')
+  _completedVariants: {},  // v3.0 §8.6: 已通关的变体 { purist: true, ... }
   _variantTimer: 0,        // speedrun计时 / toxic周期计时
   _toxicTarget: null,      // toxic变体当前衰减目标资源
   // v3.0 §8: 转生里程碑
   _unlockedMilestones: {}, // { blueprint: true, catalyst: true, ... }
   _blueprints: [],         // 蓝图系统: [{ name, belts, grid_snapshot }]
-  _catalysts: {},          // 催化剂: { beltBoost: { active, endTime }, ... }
+  _catalysts: {},          // 催化剂: { beltBoost: endTick, prodBoost: endTick, ... } (0=未激活)
   _creativeMode: false,    // 创造模式
   // Power level system
   _foodPowerLevel: 1.0, // 1.0 = full power, 0.2 = minimum
@@ -2748,7 +2784,7 @@ const G = {
       // 1/2/3 — 速度控制
       if (e.key === '1') { this.spd = 1; this._syncSpeedUI(); }
       else if (e.key === '2') { this.spd = 2; this._syncSpeedUI(); }
-      else if (e.key === '3') { this.spd = 4; this._syncSpeedUI(); }
+      else if (e.key === '3') { if (this._unlockedMilestones?.turbo) { this.spd = 4; this._syncSpeedUI(); } else { this.log('⚡ 4×加速需转生2次解锁', 'w'); } }
       // v3.0 §7.4: Tab键 — 网络总览模式
       else if (e.key === 'Tab') {
         e.preventDefault();
@@ -2765,6 +2801,9 @@ const G = {
     btn.classList.remove('spd-2', 'spd-4');
     if (this.spd === 2) btn.classList.add('spd-2');
     else if (this.spd === 4) btn.classList.add('spd-4');
+    // v3.0: 4×未解锁时提示
+    const turbo = this._unlockedMilestones?.turbo;
+    btn.title = turbo ? '加速 (1×/2×/4×)' : '加速 (1×/2×) — 转生2次解锁4×';
   },
 
   // v3.0 §7.4: 网络总览模式 — Tab键切换
@@ -4399,6 +4438,14 @@ const G = {
     const list = document.getElementById('techList');
     list.innerHTML = '';
 
+    // v3.0 §8.4: 多菌株模式标识
+    if (this._multiStrainUnlocked) {
+      const badge = document.createElement('div');
+      badge.style.cssText = 'text-align:center;padding:6px 10px;margin-bottom:8px;background:linear-gradient(135deg,rgba(34,197,94,0.12),rgba(34,197,94,0.04));border:1px solid rgba(34,197,94,0.25);border-radius:8px;font-size:0.78em;color:#22c55e;font-weight:600';
+      badge.textContent = '🌐 多菌株模式 — 无互斥限制';
+      list.appendChild(badge);
+    }
+
     // 按阶段组织科技树数据
     const phaseMap = {}; // { phase: { trunk: key, branches: [keyA, keyB] } }
     for (const key in TECHS) {
@@ -4429,7 +4476,7 @@ const G = {
 
       let exclusiveLocked = false;
       let exclusiveBy = '';
-      if (t.exclusive) {
+      if (t.exclusive && !this._multiStrainUnlocked) {
         for (const exKey of t.exclusive) {
           if (this.techs[exKey]?.done) { exclusiveLocked = true; exclusiveBy = TECHS[exKey].n; break; }
         }
@@ -4472,7 +4519,9 @@ const G = {
 
       let branchTag = '';
       if (t.exclusive && !done && !exclusiveLocked) {
-        branchTag = '<span class="tt-exclusive-tag">⚡二选一</span>';
+        branchTag = this._multiStrainUnlocked
+          ? '<span class="tt-exclusive-tag" style="background:rgba(34,197,94,0.15);color:#22c55e;border-color:rgba(34,197,94,0.3)">🌐 可同时研究</span>'
+          : '<span class="tt-exclusive-tag">⚡二选一</span>';
       }
 
       node.innerHTML = `
@@ -6681,6 +6730,8 @@ const G = {
 
   // ===== ACHIEVEMENTS =====
   checkAchievements() {
+    // v3.0 §8.5: 创造模式不记录成就
+    if (this._creativeMode) return;
     const prevCount = Object.keys(this.achievements).length;
 
     for (const a of ACHIEVE) {
@@ -7884,6 +7935,14 @@ const G = {
       details.push({ name: '特化增幅', icon: '🛡️', bonus: extra, count: 1 });
     }
 
+    // v3.0 §8.3: 邻接催化剂加成
+    const catAdjValue = this._getCatalystValue('adjMult');
+    if (catAdjValue > 0 && totalBonus > 0) {
+      const extra = totalBonus * catAdjValue;
+      totalBonus += extra;
+      details.push({ name: '催化增幅', icon: '🔗', bonus: extra, count: 1 });
+    }
+
     return { bonus: totalBonus, details };
   },
 
@@ -8131,8 +8190,8 @@ const G = {
   },
 
   // ===== UTILITY =====
-  checkRes(cost) { for (let k in cost) if ((this.res[k]||0) < cost[k]) return false; return true; },
-  spend(cost) { for (let k in cost) this.res[k] -= cost[k]; },
+  checkRes(cost) { if (this._creativeMode) return true; for (let k in cost) if ((this.res[k]||0) < cost[k]) return false; return true; },
+  spend(cost) { if (this._creativeMode) return; for (let k in cost) this.res[k] -= cost[k]; },
 
   bldCount(type) {
     return this.grid.filter(g => g && g.type === type).length;
@@ -8319,7 +8378,9 @@ const G = {
       const adjMilestone = 1 + (this._adjMilestoneBonus || 0);
       // v3.0 §8: 变体效果 — energyCrisis变体ATP产出-30%
       const variantEnergyMult = this._variantEnergyMult || 1;
-      const mult = this.gEff * popMult * bldMult * beltMult * techBonus * adjBonus * syncBonus * (this._foodPowerLevel || 1) * globalProdMult * mutGlobalBonus * adjMilestone * variantEnergyMult;
+      // v3.0 §8.3: 产出催化剂加成
+      const catalystProdMult = 1 + this._getCatalystValue('prodMult');
+      const mult = this.gEff * popMult * bldMult * beltMult * techBonus * adjBonus * syncBonus * (this._foodPowerLevel || 1) * globalProdMult * mutGlobalBonus * adjMilestone * variantEnergyMult * catalystProdMult;
       for (let k in bd.prod) {
         // ★ Q4：突变单资源产出加成
         const mutResBonus = 1 + (this._mutActiveEffects.resProdBonus?.[k] || 0);
@@ -8519,6 +8580,16 @@ const G = {
   startResearch(key) {
     if (this.rTech) { this.log('已有研究进行中', 'w'); SFX.buildFail(); return; }
     const t = TECHS[key];
+    // v3.0 §8.5: 创造模式 — 跳过阶段/前置/互斥检查，瞬间完成
+    if (this._creativeMode) {
+      if (this.techs[key]?.done) { this.log('已研究', 'w'); return; }
+      this.techs[key] = { done: true };
+      this.applyTech(key);
+      this.log(`⭐ 瞬间完成研究: ${t.n}`, 'ev');
+      SFX.researchDone();
+      this.renderTechs();
+      return;
+    }
     if (t.phase > this.phase) { this.log('需要先进入阶段 ' + t.phase, 'e'); SFX.buildFail(); return; }
     // v3.0 §3: 前置条件检查
     const prereq = this.getTechPrereqStatus(key);
@@ -8527,8 +8598,8 @@ const G = {
       SFX.buildFail();
       return;
     }
-    // 互斥分支检查 — 如果对立分支已完成，则不能研究
-    if (t.exclusive) {
+    // 互斥分支检查 — 如果对立分支已完成，则不能研究（多菌株模式下跳过）
+    if (t.exclusive && !this._multiStrainUnlocked) {
       for (const exKey of t.exclusive) {
         if (this.techs[exKey]?.done) {
           const exTech = TECHS[exKey];
@@ -8554,7 +8625,9 @@ const G = {
     // 研究个体加速：分配到研究的个体越多，研究越快
     const researchPop = Math.min(this.pop, this._popCap()) * (this.popAlloc.research / 100);
     const researchPopBonus = 1 + researchPop * 0.002; // 每个研究个体 +0.2% 研究速度
-    this.rProg += 1 * (this._techTimeMult ? (1 / this._techTimeMult) : 1) * researchPopBonus;  // 转生加成 + 个体加速
+    // v3.0 §8.3: 时间催化剂加速
+    const catalystTimeBoost = this._getCatalystValue('techSpeed') || 1;
+    this.rProg += 1 * (this._techTimeMult ? (1 / this._techTimeMult) : 1) * researchPopBonus * catalystTimeBoost;  // 转生加成 + 个体加速 + 催化剂
     const pct = Math.min(this.rProg / t.time * 100, 100);
     const fill = document.getElementById('techFill-' + this.rTech);
     if (fill) fill.style.width = pct + '%';
@@ -9637,6 +9710,8 @@ const G = {
   // 检查是否可以升级核心（所有条件达成）
   canPhaseUp() {
     if (this.phase >= 5) return false;
+    // v3.0 §8.5: 创造模式跳过条件
+    if (this._creativeMode) return true;
     const reqs = this.getPhaseUpReqs();
     return reqs.length > 0 && reqs.every(r => r.met);
   },
@@ -10264,6 +10339,10 @@ const G = {
           this.res[k] = (this.res[k]||0) + this.rates[k];
           if (this.res[k] < 0) this.res[k] = 0;
         }
+        // v3.0 §8.5: 创造模式资源锁定
+        if (this._creativeMode) {
+          for (const k in RES) this.res[k] = 99999;
+        }
 
         // Population from buildings — 有上限且消耗葡萄糖
         const bCount = this.totalBuildings();
@@ -10368,6 +10447,8 @@ const G = {
         // ★ Q4：变异实验室tick
         this._tickMutBrewing();
         this._checkMutLabUnlock();
+        // v3.0 §8.3: 催化剂倒计时
+        this._tickCatalysts();
         // v2.1 §8.2：培养皿P3+配方分散解锁检查
         this._checkPetriP3Unlock();
         this.rt++;
@@ -10423,6 +10504,8 @@ const G = {
       this.stats.onlineTime++;
       this.updateStats();
       if (this.animTick % 5 === 0) this.renderStats();
+      if (this.animTick % 5 === 0) this._renderCatalystPanel(); // v3.0 §8.3
+      if (this.animTick % 60 === 0) this._renderCreativeBadge(); // v3.0 §8.5
       if (this.animTick % 3 === 0) this.updateCellRates();
       // ★ 方案F：供给同步加成每3帧计算一次
       if (this.animTick % 3 === 0) this.computeSyncBonuses();
@@ -13636,7 +13719,10 @@ const G = {
 
   // ===== CONTROLS =====
   toggleSpeed() {
-    this.spd = this.spd >= 4 ? 1 : this.spd * 2;
+    const maxSpd = this._unlockedMilestones?.turbo ? 4 : 2;
+    let next = this.spd * 2;
+    if (next > maxSpd) next = 1;
+    this.spd = next;
     document.getElementById('spdDisplay').textContent = this.spd + '×';
     const btn = document.getElementById('spdBtn');
     btn.classList.remove('spd-2', 'spd-4');
@@ -13756,6 +13842,8 @@ const G = {
         // ★ 终局高潮系统
         _afterglowActive: this._afterglowActive || false,
         _wonderSprintActive: this._wonderSprintActive || false,
+        // v3.0 §8.3: 催化剂状态
+        _catalysts: this._catalysts || {},
       };
       localStorage.setItem('bioSphereV3', JSON.stringify(s));
       if (!silent) this.log('▸ 已保存', 's');
@@ -13915,6 +14003,8 @@ const G = {
       this._mutBrewCount = s._mutBrewCount || 0;
       // ★ 终局高潮系统状态恢复
       this._wonderSprintActive = s._wonderSprintActive || false;
+      // v3.0 §8.3: 催化剂恢复
+      this._catalysts = s._catalysts || {};
       if (s._afterglowActive) {
         // 存档时余晖仍然激活，恢复后继续显示（缩短剩余时间）
         setTimeout(() => this._startAfterglow(), 500);
@@ -14313,6 +14403,8 @@ const G = {
   // v3.0 §4: 距离效率衰减因子
   // dist=1: 100%, dist=2: 92%, dist=3: 80%, dist=4: 65%
   _distanceEfficiency(dist, viaRelay) {
+    // v3.0 §8.5: 创造模式无距离衰减
+    if (this._creativeMode) return 1.0;
     if (dist <= 1) return 1.0;
     const map = { 2: 0.92, 3: 0.80, 4: 0.65 };
     const base = map[dist] || Math.max(0.1, 1.0 - 0.12 * (dist - 1));
@@ -14343,7 +14435,9 @@ const G = {
     const relayPenalty = relayHops > 0 ? Math.pow(relayDecayRate, relayHops) : 1.0;
     // v3.0 §9.2: transport_speed 特化 — 全局传送带效率加成
     const specEffBonus = 1 + (this._specCache?.beltEffBonus || 0);
-    return baseEff * distFactor * relayPenalty * specEffBonus;
+    // v3.0 §8.3: 物流催化剂加成
+    const catalystBeltBonus = 1 + this._getCatalystValue('beltEff');
+    return baseEff * distFactor * relayPenalty * specEffBonus * catalystBeltBonus;
   },
 
   // v3.0 §5: 检查传送带是否涉及中继站
@@ -15426,11 +15520,14 @@ const G = {
   // 应用配方效果
   _applyPetriRecipe(recipe) {
     const b = recipe.buff;
+    // v3.0 §8.3: 幸运催化剂增幅效果值+30%
+    const luckBonus = this._getCatalystValue('petriBuff');
+    const buffValue = luckBonus > 0 ? b.value * (1 + luckBonus) : b.value;
     if (b.type === 'instant_random') {
       // 混沌培养：随机资源暴击
       const resKeys = Object.keys(RES).filter(k => RES[k].phase <= this.phase);
       const rk = resKeys[Math.floor(Math.random() * resKeys.length)];
-      const amount = Math.floor((this.res[rk] || 0) * b.value * 0.1 + 10);
+      const amount = Math.floor((this.res[rk] || 0) * buffValue * 0.1 + 10);
       this.res[rk] = (this.res[rk] || 0) + amount;
       this.log(`🌀 混沌培养！${RES[rk].icon || rk} +${amount}`, 's');
       this.showEvent('🧫 实验完成！', `🌀 混沌培养\n${RES[rk]?.n || rk} 暴击！+${amount}`, '#f59e0b');
@@ -15441,15 +15538,18 @@ const G = {
         name: b.name,
         icon: b.icon,
         type: b.type,
-        value: b.value,
+        value: buffValue,
         remaining: b.duration,
         total: b.duration,
         color: b.color,
       };
-      this.log(`🧫 ${b.icon} ${b.name} 激活！持续 ${b.duration}s`, 's');
-      const buffDesc = this._petriBuffDesc(b);
-      this.showEvent('🧫 实验完成！', `${b.icon} ${b.name}\n${buffDesc}\n持续 ${b.duration} 秒`, b.color);
+      const luckTag = luckBonus > 0 ? ' 🍀+30%' : '';
+      this.log(`🧫 ${b.icon} ${b.name} 激活！${luckTag} 持续 ${b.duration}s`, 's');
+      const buffDesc = this._petriBuffDesc({ ...b, value: buffValue });
+      this.showEvent('🧫 实验完成！', `${b.icon} ${b.name}${luckTag}\n${buffDesc}\n持续 ${b.duration} 秒`, b.color);
     }
+    // v3.0 §8.3: 实验后消耗幸运催化
+    this._consumeLuckCatalyst();
     // 一次性资源奖励
     if (recipe.reward) {
       for (const [k, v] of Object.entries(recipe.reward)) {
@@ -15590,6 +15690,244 @@ const G = {
     if (centerCell) centerCell.classList.add('petri-center');
   },
 
+  // ===== v3.0 §8.3: 催化剂消耗品系统 =====
+  _isCatalystActive(effectType) {
+    for (const cat of CATALYSTS) {
+      if (cat.effect === effectType) {
+        const end = this._catalysts[cat.id];
+        if (end && (end === -1 || end > this.rt)) return true;
+      }
+    }
+    return false;
+  },
+
+  _getCatalystValue(effectType) {
+    for (const cat of CATALYSTS) {
+      if (cat.effect === effectType) {
+        const end = this._catalysts[cat.id];
+        if (end && (end === -1 || end > this.rt)) return cat.value;
+      }
+    }
+    return 0;
+  },
+
+  useCatalyst(catId) {
+    const cat = CATALYSTS.find(c => c.id === catId);
+    if (!cat) return;
+    if (this.prestigeCurrency < cat.cost) {
+      this.log(`⚠️ 进化因子不足（需${cat.cost}，当前${this.prestigeCurrency}）`, 'w');
+      SFX.buildFail();
+      return;
+    }
+    // 不叠加，刷新持续时间
+    this.prestigeCurrency -= cat.cost;
+    if (cat.duration === -1) {
+      // 幸运催化：持续到下次培养皿实验
+      this._catalysts[catId] = -1;
+    } else {
+      this._catalysts[catId] = this.rt + cat.duration * 60; // duration秒 × 60tick/秒
+    }
+    this.log(`${cat.icon} 催化剂激活: ${cat.n} — ${cat.desc}`, 'ev');
+    this.showCursorTooltip(`${cat.icon} ${cat.n} 已激活！`);
+    SFX.researchDone();
+    this.stats.catalystUseCount = (this.stats.catalystUseCount || 0) + 1;
+    this._renderCatalystPanel();
+    // 持久化进化因子到prestige数据
+    this._saveCatalystPrestige();
+  },
+
+  _saveCatalystPrestige() {
+    try {
+      const pd = localStorage.getItem('bioSpherePrestige');
+      if (!pd) return;
+      const pData = JSON.parse(pd);
+      pData.pc = this.prestigeCurrency;
+      localStorage.setItem('bioSpherePrestige', JSON.stringify(pData));
+    } catch(e) {}
+  },
+
+  _tickCatalysts() {
+    let changed = false;
+    for (const cat of CATALYSTS) {
+      const end = this._catalysts[cat.id];
+      if (!end) continue;
+      if (end === -1) continue; // 幸运催化不按时间过期
+      if (this.rt >= end) {
+        delete this._catalysts[cat.id];
+        this.log(`${cat.icon} ${cat.n} 效果已结束`, '');
+        changed = true;
+      }
+    }
+    if (changed) this._renderCatalystPanel();
+  },
+
+  // 幸运催化在培养皿实验后消耗
+  _consumeLuckCatalyst() {
+    if (this._catalysts.luckBoost) {
+      delete this._catalysts.luckBoost;
+      this.log('🍀 幸运催化已消耗', '');
+      this._renderCatalystPanel();
+    }
+  },
+
+  _renderCatalystPanel() {
+    const sec = document.getElementById('catalystSection');
+    if (!sec) return;
+    // 仅转生5+次且催化剂里程碑已解锁时显示
+    if (!this._unlockedMilestones?.catalyst) {
+      sec.style.display = 'none';
+      return;
+    }
+    sec.style.display = '';
+
+    const hint = document.getElementById('catalystHint');
+    if (hint) hint.textContent = `${PRESTIGE.currencyIcon}${this.prestigeCurrency}`;
+
+    const panel = document.getElementById('catalystContent');
+    if (!panel) return;
+
+    let html = '';
+    // 活跃效果
+    const activeList = CATALYSTS.filter(c => {
+      const end = this._catalysts[c.id];
+      return end && (end === -1 || end > this.rt);
+    });
+    if (activeList.length > 0) {
+      html += `<div style="margin-bottom:8px;padding:6px 8px;background:rgba(249,115,22,0.06);border:1px solid rgba(249,115,22,0.15);border-radius:6px">`;
+      html += `<div style="font-size:0.68em;color:#f97316;font-weight:600;margin-bottom:4px">活跃效果</div>`;
+      for (const cat of activeList) {
+        const end = this._catalysts[cat.id];
+        let timeStr;
+        if (end === -1) {
+          timeStr = '持续到下次实验';
+        } else {
+          const remain = Math.max(0, Math.ceil((end - this.rt) / 60));
+          const pct = Math.min(100, (end - this.rt) / (cat.duration * 60) * 100);
+          timeStr = `${remain}秒`;
+          html += `<div style="display:flex;align-items:center;gap:6px;margin:2px 0">`;
+          html += `<span style="font-size:0.8em">${cat.icon}</span>`;
+          html += `<span style="font-size:0.72em;color:${cat.color};font-weight:600;min-width:52px">${cat.n}</span>`;
+          html += `<div style="flex:1;height:4px;background:rgba(255,255,255,0.06);border-radius:2px;overflow:hidden">`;
+          html += `<div style="width:${pct}%;height:100%;background:${cat.color};border-radius:2px;transition:width 1s linear"></div></div>`;
+          html += `<span style="font-size:0.65em;color:var(--dim);min-width:32px;text-align:right">${timeStr}</span>`;
+          html += `</div>`;
+          continue;
+        }
+        html += `<div style="display:flex;align-items:center;gap:6px;margin:2px 0">`;
+        html += `<span style="font-size:0.8em">${cat.icon}</span>`;
+        html += `<span style="font-size:0.72em;color:${cat.color};font-weight:600">${cat.n}</span>`;
+        html += `<span style="font-size:0.65em;color:var(--dim);margin-left:auto">${timeStr}</span>`;
+        html += `</div>`;
+      }
+      html += `</div>`;
+    }
+
+    // 催化剂列表
+    for (const cat of CATALYSTS) {
+      const canBuy = this.prestigeCurrency >= cat.cost;
+      const isActive = this._catalysts[cat.id] && (this._catalysts[cat.id] === -1 || this._catalysts[cat.id] > this.rt);
+      const durText = cat.duration === -1 ? '持续到下次实验' : `${cat.duration}秒`;
+      html += `<div style="display:flex;align-items:center;gap:8px;padding:5px 8px;margin:3px 0;border-radius:6px;
+        background:${isActive ? `rgba(249,115,22,0.04)` : 'rgba(255,255,255,0.02)'};
+        border:1px solid ${isActive ? 'rgba(249,115,22,0.2)' : canBuy ? `${cat.color}30` : 'rgba(255,255,255,0.04)'};
+        cursor:${canBuy && !isActive ? 'pointer' : 'default'};opacity:${canBuy || isActive ? '1' : '0.5'}"
+        ${canBuy && !isActive ? `onclick="G.useCatalyst('${cat.id}')"` : ''}>
+        <span style="font-size:1em">${cat.icon}</span>
+        <div style="flex:1">
+          <div style="font-size:0.75em;font-weight:600;color:${cat.color}">${cat.n}</div>
+          <div style="font-size:0.65em;color:var(--dim)">${cat.desc} · ${durText}</div>
+        </div>
+        <div style="font-size:0.68em;color:${canBuy ? '#f97316' : 'var(--dim)'};font-weight:600;white-space:nowrap">
+          ${isActive ? '<span style="color:#22c55e">✓ 活跃</span>' : `${cat.cost}${PRESTIGE.currencyIcon}`}
+        </div>
+      </div>`;
+    }
+
+    panel.innerHTML = html;
+  },
+
+  // ===== v3.0 §8.5: 创造模式（转生15次解锁）=====
+  enterCreativeMode() {
+    if (!this._creativeAvailable) {
+      this.log('⚠️ 创造模式需转生15次解锁', 'w');
+      return;
+    }
+    if (this._creativeMode) {
+      this.log('已在创造模式中', 'w');
+      return;
+    }
+    // 确认弹窗
+    this.showEvent('⭐ 创造模式', '进入创造模式后：\n\n✅ 无限资源，免费建造\n✅ 科技瞬间完成\n✅ 无需进化条件\n✅ 传送带无距离限制\n\n⚠️ 成就和转生进度不计入\n⚠️ 需要转生退出创造模式', '#fbbf24');
+    setTimeout(() => {
+      if (!confirm('确定进入创造模式？\n\n✅ 无限资源、免费建造、科技瞬间完成\n⚠️ 不计入成就和转生进度\n⚠️ 当前世进度将重置')) return;
+      this._creativeMode = true;
+      // 重置当前世
+      localStorage.removeItem('bioSphereV3');
+      // 保存创造模式标记到prestige data
+      try {
+        const pd = localStorage.getItem('bioSpherePrestige');
+        if (pd) {
+          const pData = JSON.parse(pd);
+          pData.creativeMode = true;
+          localStorage.setItem('bioSpherePrestige', JSON.stringify(pData));
+        }
+      } catch(e) {}
+      location.reload();
+    }, 500);
+  },
+
+  exitCreativeMode() {
+    if (!this._creativeMode) return;
+    if (!confirm('退出创造模式？\n\n创造模式下的进度将被清除。')) return;
+    this._creativeMode = false;
+    localStorage.removeItem('bioSphereV3');
+    try {
+      const pd = localStorage.getItem('bioSpherePrestige');
+      if (pd) {
+        const pData = JSON.parse(pd);
+        delete pData.creativeMode;
+        localStorage.setItem('bioSpherePrestige', JSON.stringify(pData));
+      }
+    } catch(e) {}
+    location.reload();
+  },
+
+  _applyCreativeMode() {
+    if (!this._creativeMode) return;
+    // 资源锁定99999
+    for (const k in RES) {
+      this.res[k] = 99999;
+    }
+  },
+
+  _isCreativeCheckRes() {
+    // 创造模式下跳过资源检查
+    return this._creativeMode;
+  },
+
+  _renderCreativeBadge() {
+    // 顶栏金色标识
+    let badge = document.getElementById('creativeBadge');
+    if (this._creativeMode) {
+      if (!badge) {
+        badge = document.createElement('div');
+        badge.id = 'creativeBadge';
+        badge.style.cssText = 'position:fixed;top:0;left:50%;transform:translateX(-50%);z-index:9999;padding:4px 16px;background:linear-gradient(135deg,rgba(251,191,36,0.15),rgba(251,191,36,0.05));border:1px solid rgba(251,191,36,0.3);border-top:none;border-radius:0 0 8px 8px;font-size:0.72em;color:#fbbf24;font-weight:700;letter-spacing:1px;pointer-events:auto;cursor:pointer';
+        badge.textContent = '⭐ 创造模式 — 自由实验中';
+        badge.title = '点击退出创造模式';
+        badge.onclick = () => this.exitCreativeMode();
+        document.body.appendChild(badge);
+      }
+    } else if (badge) {
+      badge.remove();
+    }
+    // 创造模式入口按钮
+    const btn = document.getElementById('creativeEntryBtn');
+    if (btn) {
+      btn.style.display = this._creativeAvailable && !this._creativeMode ? '' : 'none';
+    }
+  },
+
   // ===== PRESTIGE SYSTEM =====
   canPrestige() {
     return this.phase >= 4 || this.wonderComplete;
@@ -15711,6 +16049,12 @@ const G = {
   },
 
   doPrestige() {
+    // v3.0 §8.5: 创造模式禁止转生
+    if (this._creativeMode) {
+      this.log('⭐ 创造模式中无法转生。请先退出创造模式。', 'w');
+      SFX.buildFail();
+      return;
+    }
     if (!this.canPrestige()) return;
     const gain = this.getPrestigeGain();
     const nextCount = this.prestigeCount + 1;
@@ -15728,6 +16072,12 @@ const G = {
     this.prestigeCurrency += gain;
     this.prestigeCount++;
 
+    // v3.0 §8.6: 记录变体通关
+    const completedVariants = { ...(this._completedVariants || {}) };
+    if (this._activeVariant) {
+      completedVariants[this._activeVariant] = true;
+    }
+
     // v3.0 §8: 更新里程碑
     const milestones = { ...(this._unlockedMilestones || {}) };
     for (const m of PRESTIGE_MILESTONES) {
@@ -15743,6 +16093,7 @@ const G = {
         infLevels: { ...this.infiniteBonusLevels },
         milestones,
         blueprints: this._blueprints || [],
+        completedVariants,
       };
       this._showVariantChoice();
       return; // 等玩家选择后再重载
@@ -15756,6 +16107,7 @@ const G = {
       infLevels: { ...this.infiniteBonusLevels },
       milestones,
       blueprints: this._blueprints || [],
+      completedVariants,
       variant: null,
     };
     localStorage.removeItem('bioSphereV3');
@@ -15855,6 +16207,7 @@ const G = {
       this._activeVariant = pData.variant || null;
       this._unlockedMilestones = pData.milestones || {};
       this._blueprints = pData.blueprints || [];
+      this._completedVariants = pData.completedVariants || {};
       // 确保里程碑根据当前转生次数更新
       for (const m of PRESTIGE_MILESTONES) {
         if (this.prestigeCount >= m.count) this._unlockedMilestones[m.id] = true;
@@ -15862,6 +16215,8 @@ const G = {
       // v3.0 §8: 里程碑效果
       if (this._unlockedMilestones.multiStrain) this._multiStrainUnlocked = true;
       if (this._unlockedMilestones.creative) this._creativeAvailable = true;
+      // v3.0 §8.5: 恢复创造模式
+      if (pData.creativeMode) this._creativeMode = true;
 
       // Apply owned fixed bonuses
       for (const idx of this.prestigeBonuses) {
@@ -15910,6 +16265,10 @@ const G = {
             this.showEvent(`${v.icon} ${v.name}`, `本世变体规则:\\n\\n${v.desc}\\n\\n${v.hint}\\n\\n🌀 进化因子获得量 ×${v.scoreBonus}`, v.color);
           }
         }
+        // v3.0 §8.4: 多菌株模式日志
+        if (this._multiStrainUnlocked) {
+          this.log('🌐 多菌株模式: 科技互斥限制已取消！', 'ev');
+        }
         // v3.0 §8: 里程碑解锁通知
         for (const m of PRESTIGE_MILESTONES) {
           if (m.count === this.prestigeCount) {
@@ -15921,6 +16280,13 @@ const G = {
           }
         }
       }
+      // v3.0 §8.5: 创造模式 badge + 日志
+      this._renderCreativeBadge();
+      if (this._creativeMode) {
+        this.log('⭐ 创造模式已激活 — 无限资源，自由实验', 'ev');
+      }
+      // v3.0: 同步速度按钮tooltip（turbo里程碑）
+      this._syncSpeedUI();
     } catch(e){}
   },
 };
