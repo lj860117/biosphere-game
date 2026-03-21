@@ -138,6 +138,20 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
   animation:pulse 3s ease-in-out infinite;
 }
 @keyframes fadeIn{0%{opacity:0;transform:translateY(4px)}100%{opacity:1;transform:translateY(0)}}
+/* J1: 菌主形象常驻 */
+.host-avatar{
+  display:flex;align-items:center;gap:6px;flex-shrink:0;
+  padding:3px 10px;border-radius:12px;
+  background:rgba(6,214,160,0.06);border:1px solid rgba(6,214,160,0.12);
+  cursor:default;transition:all 0.3s;
+}
+.host-avatar:hover{background:rgba(6,214,160,0.1);border-color:rgba(6,214,160,0.25)}
+.host-avatar-icon{font-size:1.2em;animation:pulse 3s ease-in-out infinite}
+.host-avatar-status{
+  font-size:0.68em;color:rgba(160,180,210,0.7);max-width:120px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  font-family:'ZCOOL QingKe HuangYou',sans-serif;
+}
 @keyframes pulse{0%,100%{box-shadow:0 0 10px rgba(6,214,160,0.2)}50%{box-shadow:0 0 22px rgba(6,214,160,0.4)}}
 .logo svg{width:22px;height:22px}
 .title-box h1{font-family:'Orbitron',monospace;font-size:1em;font-weight:900;color:var(--bright);letter-spacing:2px}
@@ -823,6 +837,22 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 .dish-env span{color:var(--dim)}
 .dish-env .val{font-family:'Orbitron',monospace;color:var(--color-info)}
 .dish-view{flex:1;position:relative;overflow:auto;min-height:0;scrollbar-width:thin;scrollbar-color:rgba(6,214,160,0.35) transparent}
+/* K1: 培养皿液体质感 — 波纹 + 暗角 */
+.dish-view::before{
+  content:'';position:absolute;inset:0;z-index:0;pointer-events:none;
+  background:
+    radial-gradient(ellipse 120% 80% at 30% 40%, rgba(6,214,160,0.03) 0%, transparent 60%),
+    radial-gradient(ellipse 100% 100% at 70% 60%, rgba(59,130,246,0.02) 0%, transparent 50%);
+  animation:liquidRipple 12s ease-in-out infinite alternate;
+}
+.dish-view::after{
+  content:'';position:absolute;inset:0;z-index:6;pointer-events:none;
+  background:radial-gradient(ellipse 80% 75% at 50% 50%, transparent 40%, rgba(0,0,0,0.35) 100%);
+}
+@keyframes liquidRipple{
+  0%{background-position:0% 0%,100% 100%}
+  100%{background-position:20% 20%,80% 80%}
+}
 .dish-view::-webkit-scrollbar{width:8px;height:8px}
 .dish-view::-webkit-scrollbar-track{background:rgba(0,0,0,0.15);border-radius:4px}
 .dish-view::-webkit-scrollbar-thumb{background:rgba(6,214,160,0.35);border-radius:4px}
@@ -3656,6 +3686,11 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
         <circle cx="15" cy="14" r="1.2" fill="#006a6a"/>
         <circle cx="9" cy="14" r="1" fill="#006a6a"/>
       </svg>
+    </div>
+    <!-- J1: 菌主形象常驻 -->
+    <div class="host-avatar" id="hostAvatar">
+      <span class="host-avatar-icon" id="hostAvatarIcon">🦠</span>
+      <span class="host-avatar-status" id="hostAvatarStatus">安静地等待着...</span>
     </div>
     <div class="title-box">
       <h1>BIOSPHERE</h1>

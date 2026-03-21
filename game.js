@@ -6594,6 +6594,10 @@ const G = {
 
     // 爽感系统
     this.stats.totalBuilt++;
+    // J3: 微叙事事件 — 首个建筑建成
+    if (this.stats.totalBuilt === 1) {
+      this.showMilestone('🌱', '第一个采集菌诞生了...你的帝国从此刻开始。');
+    }
     this.buildBurst(idx);
     this.addCombo();
 
@@ -10738,6 +10742,8 @@ const G = {
       if (this.phase >= 3) this._stopHelpPulse();
       this.showMilestone(p.icon, '进入阶段 ' + p.id + ': ' + p.name);
       this.log('◆ 进入阶段 ' + p.id + ': ' + p.name + ' — ' + p.desc, 's');
+      // J3: 微叙事 — 阶段升级
+      this.log('🌅 一个新时代降临...你的文明更加强大了。', 's');
       // 核心菌落升级提示
       if (cc) {
         this.log(`◆ 核心菌落进化: ${cc.name} ${cc.emoji}`, 's');
@@ -11289,6 +11295,8 @@ const G = {
       if (this.animTick % 3 === 0) this.updateAlertBar();
       // G3: 帝国总览折叠摘要每5帧更新
       if (this.animTick % 5 === 0) this.updateEmpireSummary();
+      // J1: 菌主形象每5帧更新
+      if (this.animTick % 5 === 0) this.updateHostAvatar();
       // v3.0 §2: 探索度检查（每10帧一次）
       if (this.animTick % 10 === 0) this._checkExplorationProgress();
       // v3.0 §3: 科技前置条件检查（每15帧一次）
@@ -13847,6 +13855,43 @@ const G = {
     el.textContent = `P${this.phase} ${phaseName}  ⚡${eff}%  🏆${formatNum(score)} [${rank}]`;
   },
 
+  // ===== J1: 菌主形象常驻 =====
+  _HOST_ICONS: { 1:'🦠', 2:'🧬', 3:'🧪', 4:'⚙️', 5:'🏛️' },
+  updateHostAvatar() {
+    const iconEl = document.getElementById('hostAvatarIcon');
+    const statusEl = document.getElementById('hostAvatarStatus');
+    if (!iconEl || !statusEl) return;
+
+    // 更新阶段图标
+    iconEl.textContent = this._HOST_ICONS[this.phase] || '🦠';
+
+    // 根据状态选择状态语
+    const dormCount = Object.keys(this._dormantCells).length;
+    let hasNegCritical = false;
+    let allPositive = true;
+    for (const k in this.rates) {
+      if (this.rates[k] < -0.01) {
+        allPositive = false;
+        const stock = this.res[k] || 0;
+        if (stock < Math.abs(this.rates[k]) * 30) hasNegCritical = true;
+      }
+    }
+
+    if (hasNegCritical) {
+      statusEl.textContent = '你的菌群在呼救！';
+      statusEl.style.color = '#fca5a5';
+    } else if (dormCount > 0) {
+      statusEl.textContent = `${dormCount}座建筑在休眠...`;
+      statusEl.style.color = '#fbbf24';
+    } else if (allPositive) {
+      statusEl.textContent = '帝国运转良好！';
+      statusEl.style.color = '#86efac';
+    } else {
+      statusEl.textContent = '安静地采集能量...';
+      statusEl.style.color = 'rgba(160,180,210,0.7)';
+    }
+  },
+
   // ===== SECTION TOGGLE (折叠/展开) =====
 
   // === 引导目标元素 → 所属 section ID 映射 ===
@@ -14734,7 +14779,21 @@ const G = {
   },
 
   // ===== LOG =====
+  // J2: 叙事化文案映射
+  _NARRATIVE_MAP: [
+    [/阻塞/g, '饥饿'],
+    [/回收建筑/g, '分解重组'],
+    [/升级到/g, '进化至'],
+    [/建造了/g, '培育了'],
+    [/连接传送带/g, '延伸菌丝网络'],
+    [/资源不足/g, '养分匮乏'],
+    [/效率(\d+)%/, '菌群活力$1%'],
+  ],
   log(msg, type) {
+    // J2: 叙事化文案
+    for (const [re, rep] of this._NARRATIVE_MAP) {
+      msg = msg.replace(re, rep);
+    }
     const log = document.getElementById('logBox');
     const el = document.createElement('div');
     el.className = 'log-msg' + (type ? ' ' + type : '');
