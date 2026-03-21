@@ -5037,6 +5037,9 @@ const G = {
         cell.classList.add('occupied', bd.bg);
         const cellLv = this.buildingLevels[i] || 1;
         if (cellLv > 1) cell.classList.add('upgraded');
+        // F: 升级视觉分级 — 5级体系
+        if (cellLv >= 3) cell.classList.add('upgrade-lv3');
+        if (cellLv >= 4) cell.classList.add('upgrade-lv4');
         if (cellLv >= 5) cell.classList.add('max-level');
         // 方案D：用建筑自身color作为边框色，让同色系建筑也有独特视觉签名
         cell.style.borderColor = bd.color + '70';
@@ -11283,6 +11286,8 @@ const G = {
       if (this.animTick % 3 === 0) this.updateCellRates();
       // ★ 方案F：供给同步加成每3帧计算一次
       if (this.animTick % 3 === 0) this.computeSyncBonuses();
+      // H1: 告警摘要条每3帧更新
+      if (this.animTick % 3 === 0) this.updateAlertBar();
       // v3.0 §2: 探索度检查（每10帧一次）
       if (this.animTick % 10 === 0) this._checkExplorationProgress();
       // v3.0 §3: 科技前置条件检查（每15帧一次）
@@ -13466,7 +13471,10 @@ const G = {
           rateEl.className = 'res-rate pos';
         } else if (v < -0.01) {
           rateEl.textContent = formatRate(v);
-          rateEl.className = 'res-rate neg';
+          // H2: 当存量不足 30 秒净消耗时标记为 critical
+          const stock = this.res[k] || 0;
+          const isCritical = stock < Math.abs(v) * 30;
+          rateEl.className = 'res-rate neg' + (isCritical ? ' critical' : '');
         } else {
           rateEl.textContent = '';
           rateEl.className = 'res-rate';
@@ -13749,6 +13757,79 @@ const G = {
       const canAfford = this.checkRes(this.scaledCost(key));
       btn.classList.toggle('cant-afford', !canAfford);
     }
+  },
+
+  // ===== H1: 智能告警摘要条 =====
+  updateAlertBar() {
+    const bar = document.getElementById('alertBar');
+    if (!bar) return;
+
+    const alerts = [];   // { icon, text, severity:'info'|'warn'|'danger' }
+
+    // ── 1. 负速率资源检测 ──
+    for (const k in this.rates) {
+      const rate = this.rates[k];
+      if (rate >= -0.01) continue;              // 只关注净消耗
+      const stock = this.res[k] || 0;
+      const meta  = RES[k];
+      if (!meta) continue;
+      const secLeft = stock / Math.abs(rate);   // 存量可撑秒数
+      if (secLeft < 10) {
+        alerts.push({
+          icon: meta.icon, severity: 'danger',
+          text: `${meta.n}即将耗尽(${Math.ceil(secLeft)}s)`
+        });
+      } else if (secLeft < 30) {
+        alerts.push({
+          icon: meta.icon, severity: 'warn',
+          text: `${meta.n}告急(${Math.ceil(secLeft)}s)`
+        });
+      } else if (secLeft < 120) {
+        alerts.push({
+          icon: meta.icon, severity: 'info',
+          text: `${meta.n}消耗中`
+        });
+      }
+    }
+
+    // ── 2. 休眠建筑检测 ──
+    const dormCount = Object.keys(this._dormantCells).length;
+    if (dormCount > 0) {
+      alerts.push({
+        icon: '💤', severity: 'info',
+        text: `${dormCount}座建筑休眠中`
+      });
+    }
+
+    // ── 3. 无告警 → 隐藏 ──
+    if (alerts.length === 0) {
+      bar.classList.remove('show', 'level-info', 'level-warn', 'level-danger');
+      return;
+    }
+
+    // ── 4. 取最高严重级别 ──
+    const sevOrder = { danger: 3, warn: 2, info: 1 };
+    let maxSev = 'info';
+    for (const a of alerts) {
+      if (sevOrder[a.severity] > sevOrder[maxSev]) maxSev = a.severity;
+    }
+
+    // ── 5. 构造显示文本（最多取2条最严重的摘要） ──
+    alerts.sort((a, b) => sevOrder[b.severity] - sevOrder[a.severity]);
+    const top = alerts.slice(0, 2);
+    const summary = top.map(a => `${a.icon} ${a.text}`).join('  ');
+
+    // ── 6. 更新 DOM ──
+    const iconEl  = document.getElementById('alertBarIcon');
+    const textEl  = document.getElementById('alertBarText');
+    const countEl = document.getElementById('alertBarCount');
+
+    bar.classList.remove('level-info', 'level-warn', 'level-danger');
+    bar.classList.add('show', 'level-' + maxSev);
+
+    if (iconEl) iconEl.textContent = maxSev === 'danger' ? '🚨' : maxSev === 'warn' ? '⚠️' : 'ℹ️';
+    if (textEl) textEl.textContent = summary;
+    if (countEl) countEl.textContent = alerts.length > 2 ? `+${alerts.length - 2}` : '';
   },
 
   // ===== SECTION TOGGLE (折叠/展开) =====
@@ -15191,6 +15272,23 @@ const G = {
 
     const cost = this.getUpgradeCost(idx);
     if (!cost) return;
+
+    // I2: 低价免确认 — 当每种资源费用都 < 当前存量的10%时直接升级
+    const canAfford = this.checkRes(cost);
+    if (canAfford) {
+      let isCheap = true;
+      for (let k in cost) {
+        if ((this.res[k] || 0) <= 0 || cost[k] / this.res[k] > 0.1) {
+          isCheap = false;
+          break;
+        }
+      }
+      if (isCheap) {
+        this.upgradeIdx = idx;
+        this.confirmUpgrade();
+        return;
+      }
+    }
 
     this.upgradeIdx = idx;
     const costStr = Object.entries(cost).map(([k,v]) => `${formatNum(v)}${RES[k]?.icon||k}`).join(' + ');

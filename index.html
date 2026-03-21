@@ -239,7 +239,12 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
   text-shadow:0 1px 2px rgba(0,0,0,0.6)}
 .res-rate{font-family:'Share Tech Mono',monospace;font-size:0.75em;color:var(--dim)}
 .res-rate.pos{color:var(--green)}
-.res-rate.neg{color:var(--red)}
+.res-rate.neg{color:var(--red);animation:resNegPulse 1.5s ease-in-out infinite}
+.res-rate.neg::before{content:'▼ ';font-size:0.7em;vertical-align:1px}
+.res-rate.neg.critical{color:#ff3333;animation:resNegCritical 0.8s ease-in-out infinite;font-weight:700}
+.res-rate.neg.critical::before{content:'⚠ ▼ '}
+@keyframes resNegPulse{0%,100%{opacity:1}50%{opacity:0.55}}
+@keyframes resNegCritical{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.4;transform:scale(1.05)}}
 /* 新资源解锁脉冲动画 */
 @keyframes resUnlockPulse{
   0%{box-shadow:0 0 0 0 rgba(6,214,160,0.4);opacity:0;transform:scale(0.92)}
@@ -1672,6 +1677,37 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
   color:var(--purple);cursor:default;opacity:0.8;
 }
 
+/* === H1: 智能告警摘要条 === */
+.alert-bar{
+  margin:var(--sp-xs) var(--sp-md) 0;padding:var(--sp-xs-sm) var(--sp-md-lg);
+  border-radius:5px;font-size:0.68em;font-weight:600;
+  display:none;align-items:center;gap:var(--sp-sm);
+  transition:all 0.3s ease;cursor:pointer;user-select:none;
+  overflow:hidden;white-space:nowrap;
+}
+.alert-bar.show{display:flex}
+.alert-bar.level-info{
+  background:rgba(59,130,246,0.08);border:1px solid rgba(59,130,246,0.25);color:rgba(147,197,253,0.9);
+}
+.alert-bar.level-warn{
+  background:rgba(249,115,22,0.08);border:1px solid rgba(249,115,22,0.3);color:#fdba74;
+  animation:alertBarWarn 2.5s ease-in-out infinite;
+}
+.alert-bar.level-danger{
+  background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.4);color:#fca5a5;
+  animation:alertBarDanger 1.5s ease-in-out infinite;
+}
+@keyframes alertBarWarn{0%,100%{border-color:rgba(249,115,22,0.2)}50%{border-color:rgba(249,115,22,0.5)}}
+@keyframes alertBarDanger{0%,100%{border-color:rgba(239,68,68,0.3);background:rgba(239,68,68,0.06)}50%{border-color:rgba(239,68,68,0.6);background:rgba(239,68,68,0.12)}}
+.alert-bar-icon{font-size:1.05em;flex-shrink:0}
+.alert-bar-text{flex:1;overflow:hidden;text-overflow:ellipsis}
+.alert-bar-count{
+  font-family:'Share Tech Mono',monospace;font-size:0.92em;
+  padding:var(--sp-3xs) var(--sp-sm);border-radius:8px;
+  background:rgba(255,255,255,0.06);flex-shrink:0;
+}
+.alert-bar:hover{filter:brightness(1.15);transform:translateX(2px)}
+
 /* === 帝国总览面板 — 左右两栏常驻布局 === */
 .empire-overview{
   background:linear-gradient(135deg,rgba(10,16,30,0.85),rgba(8,14,26,0.9));
@@ -2687,13 +2723,31 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 .choice-a:hover .choice-label{color:var(--cyan)}
 .choice-b:hover .choice-label{color:var(--purple)}
 
-/* ===== UPGRADE GLOW on cells ===== */
+/* ===== UPGRADE GLOW on cells — F方案: 5级视觉分级体系 ===== */
 .cell.upgraded{
   box-shadow:inset 0 0 8px rgba(251,191,36,0.15);
 }
+/* Lv3: 蓝→金过渡，边框加粗 */
+.cell.upgrade-lv3{
+  box-shadow:inset 0 0 10px rgba(251,191,36,0.2),0 0 6px rgba(251,191,36,0.08);
+  border-width:2px;
+}
+/* Lv4: 金色光晕增强 */
+.cell.upgrade-lv4{
+  box-shadow:inset 0 0 12px rgba(251,191,36,0.25),0 0 10px rgba(251,191,36,0.12);
+  border-width:2px;
+  animation:lv4Glow 3s ease-in-out infinite;
+}
+@keyframes lv4Glow{0%,100%{box-shadow:inset 0 0 10px rgba(251,191,36,0.2),0 0 8px rgba(251,191,36,0.08)}50%{box-shadow:inset 0 0 14px rgba(251,191,36,0.3),0 0 14px rgba(251,191,36,0.15)}}
 .cell.max-level{
   box-shadow:inset 0 0 12px rgba(168,85,247,0.2),0 0 8px rgba(168,85,247,0.1);
+  border-color:rgba(168,85,247,0.5) !important;
+  animation:maxLvGlow 2.5s ease-in-out infinite;
 }
+@keyframes maxLvGlow{0%,100%{box-shadow:inset 0 0 10px rgba(168,85,247,0.15),0 0 6px rgba(168,85,247,0.08)}50%{box-shadow:inset 0 0 16px rgba(168,85,247,0.3),0 0 14px rgba(168,85,247,0.2)}}
+/* MAX等级emoji特效 — 持续微缩放 */
+.cell.max-level .cell-emoji{animation:emojiMaxFloat 2s ease-in-out infinite}
+@keyframes emojiMaxFloat{0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(-3px) scale(1.08)}}
 
 /* ===== GOLDEN NUMBERS (big gain effect) ===== */
 .golden-float{
@@ -3664,6 +3718,12 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
           <span>pH <span class="val" id="envPH">7.0</span></span>
           <span>T° <span class="val" id="envT">37</span></span>
         </div>
+      </div>
+      <!-- ========== H1: 智能告警摘要条 ========== -->
+      <div class="alert-bar" id="alertBar" title="点击展开详情">
+        <span class="alert-bar-icon" id="alertBarIcon">⚠</span>
+        <span class="alert-bar-text" id="alertBarText"></span>
+        <span class="alert-bar-count" id="alertBarCount"></span>
       </div>
       <!-- ========== 帝国总览 — 左右两栏常驻面板 ========== -->
       <div class="empire-overview" id="empireOverview">
