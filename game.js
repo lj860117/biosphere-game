@@ -2636,6 +2636,7 @@ const G = {
   // v3.0 §8: 转生变体
   _activeVariant: null,    // 当前激活的变体ID (如 'purist')
   _completedVariants: {},  // v3.0 §8.6: 已通关的变体 { purist: true, ... }
+  _ratingRewardsClaimed: {}, // v1.0.2: 评级首次达成奖励 { D:true, C:true, ... }
   _variantTimer: 0,        // speedrun计时 / toxic周期计时
   _toxicTarget: null,      // toxic变体当前衰减目标资源
   // v3.0 §8: 转生里程碑
@@ -7238,6 +7239,17 @@ const G = {
     const timePenalty = Math.min(Math.floor(hours * 50), Math.floor(score * 0.15)); // 最多扣15%
     score -= timePenalty;
 
+    // 12. 转生经验 — 老玩家应该有更高的分数上限
+    score += (this.prestigeCount || 0) * 100;
+
+    // 13. 变体通关 — 高难度 = 高分
+    const variantCount = Object.keys(this._completedVariants || {}).length;
+    score += variantCount * 300;
+    if (variantCount >= 6) score += 2000; // 全变体额外大分
+
+    // 14. 催化剂使用效率
+    score += Math.min((this.stats.catalystUseCount || 0), 50) * 20;
+
     return Math.max(0, Math.floor(score));
   },
 
@@ -7251,6 +7263,87 @@ const G = {
     if (score >= 600)  return { rank:'C',   color:'#22c55e', glow:false };
     if (score >= 200)  return { rank:'D',   color:'#6b7280', glow:false };
     return { rank:'E', color:'#4b5563', glow:false };
+  },
+
+  // ===== 评级首次达成奖励 =====
+  // 按评级从低到高排列，每个评级首次达成给一次性奖励（跨世保留）
+  _RATING_REWARDS: [
+    { rank:'D', min:200,  rewards:{ energy:30 } },
+    { rank:'C', min:600,  rewards:{ energy:50, dna:20 } },
+    { rank:'B', min:1200, rewards:{ energy:100, dna:30, protein:15 } },
+    { rank:'A', min:2000, rewards:{ energy:200, dna:50, protein:30 } },
+    { rank:'S', min:3000, rewards:{ energy:300, dna:80, protein:40, biomass:20 } },
+    { rank:'SS', min:4000, rewards:{ energy:500, dna:120, protein:60, biomass:30 } },
+    { rank:'SSS', min:5000, rewards:{ energy:1000, dna:200, protein:100, biomass:50 } },
+  ],
+
+  // 检查并发放评级奖励（在 UI tick 中调用）
+  _checkRatingRewards(score) {
+    const { rank } = this._scoreRank(score);
+    if (rank === 'E') return; // E级无奖励
+    const claimed = this._ratingRewardsClaimed || {};
+    for (const rr of this._RATING_REWARDS) {
+      if (score >= rr.min && !claimed[rr.rank]) {
+        // 首次达成！
+        claimed[rr.rank] = true;
+        this._ratingRewardsClaimed = claimed;
+        // 发放奖励
+        const parts = [];
+        for (const k in rr.rewards) {
+          this.res[k] = (this.res[k] || 0) + rr.rewards[k];
+          parts.push(`+${rr.rewards[k]}${RES[k]?.icon||k}`);
+        }
+        const { color } = this._scoreRank(score);
+        this.log(`🏅 评级 ${rr.rank} 首次达成！奖励: ${parts.join(' ')}`, 's');
+        this.showEvent(`🏅 评级 ${rr.rank} 达成！`, `恭喜首次达到 ${rr.rank} 评级！\n\n🎁 奖励: ${parts.join(' ')}\n\n继续加油冲击更高评级！`, color);
+        SFX.achieve();
+        this.screenShake(6);
+        // 持久化到 prestige 数据
+        this._saveRatingRewardsToPrestige();
+        break; // 一次只弹一个，下一 tick 继续检测
+      }
+    }
+  },
+
+  // 将评级奖励状态同步到 prestige 数据（跨世保留）
+  _saveRatingRewardsToPrestige() {
+    try {
+      const pd = localStorage.getItem('bioSpherePrestige');
+      if (!pd) return;
+      const pData = JSON.parse(pd);
+      pData.ratingRewardsClaimed = this._ratingRewardsClaimed || {};
+      localStorage.setItem('bioSpherePrestige', JSON.stringify(pData));
+    } catch(e) { /* ignore */ }
+  },
+
+  // ===== 传奇分 — 跨世累计成就评分，永不重置 =====
+  calcLegacyScore() {
+    let ls = 0;
+    // 历史最高当世分
+    const highScore = parseInt(localStorage.getItem('bioHighScore') || '0', 10);
+    ls += Math.max(this.calcScore(), highScore);
+    // 转生次数
+    ls += (this.prestigeCount || 0) * 200;
+    // 变体通关
+    const variantCount = Object.keys(this._completedVariants || {}).length;
+    ls += variantCount * 500;
+    if (variantCount >= 6) ls += 2000; // 全通关额外
+    // 催化剂使用次数 (上限50次计分)
+    ls += Math.min((this.stats.catalystUseCount || 0), 50) * 30;
+    // 蓝图收藏
+    ls += (this._blueprints || []).length * 50;
+    // 成就完成率 (100%=3000分)
+    const achieveRate = Object.keys(this.achievements).length / Math.max(ACHIEVE.length, 1);
+    ls += Math.floor(achieveRate * 3000);
+    // 最快奇观时间奖励
+    const fw = this._fastestWonder;
+    if (fw && fw <= 600) ls += 1500;
+    else if (fw && fw <= 900) ls += 1000;
+    else if (fw && fw <= 1200) ls += 500;
+    // 多菌株/创造模式解锁
+    if (this._multiStrainUnlocked) ls += 500;
+    if (this._creativeAvailable) ls += 300;
+    return Math.floor(ls);
   },
 
   // 右键显示评级说明 tooltip
@@ -7302,7 +7395,7 @@ const G = {
       </div>
       ${rows}
       <div style="text-align:center;margin-top:8px;padding-top:6px;border-top:1px solid rgba(255,255,255,0.04);color:var(--dim);font-size:0.75em">
-        分数 = 阶段 + 进化 + 建筑 + 科技 + 成就 + 挑战 + 资源峰值 + 效率 − 时间惩罚
+        分数 = 阶段 + 进化 + 建筑 + 科技 + 成就 + 挑战 + 资源峰值 + 效率 + 转生 + 变体 + 催化 − 时间惩罚
       </div>
     `;
 
@@ -7412,6 +7505,9 @@ const G = {
   _lbLastFetch: 0,
   _miniLbCache: null,
   _miniLbLastFetch: 0,
+  // v1.0.2: 排名头衔系统
+  _lbRankTitle: null,     // 当前头衔 { title, color, effBonus }
+  _lbMyPosition: 99,      // 当前排名位置
 
   // 初始化玩家 ID 和昵称
   _initPlayer() {
@@ -7531,6 +7627,8 @@ const G = {
       wonder: this.wonderComplete,
       online_time: Math.floor(this.stats.onlineTime),
       score_sig: sig,
+      legacy_score: this.calcLegacyScore(),
+      prestige_count: this.prestigeCount || 0,
       updated_at: new Date().toISOString()
     };
 
@@ -7546,6 +7644,8 @@ const G = {
       if (error && (error.code === '42703' || error.code === 'PGRST204' || error.message?.includes('could not find') || error.message?.includes('does not exist'))) {
         delete data.score_sig;
         delete data.online_time;
+        delete data.legacy_score;
+        delete data.prestige_count;
         ({ error } = await window.supa
           .from('leaderboard')
           .upsert(data, { onConflict: 'player_id' }));
@@ -7577,6 +7677,20 @@ const G = {
     }
   },
 
+  // ★ 转生前保存最高分到 Supabase + localStorage
+  _saveHighScoreBeforePrestige() {
+    const score = this.calcScore();
+    // 更新 localStorage 最高分
+    const oldBest = parseInt(localStorage.getItem('bioHighScore') || '0', 10);
+    if (score > oldBest) {
+      localStorage.setItem('bioHighScore', String(score));
+    }
+    // 提交到 Supabase（确保排行榜记录巅峰状态而非转生后归零）
+    if (window.supaReady && window.supa && this._playerName) {
+      this.submitScore(); // 提交当前分数（转生前的巅峰分）
+    }
+  },
+
   // 自动提交（save 时静默同步，节流 5 分钟一次）
   _lastAutoSubmit: 0,
   _autoSubmitScore() {
@@ -7588,12 +7702,34 @@ const G = {
   },
 
   // === 排行榜 UI ===
+  _lbActiveTab: 'current', // 'current' | 'legacy'
+
   showLeaderboard() {
     const pop = document.getElementById('leaderboardPopup');
     if (!pop) return;
     pop.classList.add('show');
     this._showBackdrop();
+    this._lbActiveTab = 'current';
+    this._updateLbTabs();
     this.refreshLeaderboard();
+  },
+
+  switchLbTab(tab) {
+    this._lbActiveTab = tab;
+    this._updateLbTabs();
+    if (tab === 'current') {
+      if (this._lbCache) this._renderLeaderboard(this._lbCache);
+      else this.refreshLeaderboard();
+    } else {
+      if (this._legacyLbCache) this._renderLegacyLeaderboard(this._legacyLbCache);
+      else this.refreshLegacyLeaderboard();
+    }
+  },
+
+  _updateLbTabs() {
+    document.querySelectorAll('#lbTabs .lb-tab').forEach(t => {
+      t.classList.toggle('active', t.dataset.tab === this._lbActiveTab);
+    });
   },
 
   closeLeaderboard() {
@@ -7632,6 +7768,8 @@ const G = {
       }));
       this._lbCache = entries;
       this._lbLastFetch = Date.now();
+      // v1.0.2: 检测自己的排名并更新头衔
+      this._updateRankTitle(entries);
       this._renderLeaderboard(entries);
       // 同步更新迷你排行榜
       const top3 = entries.slice(0, 3).map(e => ({ id: e.id, name: e.name, score: e.score, rank: e.rank }));
@@ -7765,6 +7903,201 @@ const G = {
     const d = document.createElement('div');
     d.textContent = s;
     return d.innerHTML;
+  },
+
+  // ===== 排名头衔系统 =====
+  // 排名→头衔映射
+  _RANK_TITLE_DEFS: [
+    { maxRank: 1,  title: '👑 至高菌皇', color: '#fbbf24', effBonus: 0.05 },
+    { maxRank: 3,  title: '🏆 传奇元老', color: '#fbbf24', effBonus: 0.03 },
+    { maxRank: 10, title: '⭐ 精英领主', color: '#a855f7', effBonus: 0.01 },
+    { maxRank: 20, title: '🌟 荣耀先驱', color: '#3b82f6', effBonus: 0 },
+  ],
+
+  _updateRankTitle(entries) {
+    const myId = this._playerId;
+    if (!myId) return;
+    const idx = entries.findIndex(e => e.id === myId);
+    const position = idx >= 0 ? idx + 1 : 99;
+    this._lbMyPosition = position;
+    const oldTitle = this._lbRankTitle;
+    let newTitle = null;
+    for (const def of this._RANK_TITLE_DEFS) {
+      if (position <= def.maxRank) {
+        newTitle = { ...def, position };
+        break;
+      }
+    }
+    this._lbRankTitle = newTitle;
+
+    // 如果头衔变化了，通知玩家
+    if (newTitle && (!oldTitle || oldTitle.title !== newTitle.title)) {
+      this.log(`🏅 排行榜头衔: ${newTitle.title}${newTitle.effBonus > 0 ? ` (全局效率 +${(newTitle.effBonus*100).toFixed(0)}%)` : ''}`, 's');
+      if (newTitle.effBonus > 0) {
+        this.showCursorTooltip(`${newTitle.title} — 效率 +${(newTitle.effBonus*100).toFixed(0)}%`);
+      }
+    }
+
+    // 更新昵称显示的头衔
+    this._updateTitleDisplay();
+  },
+
+  // 获取当前排名头衔的效率加成
+  getRankTitleBonus() {
+    return this._lbRankTitle?.effBonus || 0;
+  },
+
+  // 更新头衔在 UI 上的显示
+  _updateTitleDisplay() {
+    const titleEl = document.getElementById('empireTitleDisplay');
+    if (!titleEl) return;
+    if (this._lbRankTitle) {
+      // 排名头衔优先级高于帝国称号，追加显示
+      const lbBadge = document.getElementById('lbRankBadge');
+      if (!lbBadge) {
+        const badge = document.createElement('span');
+        badge.id = 'lbRankBadge';
+        badge.style.cssText = `font-size:0.72em;color:${this._lbRankTitle.color};margin-left:6px;`;
+        badge.textContent = `[${this._lbRankTitle.title}]`;
+        titleEl.parentElement?.appendChild(badge);
+      } else {
+        lbBadge.textContent = `[${this._lbRankTitle.title}]`;
+        lbBadge.style.color = this._lbRankTitle.color;
+      }
+    }
+  },
+
+  // ===== 传奇榜（Legacy Leaderboard）=====
+  _legacyLbCache: null,
+  _legacyLbLastFetch: 0,
+
+  async refreshLegacyLeaderboard() {
+    const listEl = document.getElementById('leaderboardList');
+    if (!listEl) return;
+
+    if (!window.supaReady || !window.supa) {
+      listEl.innerHTML = '<div style="text-align:center;color:var(--orange);padding:20px 0">⚠ 排行榜服务未连接</div>';
+      return;
+    }
+
+    listEl.innerHTML = '<div style="text-align:center;color:var(--dim);padding:20px 0">加载传奇榜...</div>';
+
+    try {
+      // 尝试按 legacy_score 排序获取传奇榜数据
+      const { data, error } = await window.supa
+        .from('leaderboard')
+        .select('player_id, name, score, rank, phase, buildings, wonder, legacy_score, prestige_count')
+        .order('legacy_score', { ascending: false })
+        .limit(20);
+
+      if (error) {
+        // 如果 legacy_score 列不存在，回退到按 score 排序 + 本地计算
+        if (error.message?.includes('does not exist') || error.code === '42703') {
+          this._renderLegacyFallback();
+          return;
+        }
+        throw error;
+      }
+
+      const entries = (data || []).map(r => ({
+        id: r.player_id,
+        name: r.name,
+        score: r.score,
+        rank: r.rank,
+        phase: r.phase,
+        buildings: r.buildings,
+        wonder: r.wonder,
+        legacyScore: r.legacy_score || r.score,
+        prestigeCount: r.prestige_count || 0,
+      }));
+      this._legacyLbCache = entries;
+      this._legacyLbLastFetch = Date.now();
+      this._renderLegacyLeaderboard(entries);
+    } catch (err) {
+      console.error('Legacy leaderboard error:', err);
+      listEl.innerHTML = '<div style="text-align:center;color:var(--red);padding:20px 0">加载失败</div>';
+    }
+  },
+
+  // 传奇榜 legacy_score 列不存在时的回退方案（用 score 代替）
+  _renderLegacyFallback() {
+    const listEl = document.getElementById('leaderboardList');
+    if (!listEl) return;
+    // 使用缓存的当世榜数据，添加本地传奇分
+    const entries = (this._lbCache || []).map(e => ({
+      ...e,
+      legacyScore: e.score,
+      prestigeCount: 0,
+    }));
+    // 把自己的真实传奇分加上
+    const myId = this._playerId;
+    const myEntry = entries.find(e => e.id === myId);
+    if (myEntry) {
+      myEntry.legacyScore = this.calcLegacyScore();
+      myEntry.prestigeCount = this.prestigeCount || 0;
+    }
+    entries.sort((a, b) => b.legacyScore - a.legacyScore);
+    this._legacyLbCache = entries;
+    this._renderLegacyLeaderboard(entries);
+  },
+
+  _renderLegacyLeaderboard(entries) {
+    const listEl = document.getElementById('leaderboardList');
+    if (!listEl) return;
+    if (this._lbActiveTab !== 'legacy') return; // 防止 tab 切换竞态
+
+    if (!entries || entries.length === 0) {
+      listEl.innerHTML = '<div style="text-align:center;color:var(--dim);padding:20px 0">传奇榜暂无数据，快去冲击更高排名！</div>';
+      return;
+    }
+
+    const myId = this._playerId;
+    // 排名头衔映射
+    const RANK_TITLES = [
+      { rank: 1, title: '👑 至高菌皇', color: '#fbbf24' },
+      { rank: 2, title: '🏆 传奇元老', color: '#fbbf24' },
+      { rank: 3, title: '🏆 传奇元老', color: '#fbbf24' },
+    ];
+
+    let html = '<div class="lb-legacy-title"><span>🏛️</span><span>传奇榜 — 跨世累计成就</span></div>';
+    entries.forEach((e, i) => {
+      const isMe = e.id === myId;
+      const rankNum = i + 1;
+      const medal = rankNum <= 3 ? ['🥇','🥈','🥉'][i] : `<span style="color:var(--dim)">${rankNum}</span>`;
+      const { color: rankColor } = this._scoreRank(e.legacyScore || e.score);
+      const titleInfo = RANK_TITLES.find(t => t.rank === rankNum);
+      const titleBadge = titleInfo ? `<span style="font-size:0.72em;color:${titleInfo.color}">${titleInfo.title}</span>` : '';
+      const prestStr = e.prestigeCount > 0 ? `♻️${e.prestigeCount}世` : '';
+      const detailBits = [prestStr, `P${e.phase || 1}`].filter(Boolean);
+      if (e.wonder) detailBits.push('☀️');
+
+      html += `
+        <div class="lb-row ${isMe ? 'lb-me' : ''}">
+          <div class="lb-rank">${medal}</div>
+          <div class="lb-name" ${isMe ? 'style="color:var(--cyan)"' : ''}>${this._escHtml(e.name || '???')}${isMe ? ' <span style="font-size:0.8em;color:var(--cyan)">(我)</span>' : ''} ${titleBadge}</div>
+          <div class="lb-score" style="color:${rankColor}">${formatNum(e.legacyScore || e.score || 0)}</div>
+          <div class="lb-grade" style="color:${rankColor};background:${rankColor}15;border:1px solid ${rankColor}30">${e.rank || 'E'}</div>
+          <div class="lb-detail">${detailBits.join(' ')}</div>
+        </div>`;
+    });
+
+    // 如果自己不在列表中
+    if (myId && !entries.find(e => e.id === myId) && this._playerName) {
+      const myLegacy = this.calcLegacyScore();
+      const { rank, color: myColor } = this._scoreRank(myLegacy);
+      html += `
+        <div style="border-top:1px solid rgba(255,255,255,0.06);margin-top:6px;padding-top:6px">
+          <div class="lb-row lb-me">
+            <div class="lb-rank"><span style="color:var(--dim)">—</span></div>
+            <div class="lb-name" style="color:var(--cyan)">${this._escHtml(this._playerName)} <span style="font-size:0.8em">(我)</span></div>
+            <div class="lb-score" style="color:${myColor}">${formatNum(myLegacy)}</div>
+            <div class="lb-grade" style="color:${myColor};background:${myColor}15;border:1px solid ${myColor}30">${rank}</div>
+            <div class="lb-detail">♻️${this.prestigeCount || 0}世 P${this.phase}</div>
+          </div>
+        </div>`;
+    }
+
+    listEl.innerHTML = html;
   },
 
   // ===== 游戏修改建议 =====
@@ -8476,6 +8809,7 @@ const G = {
     const adjMilestone = 1 + (this._adjMilestoneBonus || 0);
     const variantEnergyMult = this._variantEnergyMult || 1;
     const catalystProdMult = 1 + this._getCatalystValue('prodMult');
+    const rankTitleMult = 1 + this.getRankTitleBonus(); // v1.0.2: 排名头衔效率加成
     const foodPowerLv = this._foodPowerLevel || 1;
     const phaseGe2 = this.phase >= 2;
 
@@ -8551,7 +8885,7 @@ const G = {
           const adjBonus = 1 + adjResult.bonus;
           const syncBonus = 1 + (this._syncBonuses[idx]?.bonus || 0);
 
-          const mult = this.gEff * popMult * bldMult * beltMult * techBonus * adjBonus * syncBonus * foodPowerLv * globalProdMult * mutGlobalBonus * adjMilestone * variantEnergyMult * catalystProdMult;
+          const mult = this.gEff * popMult * bldMult * beltMult * techBonus * adjBonus * syncBonus * foodPowerLv * globalProdMult * mutGlobalBonus * adjMilestone * variantEnergyMult * catalystProdMult * rankTitleMult;
           for (let k in bd.prod) {
             const mutResBonus = 1 + (this._mutActiveEffects.resProdBonus?.[k] || 0);
             const prodVal = bd.prod[k] * mult * mutResBonus;
@@ -12904,6 +13238,9 @@ const G = {
         localStorage.setItem('bioHighScore', String(score));
       }
 
+      // v1.0.2: 检查评级首次达成奖励
+      this._checkRatingRewards(score);
+
       // 显示历史最高分（只有重置过至少一次才有意义）
       const highScore = Math.max(score, parseInt(localStorage.getItem('bioHighScore') || '0', 10));
       const resets = parseInt(localStorage.getItem('bioResetCount') || '0', 10);
@@ -13209,11 +13546,12 @@ const G = {
     // colonyStatusBar 现在是隐藏的兼容占位符，不需要操作
     // empireOverview 始终可见，无需条件控制
 
-    // 2. 排行榜 + 迷你排行榜：进化 >= Lv.2 直接用 display 控制
+    // 2. 排行榜 + 迷你排行榜：进化 >= Lv.2 或转生过即解锁
     const miniLb = document.getElementById('miniLeaderboard');
     const lbWrap = document.getElementById('lbBtnWrap');
     const lbHint = document.getElementById('lbLockedHint');
-    if (evoLv2) {
+    const lbUnlocked = evoLv2 || (this.prestigeCount || 0) >= 1;
+    if (lbUnlocked) {
       if (miniLb) miniLb.style.display = '';
       if (lbWrap) lbWrap.style.display = '';
       if (lbHint) lbHint.classList.add('hidden');
@@ -16229,6 +16567,9 @@ const G = {
 
     if (!confirm(`确定要转生？\n\n获得 +${formatNum(gain)} ${PRESTIGE.currencyIcon}${PRESTIGE.currencyName}${extraInfo}${wonderHint}\n\n所有进度将重置（转生加成和货币保留）`)) return;
 
+    // ★ 转生前保存当世最高分到 Supabase（修复：之前转生后分数归零导致排行榜无意义）
+    this._saveHighScoreBeforePrestige();
+
     this.prestigeCurrency += gain;
     this.prestigeCount++;
 
@@ -16260,6 +16601,7 @@ const G = {
         completedVariants,
         wonderPrestigeCount,
         fastestWonder,
+        ratingRewardsClaimed: this._ratingRewardsClaimed || {},
       };
       this._showVariantChoice();
       return; // 等玩家选择后再重载
@@ -16276,6 +16618,7 @@ const G = {
       completedVariants,
       wonderPrestigeCount,
       fastestWonder,
+      ratingRewardsClaimed: this._ratingRewardsClaimed || {},
       variant: null,
     };
     localStorage.removeItem('bioSphereV3');
@@ -16376,6 +16719,7 @@ const G = {
       this._unlockedMilestones = pData.milestones || {};
       this._blueprints = pData.blueprints || [];
       this._completedVariants = pData.completedVariants || {};
+      this._ratingRewardsClaimed = pData.ratingRewardsClaimed || {};
       // B+C: 恢复奇观转生计数和最快奇观时间
       this._wonderPrestigeCount = pData.wonderPrestigeCount || 0;
       this._fastestWonder = pData.fastestWonder || null;

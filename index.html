@@ -70,6 +70,18 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
   box-shadow:0 0 40px rgba(6,214,160,0.2);display:none;
 }
 .nickname-popup.show,.leaderboard-popup.show{display:block;animation:popIn .3s ease-out}
+.lb-tabs{display:flex;gap:4px;margin-bottom:10px}
+.lb-tab{
+  flex:1;padding:5px 8px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);
+  border-radius:5px;color:var(--dim);cursor:pointer;font-family:'Rajdhani',sans-serif;font-weight:600;
+  font-size:0.82em;transition:all 0.2s;text-align:center;
+}
+.lb-tab:hover{background:rgba(255,255,255,0.08)}
+.lb-tab.active{background:rgba(251,191,36,0.1);border-color:rgba(251,191,36,0.3);color:#fbbf24}
+.lb-legacy-title{
+  display:flex;align-items:center;gap:4px;font-size:0.68em;color:#a855f7;padding:4px 0;
+  border-bottom:1px solid rgba(168,85,247,0.1);margin-bottom:4px;
+}
 .lb-row{
   display:flex;align-items:center;gap:var(--sp-md);padding:var(--sp-sm) var(--sp-md);border-radius:4px;
   transition:background 0.15s;
@@ -4147,11 +4159,15 @@ html,body{height:100%;overflow:hidden;font-family:'Rajdhani',sans-serif;backgrou
 
 <!-- Leaderboard Popup -->
 <div class="leaderboard-popup" id="leaderboardPopup" role="dialog" aria-modal="true" aria-label="排行榜" aria-hidden="true">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,0.08)">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,0.08)">
     <div style="font-family:'Orbitron',monospace;font-size:0.85em;color:#fbbf24;letter-spacing:2px">🏆 排行榜</div>
     <button onclick="G.closeLeaderboard()" style="background:none;border:none;color:var(--dim);cursor:pointer;font-size:1.2em;padding:0 4px;line-height:1">✕</button>
   </div>
-  <div id="leaderboardList" style="max-height:420px;overflow-y:auto;font-size:0.78em">
+  <div class="lb-tabs" id="lbTabs">
+    <button class="lb-tab active" data-tab="current" onclick="G.switchLbTab('current')">🧫 当世榜</button>
+    <button class="lb-tab" data-tab="legacy" onclick="G.switchLbTab('legacy')">🏛️ 传奇榜</button>
+  </div>
+  <div id="leaderboardList" style="max-height:380px;overflow-y:auto;font-size:0.78em">
     <div style="text-align:center;color:var(--dim);padding:20px 0">加载中...</div>
   </div>
   <div style="display:flex;gap:8px;justify-content:center;margin-top:12px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.06)">
