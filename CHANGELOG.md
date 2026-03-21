@@ -4,6 +4,40 @@
 
 ---
 
+## v1.2.0 — 2026-03-22 · UI/UX 四轮改造 Sprint 1-4
+
+> **UI/UX Overhaul — 4 Sprints, 16 Sub-items**
+> 基于 UI_UX_AUDIT.md 诊断报告(F-K方案)，全面实施4轮UI/UX改造。
+> 代码变更：game.js ~800行新增/修改，index.html ~200行新增/修改
+
+### Sprint 1: 核心反馈与效率优化
+- [office] H2: 资源负值脉冲 — `.res-rate.neg` 脉冲动画 + `.critical` 存量告急(30秒)加强闪烁
+- [office] H1: 智能告警摘要条 — `updateAlertBar()` 3级告警(info/warn/danger)，实时资源/休眠监控
+- [office] I2: 低价免确认 — 升级费用占存量<10%时自动执行，跳过弹窗
+- [office] F: 升级视觉分级 — 5级体系(Lv1默认→Lv2 upgraded→Lv3蓝金→Lv4金晕脉冲→Lv5 MAX紫色浮动)
+
+### Sprint 2: 信息架构精简
+- [office] G2: 建造按钮简化 — 从4行压缩为2行(名称+内联造价+产出提示)，详情移入tooltip
+- [office] G3: 帝国总览精简 — 默认折叠+摘要行(阶段/效率/评分)，`updateEmpireSummary()`
+- [office] G4: 右侧面板重排 — CSS order重新排列优先级，统计/日志默认折叠
+- [office] I1: 弹窗简化 — 升级弹窗从5行压缩为2行(名称+等级inline, 倍率+造价inline)
+
+### Sprint 3: 菌主沉浸感
+- [office] J1: 菌主形象常驻 — topbar阶段微头像(🦠→🧬→🧪→⚙️→🏛️) + 状态语实时更新
+- [office] J2: 叙事化文案 — `_NARRATIVE_MAP` 正则映射(阻塞→饥饿, 回收→分解重组, 建造→培育…)
+- [office] J3: 微叙事事件 — 首个建筑milestone + 阶段升级叙事日志
+- [office] K1: 培养皿液体质感 — `::before` 波纹渐变 + `::after` 暗角
+
+### Sprint 4: 美术风格提升
+- [office] K2: 格子美术升级 — 工作中建筑呼吸动画(scale 1→1.015) + 产出边框微发光
+- [office] K3: 色彩系统简化 — 4色状态变量(--status-ok/warn/danger/special/reward)
+- [office] K4: 字体层级精简 — 3档字体变量(--font-heading/body/mono) + 实用CSS类
+
+### 📄 新增/更新文档
+- [office] `UI_UX_AUDIT.md` — UI/UX诊断报告(8个问题 + 6大方案F-K + 4个Sprint路线图)
+
+---
+
 ## v1.1.0 — 2026-03-21 · 视觉叙事增强 Phase A-E
 
 > **Visual Narrative Enhancement — 5 Phase Implementation**
