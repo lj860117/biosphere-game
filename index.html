@@ -1000,7 +1000,7 @@ html,body{height:100%;overflow:hidden;font-family:var(--font-body);background:va
 .dish-guide-text{
   font-size:0.78em;color:rgba(255,255,255,0.88);font-weight:500;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-  flex:1;min-width:0;
+  flex:0 1 auto;min-width:0;
 }
 /* 步骤变化时闪烁 */
 .dish-guide-bar.flash{
@@ -1012,6 +1012,21 @@ html,body{height:100%;overflow:hidden;font-family:var(--font-body);background:va
 }
 /* 游戏通关后隐藏 */
 .dish-guide-bar.hidden{display:none}
+/* 告警信息合并到引导条右侧 */
+.dish-guide-sep{
+  width:1px;height:14px;flex-shrink:0;
+  background:rgba(255,255,255,0.12);display:none;
+}
+.dish-guide-sep.show{display:block}
+.dish-guide-alert{
+  font-size:0.72em;color:rgba(255,255,255,0.6);
+  white-space:nowrap;flex-shrink:0;display:none;
+  gap:4px;align-items:center;
+}
+.dish-guide-alert.show{display:flex}
+.dish-guide-alert.level-warn{color:#fdba74}
+.dish-guide-alert.level-danger{color:#fca5a5;animation:alertTextPulse 1.5s ease-in-out infinite}
+@keyframes alertTextPulse{0%,100%{opacity:0.8}50%{opacity:1}}
 
 /* 滚动提示渐变阴影 — 在 dish-view-wrap 的伪元素上实现，不受 dish-view 滚动影响 */
 .dish-view-wrap{position:relative;flex:1;min-height:45vh;display:flex;flex-direction:column}
@@ -1859,14 +1874,13 @@ html,body{height:100%;overflow:hidden;font-family:var(--font-body);background:va
   display:none;
 }
 .empire-overview.collapsed .empire-overview-summary{display:block}
-/* 帝国总览折叠时的展开提示 — 绝对居中 */
+/* 帝国总览折叠时的展开提示 — 紧跟摘要后方 */
 .empire-expand-hint{
   display:none;font-size:0.65em;color:rgba(6,214,160,0.7);opacity:0.9;
   padding:1px 7px;border-radius:3px;white-space:nowrap;
   background:rgba(6,214,160,0.06);border:1px solid rgba(6,214,160,0.12);
   animation:hintPulse 2.5s ease-in-out infinite;
-  position:absolute;left:50%;transform:translateX(-50%);
-  pointer-events:none;
+  margin-left:8px;
 }
 .empire-overview.collapsed .empire-expand-hint{display:block}
 @keyframes hintPulse{0%,100%{opacity:0.9}50%{opacity:0.55}}
@@ -3860,8 +3874,8 @@ html,body{height:100%;overflow:hidden;font-family:var(--font-body);background:va
         <div class="empire-overview-header" onclick="G.toggleSection('empireOverview')">
           <span class="empire-overview-icon">🏛️</span>
           <span class="empire-overview-title">帝国总览</span>
-          <span class="empire-overview-summary" id="empireOverviewSummary"></span>
           <span class="empire-expand-hint">▸ 点击展开</span>
+          <span class="empire-overview-summary" id="empireOverviewSummary"></span>
           <button class="colony-status-toggle" id="empireOverviewToggle" aria-expanded="false">▾</button>
         </div>
         <div class="empire-overview-body" id="empireOverviewBody">
@@ -4015,6 +4029,8 @@ html,body{height:100%;overflow:hidden;font-family:var(--font-body);background:va
         <span class="dish-guide-icon" id="dishGuideIcon">🎯</span>
         <span class="dish-guide-label">下一步</span>
         <span class="dish-guide-text" id="dishGuideText"></span>
+        <span class="dish-guide-sep" id="dishGuideSep"></span>
+        <span class="dish-guide-alert" id="dishGuideAlert"></span>
       </div>
       <div class="dish-view-wrap">
       <div class="dish-view">

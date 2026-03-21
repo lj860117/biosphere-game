@@ -13901,6 +13901,11 @@ const G = {
     // ── 3. 无告警 → 隐藏 ──
     if (alerts.length === 0) {
       bar.classList.remove('show', 'level-info', 'level-warn', 'level-danger');
+      // 同时隐藏引导条内的告警区域
+      const guideAlert = document.getElementById('dishGuideAlert');
+      const guideSep   = document.getElementById('dishGuideSep');
+      if (guideAlert) guideAlert.classList.remove('show', 'level-info', 'level-warn', 'level-danger');
+      if (guideSep) guideSep.classList.remove('show');
       return;
     }
 
@@ -13916,17 +13921,22 @@ const G = {
     const top = alerts.slice(0, 2);
     const summary = top.map(a => `${a.icon} ${a.text}`).join('  ');
 
-    // ── 6. 更新 DOM ──
-    const iconEl  = document.getElementById('alertBarIcon');
-    const textEl  = document.getElementById('alertBarText');
-    const countEl = document.getElementById('alertBarCount');
+    // ── 6. 更新 DOM —— 合并到引导提示条右侧 ──
+    // 隐藏独立告警条
+    bar.classList.remove('show');
 
-    bar.classList.remove('level-info', 'level-warn', 'level-danger');
-    bar.classList.add('show', 'level-' + maxSev);
+    const guideSep   = document.getElementById('dishGuideSep');
+    const guideAlert = document.getElementById('dishGuideAlert');
+    if (!guideAlert) return;
 
-    if (iconEl) iconEl.textContent = maxSev === 'danger' ? '🚨' : maxSev === 'warn' ? '⚠️' : 'ℹ️';
-    if (textEl) textEl.textContent = summary;
-    if (countEl) countEl.textContent = alerts.length > 2 ? `+${alerts.length - 2}` : '';
+    guideAlert.classList.remove('show', 'level-info', 'level-warn', 'level-danger');
+    if (guideSep) guideSep.classList.remove('show');
+
+    if (alerts.length > 0) {
+      guideAlert.classList.add('show', 'level-' + maxSev);
+      if (guideSep) guideSep.classList.add('show');
+      guideAlert.textContent = summary + (alerts.length > 2 ? ` +${alerts.length - 2}` : '');
+    }
 
     // ── 7. 告警级别 warn/danger → 自动展开帝国总览 ──
     if (maxSev === 'warn' || maxSev === 'danger') {
