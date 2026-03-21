@@ -1772,7 +1772,7 @@ const GUIDE = {
     { check: s => s.bldCount('simpleExtractor') > 0 && s.res.dna < 3, text:'DNA正在合成中...攒到3就能研究科技（小手会指路！）', icon:'🔬' },
     { check: s => s.res.dna >= 3 && !s.techs.pureCulture.done, text:'DNA够了！点左侧「研究」→「纯培养技术」— 全局效率+10%，第一个科技里程碑', icon:'🧫' },
     { check: s => s.techs.pureCulture.done && s.eL < 2 && !s.canEvolve(), text:'纯培养技术✓（效率+10%）→ 攒够DNA后进化到Lv.2，解锁更多建筑！', icon:'📈' },
-    { check: s => s.techs.pureCulture.done && s.eL < 2 && s.canEvolve(), text:'资源就绪！点击底部「进化」按钮升到Lv.2 — 将解锁固氮装置和蛋白质工厂', icon:'✨' },
+    { check: s => s.techs.pureCulture.done && s.eL < 2 && s.canEvolve(), text:'资源就绪！点击右栏「进化」按钮升到Lv.2 — 将解锁固氮装置和蛋白质工厂', icon:'✨' },
   ],
   2: [
     // v2.0 §11.2: P2预热期端口教学
