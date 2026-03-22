@@ -166,6 +166,20 @@ body::after{
 .mini-lb-score{font-family:'Share Tech Mono',monospace;font-weight:700;color:#fbbf24;min-width:40px;text-align:right;font-size:0.9em}
 .mini-lb-grade{font-family:'Orbitron',monospace;font-size:0.7em;font-weight:700;padding:var(--sp-3xs) var(--sp-xs);border-radius:2px;min-width:24px;text-align:center}
 
+/* ★ 社交增强v1.0: 分榜Tab */
+.lb-sub-tab.active{background:rgba(251,191,36,0.12)!important;border-color:rgba(251,191,36,0.25)!important;color:#fbbf24!important}
+.lb-sub-tab:hover{background:rgba(255,255,255,0.06)}
+
+/* ★ 社交增强v1.0: 成就展柜高亮 */
+.achv-card.in-showcase{
+  border-color:rgba(251,191,36,0.4)!important;
+  box-shadow:0 0 8px rgba(251,191,36,0.15),inset 0 0 4px rgba(251,191,36,0.06);
+}
+.achv-card.unlocked:hover{
+  transform:translateY(-2px);box-shadow:0 4px 12px rgba(0,0,0,0.3);
+  transition:all 0.2s;
+}
+
 /* === LAYOUT === */
 .app{display:flex;flex-direction:column;height:100vh}
 
@@ -4946,6 +4960,7 @@ body::after{
               </div>
               <div class="csb-group" id="lbBtnWrap" style="display:none;gap:8px">
                 <button onclick="G.showLeaderboard()" class="lb-btn" style="font-size:0.72em;padding:3px 10px">🏆 排行榜</button>
+                <button onclick="G.shareEmpireCard()" class="lb-btn" style="font-size:0.72em;padding:3px 10px;border-color:rgba(168,85,247,0.3);color:#a855f7;background:rgba(168,85,247,0.06)">📸 分享</button>
                 <button onclick="G.showPrestigePanel()" class="lb-btn" id="prestigeEntryBtn" style="font-size:0.72em;padding:3px 10px;border-color:rgba(168,85,247,0.3);color:#a855f7;background:rgba(168,85,247,0.06);display:none">🌀 转生</button>
                 <button onclick="G.enterCreativeMode()" class="lb-btn" id="creativeEntryBtn" style="font-size:0.72em;padding:3px 10px;border-color:rgba(251,191,36,0.3);color:#fbbf24;background:rgba(251,191,36,0.06);display:none">⭐ 创造</button>
               </div>
@@ -5563,13 +5578,21 @@ body::after{
     <button class="lb-tab active" data-tab="current" onclick="G.switchLbTab('current')">🧫 当世榜</button>
     <button class="lb-tab" data-tab="legacy" onclick="G.switchLbTab('legacy')">🏛️ 传奇榜</button>
   </div>
+  <!-- ★ 社交增强: 分榜Tab -->
+  <div class="lb-sub-tabs" id="lbSubTabs" style="display:flex;gap:4px;margin-bottom:6px">
+    <button class="lb-sub-tab active" data-sub="score" onclick="G.switchLbSubTab('score')" style="padding:2px 8px;font-size:0.65em;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);color:var(--dim);border-radius:3px;cursor:pointer;font-family:'Rajdhani',sans-serif;transition:all 0.2s">🏆 总分</button>
+    <button class="lb-sub-tab" data-sub="speed" onclick="G.switchLbSubTab('speed')" style="padding:2px 8px;font-size:0.65em;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);color:var(--dim);border-radius:3px;cursor:pointer;font-family:'Rajdhani',sans-serif;transition:all 0.2s">⏱ 速度</button>
+    <button class="lb-sub-tab" data-sub="efficiency" onclick="G.switchLbSubTab('efficiency')" style="padding:2px 8px;font-size:0.65em;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);color:var(--dim);border-radius:3px;cursor:pointer;font-family:'Rajdhani',sans-serif;transition:all 0.2s">📈 效率</button>
+    <button class="lb-sub-tab" data-sub="achievement" onclick="G.switchLbSubTab('achievement')" style="padding:2px 8px;font-size:0.65em;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);color:var(--dim);border-radius:3px;cursor:pointer;font-family:'Rajdhani',sans-serif;transition:all 0.2s">🏆 成就</button>
+  </div>
   <div id="leaderboardList" style="max-height:380px;overflow-y:auto;font-size:0.78em">
     <div style="text-align:center;color:var(--dim);padding:20px 0">加载中...</div>
   </div>
-  <div style="display:flex;gap:8px;justify-content:center;margin-top:12px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.06)">
+  <div style="display:flex;gap:8px;justify-content:center;margin-top:12px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.06);flex-wrap:wrap">
     <button onclick="G.refreshLeaderboard()" style="padding:5px 16px;background:rgba(251,191,36,0.1);border:1px solid rgba(251,191,36,0.3);color:#fbbf24;border-radius:4px;cursor:pointer;font-family:'Rajdhani',sans-serif;font-weight:600;font-size:0.85em;transition:all 0.2s">🔄 刷新</button>
     <button onclick="G.submitScore()" style="padding:5px 16px;background:rgba(6,214,160,0.1);border:1px solid rgba(6,214,160,0.3);color:var(--cyan);border-radius:4px;cursor:pointer;font-family:'Rajdhani',sans-serif;font-weight:600;font-size:0.85em;transition:all 0.2s">📤 提交分数</button>
     <button onclick="G.editNickname()" style="padding:5px 16px;background:rgba(59,130,246,0.1);border:1px solid rgba(59,130,246,0.3);color:var(--blue);border-radius:4px;cursor:pointer;font-family:'Rajdhani',sans-serif;font-weight:600;font-size:0.85em;transition:all 0.2s">✏️ 改名</button>
+    <button onclick="G.shareEmpireCard()" style="padding:5px 16px;background:rgba(168,85,247,0.1);border:1px solid rgba(168,85,247,0.3);color:#a855f7;border-radius:4px;cursor:pointer;font-family:'Rajdhani',sans-serif;font-weight:600;font-size:0.85em;transition:all 0.2s">📸 分享名片</button>
   </div>
 </div>
 
@@ -5583,7 +5606,10 @@ body::after{
   <div class="chronicle-journey" id="chronicleJourney"></div>
   <div class="chronicle-stats" id="chronicleStats"></div>
   <div class="chronicle-quote" id="chronicleQuote"></div>
-  <button class="chronicle-close" onclick="G.closeChronicle()">✦ 继续书写传奇 ✦</button>
+  <div style="display:flex;gap:8px;justify-content:center;margin-top:12px">
+    <button class="chronicle-close" onclick="G.closeChronicle()">✦ 继续书写传奇 ✦</button>
+    <button onclick="G.shareEmpireCard()" style="padding:8px 20px;background:rgba(168,85,247,0.15);border:1px solid rgba(168,85,247,0.4);color:#a855f7;border-radius:8px;cursor:pointer;font-family:'Rajdhani',sans-serif;font-weight:700;font-size:0.9em;letter-spacing:1px">📸 分享编年史</button>
+  </div>
 </div>
 
 </body>

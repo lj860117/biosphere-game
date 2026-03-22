@@ -7841,6 +7841,8 @@ const G = {
         SFX.achieve();
         this.log(`🏆 菌主大人，成就解锁: ${a.n} — ${a.d}`, 's');
         this.log(`   奖励: ${rewardParts.join(' ')}`, 'ev');
+        // ★ 社交增强: 金/钻成就广播
+        this._broadcastAchievement(a.n, tier);
 
         // 等级化屏幕震动和飘字
         if (tier === 'diamond') {
@@ -7940,77 +7942,8 @@ const G = {
   },
 
   _renderAchvHall() {
-    const count = Object.keys(this.achievements).length;
-    const total = ACHIEVE.length;
-    const pct = Math.round(count / total * 100);
-
-    // Update progress
-    document.getElementById('achvHallProgress').textContent = `${count}/${total}`;
-    document.getElementById('achvProgressBar').style.width = pct + '%';
-    document.getElementById('achvProgressLabel').textContent = pct + '%';
-    // ARIA: 同步成就进度
-    document.getElementById('achvProgressBar').closest('[role="progressbar"]')?.setAttribute('aria-valuenow', pct);
-
-    // Build filter tabs
-    const filterWrap = document.getElementById('achvFilters');
-    const tiers = ['all','bronze','silver','gold','diamond'];
-    const tierLabels = { all:'全部', bronze:'🥉 铜', silver:'🥈 银', gold:'🥇 金', diamond:'💎 钻石' };
-    filterWrap.innerHTML = tiers.map(t =>
-      `<button class="achv-filter-btn${this._achvFilter===t?' active':''}" role="tab" aria-selected="${this._achvFilter===t}" onclick="G._achvFilter='${t}';G._renderAchvHall()">${tierLabels[t]}</button>`
-    ).join('');
-
-    // Build body content by category
-    const body = document.getElementById('achvHallBody');
-    let html = '';
-
-    for (const [catKey, cat] of Object.entries(ACHV_CATEGORIES)) {
-      const catAchievements = cat.ids.map(id => ACHIEVE.find(a => a.id === id)).filter(Boolean);
-      // Apply filter
-      const filtered = this._achvFilter === 'all' ? catAchievements : catAchievements.filter(a => a.tier === this._achvFilter);
-      if (filtered.length === 0) continue;
-
-      const catUnlocked = filtered.filter(a => this.achievements[a.id]).length;
-      html += `<div class="achv-cat">
-        <div class="achv-cat-title">${cat.icon} ${cat.name} <span class="achv-cat-count">${catUnlocked}/${filtered.length}</span></div>
-        <div class="achv-grid">`;
-
-      for (const a of filtered) {
-        const unlocked = !!this.achievements[a.id];
-        const tier = a.tier || 'bronze';
-        const rewardParts = [];
-        for (let k in a.reward) {
-          rewardParts.push(`+${a.reward[k]}${RES[k]?.icon||k}`);
-        }
-        const hintText = unlocked ? '' : `💡 ${a.d}`;
-
-        html += `<div class="achv-card ${unlocked?'unlocked':'locked'}">
-          ${!unlocked ? `<div class="achv-card-hint">${hintText}</div>` : ''}
-          <span class="achv-card-tier tier-${tier}">${ACHV_TIER_LABELS[tier]}</span>
-          <div class="achv-card-top">
-            <span class="achv-card-icon">${unlocked ? a.n.split(' ')[0] : '🔒'}</span>
-            <span class="achv-card-name">${unlocked ? a.n.replace(/^[^\s]+\s/,'') : '???'}</span>
-          </div>
-          <div class="achv-card-desc">${unlocked ? a.d : '未解锁'}</div>
-          <div class="achv-card-reward">${unlocked ? rewardParts.join(' ') : '---'}</div>
-        </div>`;
-      }
-      html += '</div></div>';
-    }
-
-    // Milestones section
-    html += `<div class="achv-milestones">
-      <div class="achv-ms-title">🎖️ 里程碑</div>
-      <div class="achv-ms-grid">`;
-    for (const ms of ACHIEVE_MILESTONES) {
-      const claimed = this._claimedMilestones && this._claimedMilestones[ms.count];
-      html += `<div class="achv-ms-item ${claimed?'claimed':'unclaimed'}">
-        <div class="achv-ms-count">${ms.count}</div>
-        <div class="achv-ms-buff">${claimed ? ms.buff : '???'}</div>
-      </div>`;
-    }
-    html += '</div></div>';
-
-    body.innerHTML = html;
+    // ★ 社交增强v1.0: 代理到增强版（含稀有度+展柜+分享按钮）
+    this._renderAchvHallEnhanced();
   },
 
   // === 分数变化飘字 — 从荣誉区域分数行飘出 ===
@@ -8739,6 +8672,8 @@ const G = {
       score_sig: sig,
       legacy_score: this.calcLegacyScore(),
       prestige_count: this.prestigeCount || 0,
+      showcase_badges: JSON.stringify(this._achieveShowcase || []),
+      fastest_p5: (this.phase >= 5 && this.stats.onlineTime) ? Math.floor(this.stats.onlineTime) : null,
       updated_at: new Date().toISOString()
     };
 
@@ -8756,6 +8691,8 @@ const G = {
         delete data.online_time;
         delete data.legacy_score;
         delete data.prestige_count;
+        delete data.showcase_badges;
+        delete data.fastest_p5;
         ({ error } = await window.supa
           .from('leaderboard')
           .upsert(data, { onConflict: 'player_id' }));
@@ -8861,7 +8798,7 @@ const G = {
     try {
       const { data, error } = await window.supa
         .from('leaderboard')
-        .select('player_id, name, score, rank, phase, buildings, wonder')
+        .select('player_id, name, score, rank, phase, buildings, wonder, achievements, prestige_count, online_time, showcase_badges, fastest_p5')
         .order('score', { ascending: false })
         .limit(20);
 
@@ -8874,15 +8811,20 @@ const G = {
         rank: r.rank,
         phase: r.phase,
         buildings: r.buildings,
-        wonder: r.wonder
+        wonder: r.wonder,
+        achievements: r.achievements || 0,
+        prestige_count: r.prestige_count || 0,
+        online_time: r.online_time || 0,
+        showcase_badges: r.showcase_badges || '[]',
+        fastest_p5: r.fastest_p5 || null,
       }));
       this._lbCache = entries;
       this._lbLastFetch = Date.now();
       // v1.0.2: 检测自己的排名并更新头衔
       this._updateRankTitle(entries);
       this._renderLeaderboard(entries);
-      // 同步更新迷你排行榜
-      const top3 = entries.slice(0, 3).map(e => ({ id: e.id, name: e.name, score: e.score, rank: e.rank }));
+      // 同步更新迷你排行榜 — 增强版需要更多字段
+      const top3 = entries.slice(0, 3).map(e => ({ id: e.id, name: e.name, score: e.score, rank: e.rank, buildings: e.buildings }));
       this._miniLbCache = top3;
       this._miniLbLastFetch = Date.now();
       this._renderMiniLeaderboard(top3);
@@ -8893,53 +8835,13 @@ const G = {
   },
 
   _renderLeaderboard(entries) {
-    const listEl = document.getElementById('leaderboardList');
-    if (!listEl) return;
-
+    // ★ 社交增强v1.0: 代理到卡片化增强版
     if (entries.length === 0) {
-      listEl.innerHTML = '<div style="text-align:center;color:var(--dim);padding:20px 0">还没有人上榜，你来当第一名！</div>';
+      const listEl = document.getElementById('leaderboardList');
+      if (listEl) listEl.innerHTML = '<div style="text-align:center;color:var(--dim);padding:20px 0">还没有人上榜，你来当第一名！</div>';
       return;
     }
-
-    const myId = this._playerId;
-
-    let html = '';
-    entries.forEach((e, i) => {
-      const isMe = e.id === myId;
-      const rankNum = i + 1;
-      const medal = rankNum <= 3 ? ['🥇','🥈','🥉'][i] : `<span style="color:var(--dim)">${rankNum}</span>`;
-      const { color: rankColor } = this._scoreRank(e.score);
-      const phaseStr = `P${e.phase || 1}`;
-      const bldStr = `${e.buildings || 0}🏗`;
-      const detailBits = [phaseStr, bldStr];
-      if (e.wonder) detailBits.push('☀️');
-
-      html += `
-        <div class="lb-row ${isMe ? 'lb-me' : ''}">
-          <div class="lb-rank">${medal}</div>
-          <div class="lb-name" ${isMe ? 'style="color:var(--cyan)"' : ''}>${this._escHtml(e.name || '???')}${isMe ? ' <span style="font-size:0.8em;color:var(--cyan)">(我)</span>' : ''}</div>
-          <div class="lb-score" style="color:${rankColor}">${formatNum(e.score || 0)}</div>
-          <div class="lb-grade" style="color:${rankColor};background:${rankColor}15;border:1px solid ${rankColor}30">${e.rank || 'E'}</div>
-          <div class="lb-detail">${detailBits.join(' ')}</div>
-        </div>`;
-    });
-
-    if (myId && !entries.find(e => e.id === myId) && this._playerName) {
-      const myScore = this.calcScore();
-      const { rank, color: myColor } = this._scoreRank(myScore);
-      html += `
-        <div style="border-top:1px solid rgba(255,255,255,0.06);margin-top:6px;padding-top:6px">
-          <div class="lb-row lb-me">
-            <div class="lb-rank"><span style="color:var(--dim)">—</span></div>
-            <div class="lb-name" style="color:var(--cyan)">${this._escHtml(this._playerName)} <span style="font-size:0.8em">(我)</span></div>
-            <div class="lb-score" style="color:${myColor}">${formatNum(myScore)}</div>
-            <div class="lb-grade" style="color:${myColor};background:${myColor}15;border:1px solid ${myColor}30">${rank}</div>
-            <div class="lb-detail">P${this.phase} ${this.totalBuildings()}🏗${this.wonderComplete ? ' ☀️' : ''}</div>
-          </div>
-        </div>`;
-    }
-
-    listEl.innerHTML = html;
+    this._renderLeaderboardEnhanced(entries);
   },
 
   // === 迷你排行榜 (Top 3) — 显示在右侧面板总分数下方 ===
@@ -8983,30 +8885,8 @@ const G = {
   },
 
   _renderMiniLeaderboard(entries) {
-    const listEl = document.getElementById('miniLbList');
-    if (!listEl) return;
-
-    if (!entries || entries.length === 0) {
-      listEl.innerHTML = '<span style="color:var(--dim);font-size:0.58em">暂无数据</span>';
-      return;
-    }
-
-    const myId = this._playerId;
-    const medals = ['🥇', '🥈', '🥉'];
-
-    let html = '';
-    entries.forEach((e, i) => {
-      const isMe = e.id === myId;
-      const { color: rankColor } = this._scoreRank(e.score);
-      html += `<span class="mini-lb-entry" style="display:inline-flex;align-items:center;gap:4px;${isMe ? 'color:var(--cyan)' : ''}">
-        <span>${medals[i]}</span>
-        <span style="max-width:80px;overflow:hidden;text-overflow:ellipsis">${this._escHtml(e.name || '???')}</span>
-        <span style="color:${rankColor};font-weight:600;font-family:'Share Tech Mono',monospace">${formatNum(e.score || 0)}</span>
-        <span style="color:${rankColor};font-size:0.85em;padding:1px 4px;border-radius:3px;background:${rankColor}15;border:1px solid ${rankColor}30">${e.rank || 'E'}</span>
-      </span>`;
-    });
-
-    listEl.innerHTML = html;
+    // ★ 社交增强v1.0: 代理到增强版迷你排行
+    this._renderMiniLeaderboardEnhanced(entries);
   },
 
   _escHtml(s) {
@@ -9917,6 +9797,11 @@ const G = {
     if (!g) return 0;
     const bd = BLDS[g.type];
     if (!bd || !bd.prod[resKey]) return 0;
+    // ★ 闲置碳源（超出核心供能上限）不产出 → 流量为0
+    if (bd.corePowered) {
+      const supplied = this._coreSuppliedIndices || [];
+      if (!supplied.includes(buildingIdx)) return 0;
+    }
     const bldMult = this.getUpgradeMultiplier(buildingIdx);
     const beltMult = this.getBeltMultiplierForBuilding(buildingIdx);
     const hPop = Math.min(this.pop, this._popCap()) * (this.popAlloc.harvest / 100);
@@ -10363,8 +10248,31 @@ const G = {
       }
     }
 
+    // ★ 停滞检测：追踪进度是否变化
+    const curProgress = task.progress(this);
+    if (this._evoStallLastProgress === undefined) {
+      this._evoStallLastProgress = curProgress;
+      this._evoStallTimer = 0;
+    }
+    if (curProgress === this._evoStallLastProgress) {
+      this._evoStallTimer = (this._evoStallTimer || 0) + 1;
+    } else {
+      this._evoStallLastProgress = curProgress;
+      this._evoStallTimer = 0;
+      this._evoStallNotified = false;
+    }
+    // 停滞45秒 → 标记可免费跳过 + 提示
+    if (this._evoStallTimer >= 45 && !this._evoStallNotified) {
+      this._evoStallNotified = true;
+      this._evoStallFreeSkip = true;
+      this.log('🧬 培养任务停滞较久，可免费跳过！展开帝国总览查看', 'w');
+      this._showGuideBubble('进度停滞？可免费跳过培养任务', document.getElementById('empireOverview'), { dir: 'down', duration: 6000 });
+    }
+
     // 检测任务完成
     if (task.check(this)) {
+      this._evoStallTimer = 0;
+      this._evoStallFreeSkip = false;
       this.log(`🧬 培养任务完成! ${task.icon} ${task.n} ✓`, 's');
       SFX.milestone();
       this.showMilestone('🧬', '培养完成!');
@@ -10400,11 +10308,26 @@ const G = {
     const max = task.max;
     const pct = max > 0 ? Math.min(cur / max * 100, 100) : 0;
     const elapsed = (Date.now() - this._evoTaskStartTime) / 1000;
-    const canSkip = elapsed >= 120;
-    let skipCost = 20;
-    if (this.prestigeCount > 0) skipCost = Math.ceil(skipCost * 0.5);
+    const isFreeSkip = !!this._evoStallFreeSkip;
+    const waitTime = 60;
+    const canSkip = isFreeSkip || elapsed >= waitTime;
+    let skipCost = 0;
+    if (!isFreeSkip) {
+      skipCost = this.phase <= 1 ? 5 : 10;
+      if (this.prestigeCount > 0) skipCost = Math.ceil(skipCost * 0.5);
+    }
     const typeColors = { '连线':'#f97316', '布局':'#3b82f6', '经济':'#eab308' };
     const tc = typeColors[task.type] || '#94a3b8';
+
+    // 经济任务负收益提示
+    let stallHint = '';
+    if (task.id === 'et1_econ30' && (this.rates?.glucose || 0) <= 0) {
+      stallHint = `<div style="font-size:0.68em;color:#f97316;margin-top:3px">⚠ 葡萄糖收支为负 — 建造更多碳源采集器</div>`;
+    }
+    // 停滞免费跳过提示
+    if (isFreeSkip) {
+      stallHint += `<div style="font-size:0.68em;color:#22c55e;margin-top:3px">✅ 进度停滞较久，可免费跳过</div>`;
+    }
 
     evoDiv.innerHTML = `
       <div style="display:flex;align-items:center;gap:5px;margin-bottom:4px">
@@ -10422,14 +10345,15 @@ const G = {
         </div>
         <span style="font-size:0.72em;font-weight:700;color:${tc}">${cur}/${max}</span>
       </div>
+      ${stallHint}
       ${canSkip ? `<div style="text-align:right;margin-top:4px">
         <button onclick="G._skipEvoTask()" style="
-          font-size:0.68em;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);
-          color:#ef4444;padding:2px 10px;border-radius:3px;cursor:pointer">
-          跳过 (-${skipCost}🧬)
+          font-size:0.68em;background:${isFreeSkip ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)'};border:1px solid ${isFreeSkip ? 'rgba(34,197,94,0.3)' : 'rgba(239,68,68,0.3)'};
+          color:${isFreeSkip ? '#22c55e' : '#ef4444'};padding:2px 10px;border-radius:3px;cursor:pointer">
+          ${isFreeSkip ? '免费跳过 ✓' : `跳过 (-${skipCost}🧬)`}
         </button>
       </div>` : `<div style="font-size:0.65em;color:var(--dim);margin-top:3px;text-align:right">
-        ${Math.ceil(120 - elapsed)}s后可跳过
+        ${Math.ceil(waitTime - elapsed)}s后可跳过
       </div>`}
     `;
   },
@@ -11479,6 +11403,10 @@ const G = {
     this._evoTaskBase = base;
     this._evoEconTimer = 0;
     this._evoTaskStartTime = Date.now();
+    this._evoStallTimer = 0;
+    this._evoStallFreeSkip = false;
+    this._evoStallLastProgress = undefined;
+    this._evoStallNotified = false;
 
     // 如果任务已经满足 → 直接完成
     if (task.check(this)) {
@@ -11521,6 +11449,10 @@ const G = {
     this._evoTaskBase = null;
     this._evoEconTimer = 0;
     this._evoTaskStartTime = 0;
+    this._evoStallTimer = 0;
+    this._evoStallFreeSkip = false;
+    this._evoStallLastProgress = undefined;
+    this._evoStallNotified = false;
 
     // 执行升级
     this._doPhaseUpgrade();
@@ -11531,25 +11463,36 @@ const G = {
     const task = this._evoTask;
     if (!task) return;
     const elapsed = (Date.now() - this._evoTaskStartTime) / 1000;
-    if (elapsed < 120) {
-      this.log(`🧬 还需等待 ${Math.ceil(120 - elapsed)} 秒才能跳过`, 'w');
+    // ★ v3.1+: 停滞免费跳过 — 无需等待
+    const isFreeSkip = !!this._evoStallFreeSkip;
+    // ★ v3.1+: 等待时间从120s降到60s
+    const waitTime = 60;
+    if (!isFreeSkip && elapsed < waitTime) {
+      this.log(`🧬 还需等待 ${Math.ceil(waitTime - elapsed)} 秒才能跳过`, 'w');
       SFX.buildFail();
       return;
     }
-    // 跳过成本: 20 DNA（转生减免50%）
-    let skipCost = 20;
-    if (this.prestigeCount > 0) skipCost = Math.ceil(skipCost * 0.5);
-    if ((this.res.dna || 0) < skipCost) {
+    // ★ v3.1+: P1阶段跳过成本仅5DNA，其他阶段10DNA；停滞=免费
+    let skipCost = 0;
+    if (!isFreeSkip) {
+      skipCost = this.phase <= 1 ? 5 : 10;
+      if (this.prestigeCount > 0) skipCost = Math.ceil(skipCost * 0.5);
+    }
+    if (skipCost > 0 && (this.res.dna || 0) < skipCost) {
       this.log(`🧬 跳过需要 ${skipCost}🧬，DNA不足`, 'e');
       SFX.buildFail();
       return;
     }
-    this.res.dna -= skipCost;
-    this.log(`🧬 跳过培养任务 — 消耗 ${skipCost}🧬`, 'w');
+    if (skipCost > 0) this.res.dna -= skipCost;
+    this.log(`🧬 跳过培养任务${isFreeSkip ? '（停滞免费）' : skipCost > 0 ? ` — 消耗 ${skipCost}🧬` : ''}`, 'w');
     this._evoTask = null;
     this._evoTaskBase = null;
     this._evoEconTimer = 0;
     this._evoTaskStartTime = 0;
+    this._evoStallTimer = 0;
+    this._evoStallFreeSkip = false;
+    this._evoStallLastProgress = undefined;
+    this._evoStallNotified = false;
     this._doPhaseUpgrade();
   },
 
@@ -11765,7 +11708,8 @@ const G = {
     // ★ E: 6.0s — flavor小字 + 点击任意处关闭
     setTimeout(() => {
       if (narr) {
-        descEl.innerHTML = '<span style="opacity:0.7;font-style:italic">' + narr.flavor + '</span><br><span style="opacity:0.4;font-size:0.8em;margin-top:8px;display:inline-block">点击任意处继续</span>';
+        descEl.innerHTML = '<span style="opacity:0.7;font-style:italic">' + narr.flavor + '</span><br><span style="opacity:0.4;font-size:0.8em;margin-top:8px;display:inline-block">点击任意处继续</span>' +
+          '<br><button onclick="event.stopPropagation();G.shareEmpireCard()" style="margin-top:8px;padding:4px 16px;background:rgba(168,85,247,0.2);border:1px solid rgba(168,85,247,0.4);color:#a855f7;border-radius:6px;cursor:pointer;font-family:\'Rajdhani\',sans-serif;font-weight:600;font-size:0.8em">📸 分享此刻</button>';
       }
 
       this.showMilestone(p.icon, '菌主大人，帝国迈入阶段 ' + p.id + ': ' + p.name + '！');
@@ -13545,26 +13489,51 @@ const G = {
         // ★ v2.1: 休眠建筑 — 传送带灰色渲染，停止货物传输
         const fiDormant = this._dormantCells[belt.fi];
         const tiDormant = this._dormantCells[belt.ti];
-        if (fiDormant || tiDormant) {
+        // ★ 闲置碳源（超出核心供能上限）— 传送带也灰色渲染
+        const supplied = this._coreSuppliedIndices || [];
+        const fiBd = BLDS[this.grid[belt.fi]?.type];
+        const tiBd2 = BLDS[this.grid[belt.ti]?.type];
+        const fiIdleCollector = fiBd?.corePowered && !supplied.includes(belt.fi);
+        const tiIdleCollector = tiBd2?.corePowered && !supplied.includes(belt.ti);
+        if (fiDormant || tiDormant || fiIdleCollector || tiIdleCollector) {
           const pulse = 0.2 + Math.sin(Date.now() / 800) * 0.08;
-          // 灰色虚线轨道
+          // 灰色虚线轨道（闲置碳源用偏黄色区分休眠的灰色）
+          const idleColor = (fiIdleCollector || tiIdleCollector) && !fiDormant && !tiDormant;
           ctx.lineWidth = 5;
-          ctx.strokeStyle = `rgba(80,90,100,${pulse})`;
+          ctx.strokeStyle = idleColor
+            ? `rgba(120,110,60,${pulse})`
+            : `rgba(80,90,100,${pulse})`;
           ctx.setLineDash([5, 5]);
           ctx.lineDashOffset = -(Date.now() / 300) % 10;
           ctx.lineCap = 'butt';
           ctx.lineJoin = 'miter';
           drawLPath(); ctx.stroke();
           ctx.lineWidth = 2.5;
-          ctx.strokeStyle = `rgba(40,50,60,${pulse + 0.1})`;
+          ctx.strokeStyle = idleColor
+            ? `rgba(80,70,30,${pulse + 0.1})`
+            : `rgba(40,50,60,${pulse + 0.1})`;
           ctx.setLineDash([3, 3]);
           drawLPath(); ctx.stroke();
           ctx.setLineDash([]);
-          // 两端灰色小方块
+          // 两端小方块
           const tSz = 2.5;
-          ctx.fillStyle = `rgba(80,90,100,${pulse + 0.15})`;
+          ctx.fillStyle = idleColor
+            ? `rgba(120,110,60,${pulse + 0.15})`
+            : `rgba(80,90,100,${pulse + 0.15})`;
           ctx.fillRect(sx - tSz, sy - tSz, tSz*2, tSz*2);
           ctx.fillRect(ex - tSz, ey - tSz, tSz*2, tSz*2);
+          // 闲置碳源中间标记
+          if (idleColor) {
+            const midXI = isOrthogonal ? (sx+ex)/2 : mx;
+            const midYI = isOrthogonal ? (sy+ey)/2 : my;
+            ctx.globalAlpha = 0.6;
+            ctx.font = 'bold 7px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillStyle = '#eab308';
+            ctx.fillText('⚡', midXI, midYI);
+            ctx.globalAlpha = 1;
+          }
           // 悬停高亮仍可操作
           if (this._hoverBeltKey === beltKey) {
             ctx.save();
@@ -16163,9 +16132,8 @@ const G = {
 
   // ===== 红点提醒 =====
   updateRedDots() {
-    // 1. 建筑升级按钮红点 — 检查每种建筑是否有可升级且买得起的
+    // 1. 建筑升级按钮红点 — 直接检查grid中该类型建筑是否有可升级且买得起的
     document.querySelectorAll('.build-upgrade-btn').forEach(btn => {
-      if (btn.classList.contains('maxed')) { btn.classList.remove('has-red-dot'); return; }
       const row = btn.closest('.build-row');
       if (!row) { btn.classList.remove('has-red-dot'); return; }
       const actionBtn = row.querySelector('.action-btn');
@@ -16174,16 +16142,25 @@ const G = {
       if (!key) { btn.classList.remove('has-red-dot'); return; }
       // 检查是否有任一同类建筑可升级且买得起
       let canUp = false;
+      let hasAnyUnderMax = false;
       this.grid.forEach((g, i) => {
-        if (canUp) return;
         if (g && g.type === key) {
           const lv = this.buildingLevels[i] || 1;
           if (lv < 5) {
-            const cost = this.getUpgradeCost(i);
-            if (cost && this.checkRes(cost)) canUp = true;
+            hasAnyUnderMax = true;
+            if (!canUp) {
+              const cost = this.getUpgradeCost(i);
+              if (cost && this.checkRes(cost)) canUp = true;
+            }
           }
         }
       });
+      // ★ 实时同步maxed class — 防止renderBuildings没及时重建导致的视觉不一致
+      if (!hasAnyUnderMax && !btn.classList.contains('maxed')) {
+        btn.classList.add('maxed');
+        btn.disabled = true;
+        btn.innerHTML = '<span class="build-up-icon">✦</span><span class="build-up-label">MAX</span>';
+      }
       btn.classList.toggle('has-red-dot', canUp);
     });
 
@@ -16689,6 +16666,7 @@ const G = {
         wBuild: this.wBuild, wProg: this.wProg, wonderComplete: this.wonderComplete,
         _wonderEventsTriggered: this._wonderEventsTriggered || [],  // ★ 改进2：奇观建造事件记录
         achievements: this.achievements, stats: this.stats,
+        _achieveShowcase: this._achieveShowcase || [],
         // New systems
         lastOnlineTime: Date.now(),
         buildingLevels: this.buildingLevels,
@@ -16854,6 +16832,7 @@ const G = {
       this.wonderComplete = s.wonderComplete || false;
       this._wonderEventsTriggered = s._wonderEventsTriggered || [];  // ★ 改进2：恢复奇观事件记录
       this.achievements = s.achievements || {};
+      this._achieveShowcase = s._achieveShowcase || [];
       if (s.stats) Object.assign(this.stats, s.stats);
       // New systems
       this.lastOnlineTime = s.lastOnlineTime || Date.now();
@@ -19404,6 +19383,646 @@ const G = {
       // v3.0: 同步速度按钮tooltip（turbo里程碑）
       this._syncSpeedUI();
     } catch(e){}
+  },
+
+  // ====================================================================
+  // ===== 社交功能增强 v1.0 — 分享卡 / 排行榜增强 / 成就社交 =====
+  // ====================================================================
+
+  // ===== 模块A: 帝国分享卡（Canvas渲染视觉名片）=====
+
+  // 阶段渐变色映射
+  _SHARE_CARD_GRADIENTS: {
+    1: ['#0a2e38','#06d6a0'],  // P1: 深蓝绿→生命青
+    2: ['#06d6a0','#14b8a6'],  // P2: 青→蓝绿
+    3: ['#14b8a6','#f59e0b'],  // P3: 蓝绿→金黄
+    4: ['#f59e0b','#a855f7'],  // P4: 金黄→紫
+    5: ['#a855f7','#ec4899'],  // P5: 紫→品红
+  },
+
+  // 建筑类型对应色块色
+  _BLD_COLORS: {
+    glucoseCollector:'#22c55e', atpSynthase:'#f59e0b', dnaSplicer:'#818cf8',
+    ribosomeMini:'#ec4899', fermentVacuole:'#06d6a0', signalRelay:'#3b82f6',
+    membraneHub:'#14b8a6', nitrogenFixer:'#10b981', biofilmNode:'#8b5cf6',
+    lysozymeTurret:'#ef4444', sporePod:'#f97316', photoBattery:'#fbbf24',
+    neuroNode:'#a855f7', genomeVault:'#6366f1', quantumWell:'#06b6d4',
+  },
+
+  /** A1. 生成分享卡Canvas → 返回 Blob */
+  async generateShareCard(mode = 'standard') {
+    const W = 800, H = mode === 'square' ? 800 : 600;
+    const c = document.createElement('canvas');
+    c.width = W; c.height = H;
+    const ctx = c.getContext('2d');
+
+    // — 背景渐变 —
+    const grad = this._SHARE_CARD_GRADIENTS[this.phase] || this._SHARE_CARD_GRADIENTS[1];
+    const bg = ctx.createLinearGradient(0, 0, W, H);
+    bg.addColorStop(0, grad[0]);
+    bg.addColorStop(1, grad[1]);
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, W, H);
+
+    // — 微粒纹理 —
+    ctx.globalAlpha = 0.04;
+    for (let i = 0; i < 120; i++) {
+      ctx.beginPath();
+      ctx.arc(Math.random() * W, Math.random() * H, Math.random() * 3 + 1, 0, Math.PI * 2);
+      ctx.fillStyle = '#fff';
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+
+    // — 品牌标题 —
+    ctx.font = 'bold 28px "Orbitron", "Rajdhani", monospace';
+    ctx.fillStyle = '#ffffff';
+    ctx.textAlign = 'center';
+    ctx.fillText('🧫 微 生 物 帝 国', W / 2, 44);
+
+    // 分割线
+    ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(100, 60); ctx.lineTo(W - 100, 60); ctx.stroke();
+
+    // — 帝国名 + 称号 —
+    const empireName = this._playerName || '未命名帝国';
+    ctx.font = 'bold 24px "Rajdhani", sans-serif';
+    ctx.fillStyle = '#fbbf24';
+    ctx.fillText(`「${empireName}」`, W / 2, 95);
+
+    // 称号 + 排名头衔
+    const titleText = (document.getElementById('empireTitleDisplay')?.textContent || '🦠 初生细胞');
+    const rankTitle = this._lbRankTitle ? this._lbRankTitle.title : '';
+    ctx.font = '16px "Rajdhani", sans-serif';
+    ctx.fillStyle = 'rgba(255,255,255,0.7)';
+    ctx.fillText(titleText + (rankTitle ? '  ·  ' + rankTitle : ''), W / 2, 120);
+
+    // — 培养皿缩略图（左侧）—
+    const thumbSize = 160;
+    const thumbX = 60, thumbY = 150;
+    this._drawDishThumbnail(ctx, thumbX, thumbY, thumbSize);
+
+    // — 核心数据（右侧）—
+    const score = this.calcScore();
+    const { rank, color: rankColor } = this._scoreRank(score);
+    const t = this.stats.onlineTime;
+    const hrs = Math.floor(t / 3600);
+    const min = Math.floor((t % 3600) / 60);
+    const timeStr = hrs > 0 ? `${hrs}h${min}m` : `${min}m`;
+    const achieves = Object.keys(this.achievements).length;
+
+    const dataX = 290, dataY = 170;
+    const lines = [
+      { icon: '🏆', label: '总分', value: formatNum(score), extra: `[${rank}]`, color: rankColor },
+      { icon: '📡', label: '阶段', value: `P${this.phase}`, color: '#fff' },
+      { icon: '🧬', label: '进化', value: `Lv.${this.eL}`, color: '#818cf8' },
+      { icon: '🏗️', label: '建筑', value: `${this.totalBuildings()}座`, color: '#06d6a0' },
+      { icon: '🦠', label: '峰值', value: formatNum(this.stats.peakPop || 0), color: '#f97316' },
+      { icon: '⏱', label: '在线', value: timeStr, color: 'rgba(255,255,255,0.6)' },
+    ];
+
+    lines.forEach((line, i) => {
+      const y = dataY + i * 32;
+      ctx.font = '15px sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillStyle = 'rgba(255,255,255,0.5)';
+      ctx.fillText(line.icon + ' ' + line.label, dataX, y);
+      ctx.font = 'bold 18px "Share Tech Mono", monospace';
+      ctx.fillStyle = line.color;
+      ctx.fillText(line.value + (line.extra ? '  ' + line.extra : ''), dataX + 100, y);
+    });
+
+    // — 转生 + 奇观 —
+    if (this.prestigeCount > 0 || this.wonderComplete) {
+      const extras = [];
+      if (this.wonderComplete) extras.push('☀️ 戴森球');
+      if (this.prestigeCount > 0) extras.push(`♻️ 转生×${this.prestigeCount}`);
+      ctx.font = '14px "Rajdhani", sans-serif';
+      ctx.fillStyle = '#fbbf24';
+      ctx.textAlign = 'left';
+      ctx.fillText(extras.join('  ·  '), dataX, dataY + lines.length * 32 + 5);
+    }
+
+    // — 成就进度条 —
+    const barY = H - (mode === 'square' ? 160 : 120);
+    ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+    ctx.beginPath(); ctx.moveTo(60, barY - 20); ctx.lineTo(W - 60, barY - 20); ctx.stroke();
+
+    const total = ACHIEVE.length;
+    const pct = achieves / total;
+    ctx.font = 'bold 14px "Rajdhani", sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillStyle = 'rgba(255,255,255,0.7)';
+    ctx.fillText(`🏆 成就 ${achieves}/${total}`, 60, barY);
+
+    // 进度条
+    const barW = W - 120, barH = 10;
+    ctx.fillStyle = 'rgba(255,255,255,0.1)';
+    ctx.fillRect(60, barY + 8, barW, barH);
+    const progGrad = ctx.createLinearGradient(60, 0, 60 + barW * pct, 0);
+    progGrad.addColorStop(0, '#06d6a0');
+    progGrad.addColorStop(1, '#fbbf24');
+    ctx.fillStyle = progGrad;
+    ctx.fillRect(60, barY + 8, barW * pct, barH);
+
+    // — 展柜成就（如果有）—
+    const showcase = this._achieveShowcase || [];
+    if (showcase.length > 0) {
+      ctx.font = '13px sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillStyle = 'rgba(255,255,255,0.5)';
+      const scIcons = showcase.map(id => {
+        const a = ACHIEVE.find(x => x.id === id);
+        return a ? a.n.split(' ')[0] : '?';
+      }).join(' ');
+      ctx.fillText('⭐ 展柜: ' + scIcons, 60, barY + 36);
+    }
+
+    // — 品牌水印 —
+    ctx.font = '12px "Rajdhani", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = 'rgba(255,255,255,0.25)';
+    ctx.fillText('🧫 微生物帝国 · Biosphere Game', W / 2, H - 20);
+
+    // 转为 Blob
+    return new Promise(resolve => c.toBlob(resolve, 'image/png'));
+  },
+
+  /** A1b. 绘制培养皿缩略图 */
+  _drawDishThumbnail(ctx, x, y, size) {
+    const cols = this.gridCols, rows = this.gridRows;
+    const cellW = size / cols, cellH = size / rows;
+
+    // 背景圆
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(x + size / 2, y + size / 2, size / 2 + 4, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(0,0,0,0.3)';
+    ctx.fill();
+
+    // 膜边缘
+    ctx.strokeStyle = 'rgba(6,214,160,0.4)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.restore();
+
+    // 网格色块
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const idx = r * cols + c;
+        const cx = x + c * cellW, cy = y + r * cellH;
+
+        if (this.isCoreCell && this.isCoreCell(idx)) {
+          // 核心格：发光中心
+          ctx.fillStyle = '#06d6a0';
+          ctx.fillRect(cx + 1, cy + 1, cellW - 2, cellH - 2);
+          ctx.fillStyle = 'rgba(6,214,160,0.5)';
+          ctx.beginPath();
+          ctx.arc(cx + cellW / 2, cy + cellH / 2, cellW * 0.6, 0, Math.PI * 2);
+          ctx.fill();
+        } else if (this.grid[idx]) {
+          const bldType = this.grid[idx].type;
+          ctx.fillStyle = this._BLD_COLORS[bldType] || '#4a5568';
+          ctx.fillRect(cx + 1, cy + 1, cellW - 2, cellH - 2);
+        } else {
+          // 空格
+          ctx.fillStyle = 'rgba(255,255,255,0.03)';
+          ctx.fillRect(cx + 1, cy + 1, cellW - 2, cellH - 2);
+        }
+      }
+    }
+  },
+
+  /** A2. 分享卡触发 — 生成 → 复制/下载/WebShare */
+  async shareEmpireCard(mode) {
+    try {
+      this.showCursorTooltip('⏳ 正在生成分享卡...');
+      const blob = await this.generateShareCard(mode || 'standard');
+      if (!blob) { this.showCursorTooltip('生成失败'); return; }
+
+      // 优先尝试 Web Share API（移动端）
+      if (navigator.share && navigator.canShare) {
+        const file = new File([blob], 'biosphere-empire.png', { type: 'image/png' });
+        if (navigator.canShare({ files: [file] })) {
+          try {
+            await navigator.share({ files: [file], title: '微生物帝国', text: `我的帝国评级 [${this._scoreRank(this.calcScore()).rank}]！来挑战！` });
+            SFX.reward();
+            this.log('📸 帝国名片已分享！', 's');
+            return;
+          } catch (e) { /* 用户取消或不支持，走降级 */ }
+        }
+      }
+
+      // 降级1: 复制到剪贴板
+      if (navigator.clipboard && window.ClipboardItem) {
+        try {
+          await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+          this.showMilestone('📸', '帝国名片已复制到剪贴板！');
+          SFX.reward();
+          this.log('📸 帝国名片已复制到剪贴板', 's');
+          return;
+        } catch (e) { /* 降级到下载 */ }
+      }
+
+      // 降级2: 下载PNG
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = 'biosphere-empire.png';
+      document.body.appendChild(a); a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      this.showMilestone('📸', '帝国名片已下载！');
+      SFX.reward();
+      this.log('📸 帝国名片已下载为PNG', 's');
+    } catch (err) {
+      console.error('Share card error:', err);
+      this.showCursorTooltip('分享失败，请重试');
+    }
+  },
+
+  // ===== 模块B: 排行榜增强 =====
+
+  // B2. 追赶目标 — 缓存上次排名用于被超越检测
+  _lbMyLastPosition: null,
+  _lbCatchupTarget: null,
+
+  /** B2. 计算追赶目标 */
+  _updateCatchupTarget(entries) {
+    const myId = this._playerId;
+    if (!myId) return;
+    const myIdx = entries.findIndex(e => e.id === myId);
+    const myScore = myIdx >= 0 ? entries[myIdx].score : this.calcScore();
+    const myPos = myIdx >= 0 ? myIdx + 1 : 99;
+
+    // 找上方最近的对手
+    if (myIdx > 0) {
+      const above = entries[myIdx - 1];
+      const gap = above.score - myScore;
+      const closePct = myScore / above.score;
+      this._lbCatchupTarget = {
+        rank: myIdx,
+        name: above.name,
+        gap: gap,
+        close: closePct > 0.85,  // 差距<15%算"即将超越"
+      };
+    } else if (myIdx === 0) {
+      this._lbCatchupTarget = { rank: 1, name: null, gap: 0, close: false }; // 第一名
+    } else {
+      // 未上榜：目标是最后一名
+      if (entries.length > 0) {
+        const last = entries[entries.length - 1];
+        this._lbCatchupTarget = {
+          rank: entries.length + 1,
+          name: last.name,
+          gap: last.score - myScore,
+          close: false,
+        };
+      }
+    }
+
+    // B3. 被超越检测
+    if (this._lbMyLastPosition !== null && myPos > this._lbMyLastPosition) {
+      const overtaker = myIdx > 0 ? entries[myIdx - 1] : null;
+      if (overtaker) {
+        this.showMilestone('⚠️', `${overtaker.name} 超越了你！你现在第 ${myPos} 名`);
+        this.log(`⚠ ${overtaker.name} 超越了你！当前排名 #${myPos}`, 'w');
+      }
+    }
+    this._lbMyLastPosition = myPos;
+  },
+
+  /** B1+B2. 增强版排行榜渲染 */
+  _renderLeaderboardEnhanced(entries) {
+    const listEl = document.getElementById('leaderboardList');
+    if (!listEl) return;
+    const myId = this._playerId;
+
+    let html = '';
+    entries.forEach((e, i) => {
+      const isMe = e.id === myId;
+      const rankNum = i + 1;
+      const medal = rankNum <= 3 ? ['🥇','🥈','🥉'][i] : `<span style="color:var(--dim)">${rankNum}</span>`;
+      const { color: rankColor } = this._scoreRank(e.score);
+      const phaseStr = `P${e.phase || 1}`;
+      const bldStr = `${e.buildings || 0}🏗`;
+      const achvStr = `${e.achievements || 0}🏆`;
+      const detailBits = [phaseStr, bldStr, achvStr];
+      if (e.wonder) detailBits.push('☀️');
+      if (e.prestige_count > 0) detailBits.push(`${e.prestige_count}♻️`);
+
+      // 展柜徽章
+      let showcaseBadges = '';
+      if (e.showcase_badges) {
+        try {
+          const badges = typeof e.showcase_badges === 'string' ? JSON.parse(e.showcase_badges) : e.showcase_badges;
+          if (Array.isArray(badges) && badges.length > 0) {
+            showcaseBadges = ' ' + badges.map(id => {
+              const a = ACHIEVE.find(x => x.id === id);
+              return a ? a.n.split(' ')[0] : '';
+            }).filter(Boolean).join('');
+          }
+        } catch(e) {}
+      }
+
+      html += `
+        <div class="lb-row lb-row-card ${isMe ? 'lb-me' : ''}" style="margin-bottom:4px;padding:6px 8px;border-radius:6px;background:rgba(255,255,255,${isMe ? '0.06' : '0.02'});border:1px solid rgba(255,255,255,${isMe ? '0.12' : '0.04'})">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:2px">
+            <span class="lb-rank" style="min-width:24px">${medal}</span>
+            <span class="lb-name" ${isMe ? 'style="color:var(--cyan)"' : ''}>${this._escHtml(e.name || '???')}${showcaseBadges}${isMe ? ' <span style="font-size:0.8em;color:var(--cyan)">(我)</span>' : ''}</span>
+            <span style="margin-left:auto;display:flex;align-items:center;gap:4px">
+              <span class="lb-score" style="color:${rankColor};font-weight:700">${formatNum(e.score || 0)}</span>
+              <span class="lb-grade" style="color:${rankColor};background:${rankColor}15;border:1px solid ${rankColor}30;padding:1px 6px;border-radius:3px;font-size:0.85em;font-weight:600">${e.rank || 'E'}</span>
+            </span>
+          </div>
+          <div style="font-size:0.75em;color:var(--dim);padding-left:30px">${detailBits.join(' · ')}</div>
+        </div>`;
+    });
+
+    // 我不在榜上时追加
+    if (myId && !entries.find(e => e.id === myId) && this._playerName) {
+      const myScore = this.calcScore();
+      const { rank, color: myColor } = this._scoreRank(myScore);
+      const myAchv = Object.keys(this.achievements).length;
+      const detailBits = [`P${this.phase}`, `${this.totalBuildings()}🏗`, `${myAchv}🏆`];
+      if (this.wonderComplete) detailBits.push('☀️');
+      if (this.prestigeCount > 0) detailBits.push(`${this.prestigeCount}♻️`);
+
+      html += `
+        <div style="border-top:1px solid rgba(255,255,255,0.06);margin-top:6px;padding-top:6px">
+          <div class="lb-row lb-row-card lb-me" style="padding:6px 8px;border-radius:6px;background:rgba(6,214,160,0.04);border:1px solid rgba(6,214,160,0.12)">
+            <div style="display:flex;align-items:center;gap:6px;margin-bottom:2px">
+              <span class="lb-rank"><span style="color:var(--dim)">—</span></span>
+              <span class="lb-name" style="color:var(--cyan)">${this._escHtml(this._playerName)} <span style="font-size:0.8em">(我)</span></span>
+              <span style="margin-left:auto;display:flex;align-items:center;gap:4px">
+                <span class="lb-score" style="color:${myColor};font-weight:700">${formatNum(myScore)}</span>
+                <span class="lb-grade" style="color:${myColor};background:${myColor}15;border:1px solid ${myColor}30;padding:1px 6px;border-radius:3px;font-size:0.85em;font-weight:600">${rank}</span>
+              </span>
+            </div>
+            <div style="font-size:0.75em;color:var(--dim);padding-left:30px">${detailBits.join(' · ')}</div>
+          </div>
+        </div>`;
+    }
+
+    // B2. 追赶目标
+    this._updateCatchupTarget(entries);
+    if (this._lbCatchupTarget && this._lbCatchupTarget.name) {
+      const ct = this._lbCatchupTarget;
+      const catchupStyle = ct.close
+        ? 'color:#f97316;font-weight:700'
+        : 'color:var(--dim)';
+      const catchupIcon = ct.close ? '🔥' : '📌';
+      const catchupText = ct.close
+        ? `即将超越 ${this._escHtml(ct.name)}！差 ${formatNum(ct.gap)}`
+        : `距 #${ct.rank} ${this._escHtml(ct.name)} 还差 ${formatNum(ct.gap)}`;
+      html += `<div style="text-align:center;padding:8px 0;font-size:0.78em;${catchupStyle}">${catchupIcon} ${catchupText}</div>`;
+    } else if (this._lbCatchupTarget && !this._lbCatchupTarget.name) {
+      html += `<div style="text-align:center;padding:8px 0;font-size:0.78em;color:#fbbf24">👑 你是第一名！</div>`;
+    }
+
+    listEl.innerHTML = html;
+  },
+
+  /** B4. 排行榜分榜切换 */
+  _lbSubTab: 'score', // score | speed | efficiency | achievement
+
+  switchLbSubTab(sub) {
+    this._lbSubTab = sub;
+    // 更新子Tab高亮
+    document.querySelectorAll('#lbSubTabs .lb-sub-tab').forEach(t => {
+      t.classList.toggle('active', t.dataset.sub === sub);
+    });
+    // 重新排序并渲染
+    if (this._lbCache) {
+      let sorted = [...this._lbCache];
+      if (sub === 'speed') {
+        sorted = sorted.filter(e => e.fastest_p5).sort((a, b) => (a.fastest_p5 || 99999) - (b.fastest_p5 || 99999));
+      } else if (sub === 'efficiency') {
+        sorted.sort((a, b) => {
+          const aEff = a.score / Math.max(1, a.online_time || 3600);
+          const bEff = b.score / Math.max(1, b.online_time || 3600);
+          return bEff - aEff;
+        });
+      } else if (sub === 'achievement') {
+        sorted.sort((a, b) => (b.achievements || 0) - (a.achievements || 0));
+      } else {
+        sorted.sort((a, b) => (b.score || 0) - (a.score || 0));
+      }
+      this._renderLeaderboardEnhanced(sorted);
+    }
+  },
+
+  // ===== 模块C: 成就社交增强 =====
+
+  // C1. 成就稀有度（本地近似 — 基于成就难度tier推算）
+  _getAchievementRarity(achvId) {
+    const a = ACHIEVE.find(x => x.id === achvId);
+    if (!a) return null;
+    // 用tier作为近似稀有度（无需后端）
+    // diamond: 传说<5%, gold: 稀有5-20%, silver: 罕见20-50%, bronze: 普通
+    const rarityMap = {
+      diamond: { label: '💠 传说', color: '#a855f7', pct: '<5%' },
+      gold:    { label: '⭐ 稀有', color: '#fbbf24', pct: '5-20%' },
+      silver:  { label: '✦ 罕见', color: '#c0c0c0', pct: '20-50%' },
+      bronze:  { label: '', color: '', pct: '' },
+    };
+    return rarityMap[a.tier] || rarityMap.bronze;
+  },
+
+  // C2. 成就展柜系统
+  _achieveShowcase: [], // 存储3个成就ID
+
+  /** 设置展柜成就 */
+  setShowcase(achvId) {
+    if (!this.achievements[achvId]) return; // 未解锁不能展示
+    const idx = this._achieveShowcase.indexOf(achvId);
+    if (idx >= 0) {
+      // 已在展柜 → 移除
+      this._achieveShowcase.splice(idx, 1);
+    } else {
+      if (this._achieveShowcase.length >= 3) {
+        // 满了 → 替换最旧的
+        this._achieveShowcase.shift();
+      }
+      this._achieveShowcase.push(achvId);
+    }
+    this._renderAchvHall(); // 刷新显示
+    this.save(true);
+    // 同步到排行榜
+    this._syncShowcaseToLb();
+  },
+
+  /** 同步展柜到排行榜 */
+  async _syncShowcaseToLb() {
+    if (!window.supaReady || !window.supa || !this._playerId) return;
+    try {
+      await window.supa
+        .from('leaderboard')
+        .update({ showcase_badges: JSON.stringify(this._achieveShowcase) })
+        .eq('player_id', this._playerId);
+    } catch (e) { /* 忽略——列可能不存在 */ }
+  },
+
+  // C3. 成就解锁广播（本地模拟 — 日志区展示）
+  _broadcastAchievement(achvName, tier) {
+    if (tier !== 'gold' && tier !== 'diamond') return;
+    const name = this._playerName || '未知帝国';
+    const icon = tier === 'diamond' ? '💎' : '🏅';
+    this.log(`${icon} ${name} 解锁了「${achvName}」！`, 's');
+  },
+
+  /** 增强版成就殿堂渲染 — 含稀有度+展柜 */
+  _renderAchvHallEnhanced() {
+    const count = Object.keys(this.achievements).length;
+    const total = ACHIEVE.length;
+    const pct = Math.round(count / total * 100);
+
+    document.getElementById('achvHallProgress').textContent = `${count}/${total}`;
+    document.getElementById('achvProgressBar').style.width = pct + '%';
+    document.getElementById('achvProgressLabel').textContent = pct + '%';
+    document.getElementById('achvProgressBar').closest('[role="progressbar"]')?.setAttribute('aria-valuenow', pct);
+
+    // 筛选Tab
+    const filterWrap = document.getElementById('achvFilters');
+    const tiers = ['all','bronze','silver','gold','diamond'];
+    const tierLabels = { all:'全部', bronze:'🥉 铜', silver:'🥈 银', gold:'🥇 金', diamond:'💎 钻石' };
+    filterWrap.innerHTML = tiers.map(t =>
+      `<button class="achv-filter-btn${this._achvFilter===t?' active':''}" role="tab" aria-selected="${this._achvFilter===t}" onclick="G._achvFilter='${t}';G._renderAchvHall()">${tierLabels[t]}</button>`
+    ).join('');
+
+    const body = document.getElementById('achvHallBody');
+    let html = '';
+
+    // ★ 展柜区
+    html += `<div class="achv-showcase-section" style="margin-bottom:12px;padding:10px;background:rgba(251,191,36,0.04);border:1px solid rgba(251,191,36,0.15);border-radius:8px">
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
+        <span style="font-size:1em">🎖️</span>
+        <span style="font-size:0.85em;font-weight:700;color:#fbbf24">我的展柜</span>
+        <span style="font-size:0.65em;color:var(--dim);margin-left:auto">${this._achieveShowcase.length}/3 — 点击成就卡切换展柜</span>
+      </div>
+      <div style="display:flex;gap:8px;min-height:36px;align-items:center">`;
+
+    if (this._achieveShowcase.length === 0) {
+      html += '<span style="color:var(--dim);font-size:0.75em">点击已解锁的成就卡将其加入展柜</span>';
+    } else {
+      this._achieveShowcase.forEach(id => {
+        const a = ACHIEVE.find(x => x.id === id);
+        if (!a) return;
+        const tier = a.tier || 'bronze';
+        html += `<div style="display:flex;align-items:center;gap:4px;padding:4px 10px;background:${ACHV_TIER_COLORS[tier]}15;border:1px solid ${ACHV_TIER_COLORS[tier]}40;border-radius:6px;cursor:pointer" onclick="G.setShowcase('${id}')">
+          <span>${a.n.split(' ')[0]}</span>
+          <span style="font-size:0.75em;color:${ACHV_TIER_COLORS[tier]}">${a.n.replace(/^[^\s]+\s/,'')}</span>
+          <span style="font-size:0.6em;color:var(--dim);margin-left:4px">✕</span>
+        </div>`;
+      });
+    }
+    html += '</div></div>';
+
+    // 按分类渲染
+    for (const [catKey, cat] of Object.entries(ACHV_CATEGORIES)) {
+      const catAchievements = cat.ids.map(id => ACHIEVE.find(a => a.id === id)).filter(Boolean);
+      const filtered = this._achvFilter === 'all' ? catAchievements : catAchievements.filter(a => a.tier === this._achvFilter);
+      if (filtered.length === 0) continue;
+
+      const catUnlocked = filtered.filter(a => this.achievements[a.id]).length;
+      html += `<div class="achv-cat">
+        <div class="achv-cat-title">${cat.icon} ${cat.name} <span class="achv-cat-count">${catUnlocked}/${filtered.length}</span></div>
+        <div class="achv-grid">`;
+
+      for (const a of filtered) {
+        const unlocked = !!this.achievements[a.id];
+        const tier = a.tier || 'bronze';
+        const rewardParts = [];
+        for (let k in a.reward) {
+          rewardParts.push(`+${a.reward[k]}${RES[k]?.icon||k}`);
+        }
+        const hintText = unlocked ? '' : `💡 ${a.d}`;
+        const rarity = this._getAchievementRarity(a.id);
+        const inShowcase = this._achieveShowcase.includes(a.id);
+
+        // 稀有度标签
+        const rarityLabel = (rarity && rarity.label && unlocked)
+          ? `<span style="position:absolute;top:3px;right:3px;font-size:0.55em;color:${rarity.color};padding:1px 4px;background:${rarity.color}12;border:1px solid ${rarity.color}25;border-radius:3px">${rarity.label}</span>`
+          : '';
+
+        // 展柜标识
+        const showcaseMark = inShowcase
+          ? '<span style="position:absolute;bottom:3px;right:3px;font-size:0.6em">🎖️</span>'
+          : '';
+
+        html += `<div class="achv-card ${unlocked?'unlocked':'locked'} ${inShowcase?'in-showcase':''}" style="position:relative;cursor:${unlocked?'pointer':'default'}" ${unlocked ? `onclick="G.setShowcase('${a.id}')"` : ''}>
+          ${rarityLabel}${showcaseMark}
+          ${!unlocked ? `<div class="achv-card-hint">${hintText}</div>` : ''}
+          <span class="achv-card-tier tier-${tier}">${ACHV_TIER_LABELS[tier]}</span>
+          <div class="achv-card-top">
+            <span class="achv-card-icon">${unlocked ? a.n.split(' ')[0] : '🔒'}</span>
+            <span class="achv-card-name">${unlocked ? a.n.replace(/^[^\s]+\s/,'') : '???'}</span>
+          </div>
+          <div class="achv-card-desc">${unlocked ? a.d : '未解锁'}</div>
+          <div class="achv-card-reward">${unlocked ? rewardParts.join(' ') : '---'}</div>
+        </div>`;
+      }
+      html += '</div></div>';
+    }
+
+    // 里程碑
+    html += `<div class="achv-milestones">
+      <div class="achv-ms-title">🎖️ 里程碑</div>
+      <div class="achv-ms-grid">`;
+    for (const ms of ACHIEVE_MILESTONES) {
+      const claimed = this._claimedMilestones && this._claimedMilestones[ms.count];
+      html += `<div class="achv-ms-item ${claimed?'claimed':'unclaimed'}">
+        <div class="achv-ms-count">${ms.count}</div>
+        <div class="achv-ms-buff">${claimed ? ms.buff : '???'}</div>
+      </div>`;
+    }
+    html += '</div></div>';
+
+    // 分享按钮
+    html += `<div style="text-align:center;margin-top:12px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.06)">
+      <button onclick="G.shareEmpireCard()" style="padding:6px 20px;background:rgba(168,85,247,0.1);border:1px solid rgba(168,85,247,0.3);color:#a855f7;border-radius:6px;cursor:pointer;font-family:'Rajdhani',sans-serif;font-weight:600;font-size:0.85em">📸 炫耀成就墙</button>
+    </div>`;
+
+    body.innerHTML = html;
+  },
+
+  /** 增强版迷你排行榜 — 含追赶目标 */
+  _renderMiniLeaderboardEnhanced(entries) {
+    const listEl = document.getElementById('miniLbList');
+    if (!listEl) return;
+
+    if (!entries || entries.length === 0) {
+      listEl.innerHTML = '<span style="color:var(--dim);font-size:0.58em">暂无数据</span>';
+      return;
+    }
+
+    const myId = this._playerId;
+    const medals = ['🥇', '🥈', '🥉'];
+
+    let html = '';
+    entries.forEach((e, i) => {
+      const isMe = e.id === myId;
+      const { color: rankColor } = this._scoreRank(e.score);
+      html += `<span class="mini-lb-entry" style="display:inline-flex;align-items:center;gap:4px;${isMe ? 'color:var(--cyan)' : ''}">
+        <span>${medals[i]}</span>
+        <span style="max-width:70px;overflow:hidden;text-overflow:ellipsis">${this._escHtml(e.name || '???')}</span>
+        <span style="color:${rankColor};font-weight:600;font-family:'Share Tech Mono',monospace;font-size:0.9em">${formatNum(e.score || 0)}</span>
+        <span style="color:${rankColor};font-size:0.8em;padding:1px 3px;border-radius:3px;background:${rankColor}15;border:1px solid ${rankColor}30">${e.rank || 'E'}</span>
+        <span style="font-size:0.7em;color:var(--dim)">${e.buildings || 0}🏗</span>
+      </span>`;
+    });
+
+    // 追赶目标
+    if (this._lbCatchupTarget && this._lbCatchupTarget.name) {
+      const ct = this._lbCatchupTarget;
+      if (ct.close) {
+        html += `<div style="font-size:0.65em;color:#f97316;margin-top:4px;font-weight:600">🔥 即将超越 ${this._escHtml(ct.name)}！差 ${formatNum(ct.gap)}</div>`;
+      } else {
+        html += `<div style="font-size:0.6em;color:var(--dim);margin-top:4px">📌 距 #${ct.rank} 还差 ${formatNum(ct.gap)}</div>`;
+      }
+    }
+
+    listEl.innerHTML = html;
   },
 };
 
