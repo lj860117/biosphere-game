@@ -4649,17 +4649,16 @@ html,body{height:100%;overflow:hidden;font-family:var(--font-body);background:va
 <script src="game.js?v=20260322c"></script>
 <!-- Nickname Popup -->
 <div class="nickname-popup" id="nicknamePopup" role="dialog" aria-modal="true" aria-label="命名你的帝国" aria-hidden="true">
-  <div style="font-family:'Orbitron',monospace;font-size:0.85em;color:var(--cyan);letter-spacing:2px;margin-bottom:10px">🧬 命名你的帝国</div>
-  <div style="font-size:0.75em;color:var(--dim);margin-bottom:12px">给你的微生物帝国取个名字，格式为「xx帝国」，好友可以在排行榜上看到你！</div>
+  <div style="font-family:'Orbitron',monospace;font-size:0.85em;color:var(--cyan);letter-spacing:2px;margin-bottom:12px">🧬 命名你的帝国</div>
   <div style="display:flex;align-items:center;margin-bottom:12px;gap:0;width:100%;box-sizing:border-box">
-    <input type="text" id="nicknameInput" maxlength="8" placeholder="输入名称（2-8字符）"
+    <input type="text" id="nicknameInput" maxlength="8" placeholder="2-8字"
       style="flex:1;min-width:0;padding:8px 12px;background:rgba(20,32,64,0.6);border:1px solid var(--cyan);border-right:none;border-radius:4px 0 0 4px;color:var(--bright);font-size:0.85em;font-family:'Rajdhani',sans-serif;outline:none;text-align:center;box-sizing:border-box">
     <span style="padding:8px 14px;background:rgba(6,214,160,0.12);border:1px solid var(--cyan);border-left:none;border-radius:0 4px 4px 0;color:var(--cyan);font-size:0.85em;font-family:'Rajdhani',sans-serif;font-weight:700;white-space:nowrap;flex-shrink:0">帝国</span>
   </div>
   <div style="display:flex;gap:8px;justify-content:center">
     <button onclick="G.randomizeNickname()" style="padding:6px 16px;background:rgba(168,85,247,0.15);border:1px solid rgba(168,85,247,0.5);color:#a855f7;border-radius:4px;cursor:pointer;font-family:'Rajdhani',sans-serif;font-weight:700;font-size:0.85em;transition:all 0.2s">🎲 随机</button>
-    <button onclick="G.confirmNickname()" style="padding:6px 24px;background:rgba(6,214,160,0.15);border:1px solid var(--cyan);color:var(--cyan);border-radius:4px;cursor:pointer;font-family:'Rajdhani',sans-serif;font-weight:700;font-size:0.85em;transition:all 0.2s">确认</button>
-    <button onclick="G.skipNickname()" class="recycle-no">随机一个</button>
+    <button onclick="G.confirmNickname()" style="padding:6px 24px;background:rgba(6,214,160,0.15);border:1px solid var(--cyan);color:var(--cyan);border-radius:4px;cursor:pointer;font-family:'Rajdhani',sans-serif;font-weight:700;font-size:0.85em;transition:all 0.2s">✅ 确认</button>
+    <button onclick="G.skipNickname()" class="recycle-no">跳过</button>
   </div>
 </div>
 
