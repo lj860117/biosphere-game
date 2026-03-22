@@ -3119,6 +3119,22 @@ body::after{
   box-shadow:0 0 10px rgba(249,115,22,0.15);
   opacity:0.85;
 }
+/* ★ 传送带连接模式：悬浮预览 — 明确的"即将选中"视觉 */
+.cell.belt-hover-preview{
+  outline:2px solid #22c55e;outline-offset:2px;
+  transition:outline 0.1s,transform 0.1s;
+  transform:scale(1.06);z-index:15;
+}
+.cell.belt-hover-preview.belt-target-invalid{
+  outline-color:#fb923c;
+}
+/* 起点格子加更醒目的标签 */
+.cell.belt-connect-from::after{
+  content:'起';position:absolute;top:-6px;left:-6px;z-index:20;
+  font-size:9px;font-weight:700;color:#fff;
+  background:var(--cyan);border-radius:4px;padding:0 3px;
+  pointer-events:none;line-height:1.4;
+}
 
 /* ===== Petri Dish Experiment ===== */
 .petri-exp-btn{

@@ -5448,6 +5448,58 @@ const G = {
       if (self._petriMode) {
         self._petriHoverIdx = idx;
       }
+      // ★ 传送带连接模式：悬浮预览——显示目标建筑名+距离效率
+      if (self._beltConnectMode && self._beltConnectFrom !== null && idx !== self._beltConnectFrom) {
+        const tt = document.getElementById('tooltip');
+        const fromBld = self.grid[self._beltConnectFrom];
+        const toBld = self.grid[idx];
+        const fromDef = fromBld ? BLDS[fromBld.type] : null;
+        const toDef = toBld ? BLDS[toBld.type] : null;
+        const SZ = self.gridSize;
+        const fr = Math.floor(self._beltConnectFrom / SZ), fc = self._beltConnectFrom % SZ;
+        const tr = Math.floor(idx / SZ), tc = idx % SZ;
+        const dist = Math.abs(fr - tr) + Math.abs(fc - tc);
+        const maxBeltDist = 4 + (self._specCache?.extraBeltRange || 0);
+
+        if (toBld && toDef) {
+          const isRelay = fromDef?.isRelay || toDef?.isRelay;
+          const distEff = Math.round(self._distanceEfficiency(dist, isRelay) * 100);
+          const hasFlow = FLOW_PAIR.has((fromBld.type) + '|' + toBld.type) || FLOW_PAIR.has(toBld.type + '|' + (fromBld.type));
+          const key = Math.min(self._beltConnectFrom, idx) + '-' + Math.max(self._beltConnectFrom, idx);
+          const alreadyExists = self.manualBelts[key] || (self._activeBelts || []).some(b => {
+            const bk = Math.min(b.fi, b.ti) + '-' + Math.max(b.fi, b.ti);
+            return bk === key;
+          });
+
+          let html = `<span style="color:var(--cyan);font-weight:700">🔗 ${fromDef?.emoji||''} ${fromDef?.n||'?'}</span> → <span style="color:#22c55e;font-weight:700">${toDef.emoji||''} ${toDef.n}</span>`;
+          html += `<br><span style="color:var(--color-muted)">距离: ${dist}格 · 效率: ${distEff}%</span>`;
+          if (dist > maxBeltDist) {
+            html += `<br><span style="color:#ef4444;font-weight:700">⚠ 超出最大距离 ${maxBeltDist}格！</span>`;
+          } else if (alreadyExists) {
+            html += `<br><span style="color:#fbbf24">⚠ 已有连接</span>`;
+          } else if (!hasFlow) {
+            html += `<br><span style="color:#fb923c">⚠ 无匹配资源流</span>`;
+          } else {
+            html += `<br><span style="color:#22c55e">✓ 点击建立连接</span>`;
+          }
+
+          document.getElementById('ttName').innerHTML = '🔗 连接预览';
+          document.getElementById('ttDesc').innerHTML = html;
+          tt.classList.add('show');
+          tt.style.left = Math.min(e.clientX + 12, window.innerWidth - 280) + 'px';
+          tt.style.top = Math.min(e.clientY + 12, window.innerHeight - 100) + 'px';
+        } else if (!toBld) {
+          document.getElementById('ttName').innerHTML = '🔗 连接预览';
+          document.getElementById('ttDesc').innerHTML = '<span style="color:var(--color-muted)">⬜ 空格子 — 请选有建筑的格子</span>';
+          tt.classList.add('show');
+          tt.style.left = Math.min(e.clientX + 12, window.innerWidth - 280) + 'px';
+          tt.style.top = Math.min(e.clientY + 12, window.innerHeight - 100) + 'px';
+        }
+        // 加强悬浮格子视觉——给当前hover的cell加临时class
+        const cell = e.target.closest('.cell');
+        if (cell) cell.classList.add('belt-hover-preview');
+        return;
+      }
       // 拖拽悬停高亮
       if (self._isDragging && self._dragIdx != null && self._dragIdx !== idx) {
         self._dragOverIdx = idx;
@@ -5707,6 +5759,9 @@ const G = {
       // 培养皿实验：清除悬停
       if (self._petriMode) self._petriHoverIdx = null;
       document.getElementById('tooltip').classList.remove('show');
+      // ★ 清理传送带连接悬浮预览
+      const cell = e.target.closest('.cell');
+      if (cell) cell.classList.remove('belt-hover-preview');
       if (self._isDragging) {
         const targetCell = e.target.closest('.cell');
         if (targetCell) {
@@ -17312,6 +17367,7 @@ const G = {
     // 移除高亮
     document.querySelectorAll('.cell.belt-connect-from').forEach(c => c.classList.remove('belt-connect-from'));
     document.querySelectorAll('.cell.belt-connect-target').forEach(c => c.classList.remove('belt-connect-target', 'belt-target-valid', 'belt-target-invalid'));
+    document.querySelectorAll('.cell.belt-hover-preview').forEach(c => c.classList.remove('belt-hover-preview'));
     document.querySelectorAll('.belt-dist-badge').forEach(b => b.remove()); // v3.0 §4
     // ★ Q2：移除浮动标签和闲置计时器
     this._hideBeltModeBanner();
@@ -17671,6 +17727,7 @@ const G = {
       // 清除当前高亮
       document.querySelectorAll('.cell.belt-connect-from').forEach(c => c.classList.remove('belt-connect-from'));
       document.querySelectorAll('.cell.belt-connect-target').forEach(c => c.classList.remove('belt-connect-target', 'belt-target-valid', 'belt-target-invalid'));
+      document.querySelectorAll('.cell.belt-hover-preview').forEach(c => c.classList.remove('belt-hover-preview'));
       document.querySelectorAll('.belt-dist-badge').forEach(b => b.remove()); // v3.0 §4
       // 重置起点但保持连接模式
       this._beltConnectFrom = null;
