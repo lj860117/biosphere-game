@@ -41,6 +41,31 @@ function formatRate(v, decimals) {
   return sign + str + '/s';
 }
 
+// ===== 随机帝国名生成器 =====
+const EMPIRE_NAME_GEN = (() => {
+  // 前缀词库
+  const prefixes = [
+    '深蓝','翡翠','暗影','星尘','极光','寒冰','烈焰','雷霆','幽冥','碧波',
+    '紫晶','赤焰','金辉','银霜','苍穹','玄铁','血月','天穹','远古','神域',
+    '混沌','永恒','圣光','裂隙','深渊','晶壁','混沌','虚无','湮灭','虹光',
+    '暗物质','中子星','白矮星','红巨星','超新星','黑洞','星云','银河',
+    '蓝藻','绿藻','红藻','硅藻','甲藻','珊瑚','海绵','水母','章鱼','藻花',
+    '孢子','芽孢','菌丝','菌落','粘菌','放线菌','蓝细菌','变形菌',
+    '荧光','磷光','共生','寄生','光合','厌氧','好氧','嗜极',
+  ];
+  // 后缀词库
+  const suffixes = [
+    '','珊瑚','菌丝','菌核','孢衣','菌盖','共生体',
+    '菌落','培养皿','菌毯','菌塔','菌城','菌巢',
+  ];
+  function generate() {
+    const p = prefixes[Math.floor(Math.random() * prefixes.length)];
+    const s = suffixes[Math.floor(Math.random() * suffixes.length)];
+    return s ? p + s : p;
+  }
+  return { generate };
+})();
+
 // ===== AUDIO ENGINE — Web Audio API 合成音效 + 程序化背景音乐 =====
 const SFX = (() => {
   let ctx = null;
@@ -1754,45 +1779,47 @@ const EMPIRE_TITLES = [
 
 // ===== RANDOM EVENTS =====
 const EVENTS = [
-  { n:'营养爆发', d:'发现丰富碳源！葡萄糖+20', ty:'s', phase:1, fn:s=>{s.res.glucose+=20} },
-  { n:'能量涌动', d:'ATP合成效率暴增！能量+15', ty:'s', phase:1, fn:s=>{s.res.energy+=15} },
-  { n:'氮源富矿', d:'发现地下氮矿脉！氮源+12', ty:'s', phase:2, fn:s=>{s.res.nitrogen+=12} },
-  { n:'古老DNA', d:'发掘远古细菌DNA！DNA+8', ty:'s', phase:1, fn:s=>{s.res.dna+=8} },
-  { n:'噬菌体入侵！', d:'病毒感染！资源-10%', ty:'e', phase:1, fn:s=>{for(let k in s.res)s.res[k]*=0.9} },
-  { n:'共生互利', d:'共生伙伴加入！效率+5%', ty:'ev', phase:2, fn:s=>{s.gEff+=0.05} },
-  { n:'有益突变', d:'菌株发生有益突变！效率+3%', ty:'ev', phase:1, fn:s=>{s.gEff+=0.03} },
+  { n:'营养爆发', d:'菌主大人，发现丰富碳源！葡萄糖+20', ty:'s', phase:1, fn:s=>{s.res.glucose+=20} },
+  { n:'能量涌动', d:'禀报菌主！ATP合成效率暴增！能量+15', ty:'s', phase:1, fn:s=>{s.res.energy+=15} },
+  { n:'氮源富矿', d:'菌主大人，发现地下氮矿脉！氮源+12', ty:'s', phase:2, fn:s=>{s.res.nitrogen+=12} },
+  { n:'古老DNA', d:'菌主大人，发掘远古细菌DNA！DNA+8', ty:'s', phase:1, fn:s=>{s.res.dna+=8} },
+  { n:'噬菌体入侵！', d:'紧急！菌主大人，病毒感染！资源-10%', ty:'e', phase:1, fn:s=>{for(let k in s.res)s.res[k]*=0.9} },
+  { n:'共生互利', d:'菌主大人，共生伙伴请求加入帝国！效率+5%', ty:'ev', phase:2, fn:s=>{s.gEff+=0.05} },
+  { n:'有益突变', d:'禀报菌主！菌株发生有益突变！效率+3%', ty:'ev', phase:1, fn:s=>{s.gEff+=0.03} },
 ];
 
 // ===== GUIDE MESSAGES =====
 const GUIDE = {
   1: [
-    { check: s => s.bldCount('glucoseCollector') === 0, text:'建造「碳源采集器」— 帝国核心免费供能，采集葡萄糖（一切资源的起点！）', icon:'🌱' },
+    { check: s => s.bldCount('glucoseCollector') === 0, text:'菌主大人，建造「碳源采集器」— 帝国核心免费供能，采集葡萄糖（一切资源的起点！）', icon:'🌱' },
     { check: s => s.bldCount('glucoseCollector') > 0 && s.bldCount('energyStation') === 0, text:'建造「ATP合成酶」把葡萄糖→能量 (1🟢→2.5⚡/s) — 几乎所有设施都需要能量驱动', icon:'🔋' },
     { check: s => s.bldCount('energyStation') > 0 && s.bldCount('simpleExtractor') === 0, text:'建造「简易提取器」用葡萄糖+能量合成DNA (2🟢+1.5⚡→0.4🧬/s) — DNA是进化和研究的关键', icon:'🧬' },
     { check: s => s.bldCount('simpleExtractor') > 0 && s.res.dna < 3, text:'DNA正在合成中...攒到3就能研究科技（小手会指路！）', icon:'🔬' },
-    { check: s => s.res.dna >= 3 && !s.techs.pureCulture.done, text:'DNA够了！点左侧「研究」→「纯培养技术」— 全局效率+10%，第一个科技里程碑', icon:'🧫' },
+    { check: s => s.res.dna >= 3 && !s.techs.pureCulture.done, text:'菌主大人，DNA够了！点左侧「研究」→「纯培养技术」— 全局效率+10%，第一个科技里程碑', icon:'🧫' },
     { check: s => s.techs.pureCulture.done && s.eL < 2 && !s.canEvolve(), text:'纯培养技术✓（效率+10%）→ 攒够DNA后进化到Lv.2，解锁更多建筑！', icon:'📈' },
-    { check: s => s.techs.pureCulture.done && s.eL < 2 && s.canEvolve(), text:'资源就绪！点击右栏「进化」按钮升到Lv.2 — 将解锁固氮装置和蛋白质工厂', icon:'✨' },
+    { check: s => s.techs.pureCulture.done && s.eL < 2 && s.canEvolve(), text:'菌主大人，资源就绪！点击右栏「进化」按钮升到Lv.2 — 将解锁固氮装置和蛋白质工厂', icon:'✨' },
   ],
   2: [
     // v2.0 §11.2: P2预热期端口教学
     { check: s => s._p2PortTutorialPending, text:'📥📤 手动管线预览｜从本阶段开始，你可以手动添加管线来优化产线。每种建筑有输入📥和输出📤端口，端口数=最多连几条管线。不想手动？系统仍会自动帮你连接基础管线！', icon:'🔗', once:'p2PortTutorial' },
     // ── P2a · 代谢基础：固氮 + 蛋白 ──
-    { check: s => s.bldCount('nitrogenFixer') === 0, text:'▸ P2a · 代谢基础｜建造「固氮装置」获取氮源 (0.3⚡→1🔵/s) — 蛋白质工厂的原料来源！', icon:'💨' },
+    { check: s => s.bldCount('nitrogenFixer') === 0, text:'▸ P2a · 代谢基础｜菌主大人，建造「固氮装置」获取氮源 (0.3⚡→1🔵/s) — 蛋白质工厂的原料来源！', icon:'💨' },
     { check: s => s.bldCount('nitrogenFixer') > 0 && s.bldCount('proteinFactory') === 0, text:'▸ P2a · 代谢基础｜建造「蛋白质工厂」(0.8🔵+0.5⚡→0.6🧪/s) — 用氮源合成蛋白质', icon:'⚗️' },
     // v2.0 §11.2: 首次放置建筑邻接推荐
     { check: s => !s._adjPreviewShown && s.totalBuildings() >= 3, text:'💡 选中建筑后，空格子会显示邻接加成分数（如 +15%）！颜色越亮加成越高，选位置放置试试', icon:'📐', once:'adjPreviewHint' },
+    // v2.2: 框选批量移动教学
+    { check: s => !s._boxSelectHintShown && s.totalBuildings() >= 4, text:'💡 在空白格子上拖拽可以框选多个建筑，框选后拖动即可批量移动！重新布局超方便', icon:'☐', once:'boxSelectHint' },
     { check: s => s.bldCount('proteinFactory') > 0 && !s.techs.basicMetab.done, text:'▸ P2a → P2b｜研究「基础代谢学」— 解锁代谢进阶：高效DNA提取器 + 旁路建筑 + 互斥科技路线！', icon:'📖' },
     // ── P2b · 代谢进阶：旁路 + 互斥 ──
     { check: s => s.techs.basicMetab.done && s.bldCount('geneExtractor') === 0, text:'▸ P2b · 代谢进阶｜建造「DNA提取器」(0.5🧪+1⚡→0.8🧬/s) — 比简易提取器快2倍！', icon:'🏭' },
     { check: s => s.techs.basicMetab.done && s.bldCount('geneExtractor') > 0 && s.bldCount('aminoSynth') === 0 && s.bldCount('ribosomeCluster') === 0, text:'▸ P2b · 代谢进阶｜试试「氨基酸合成仪」或「核糖体集群」— 旁路产线，多样化你的代谢网络', icon:'🧬' },
-    { check: s => s.techs.basicMetab.done && (s.bldCount('aminoSynth') > 0 || s.bldCount('ribosomeCluster') > 0) && !s.techs.nitrogenCycle?.done && !s.techs.proteinEng?.done, text:'▸ P2b · 互斥抉择｜选择科技路线：「氮循环工程」(强化固氮) 或「蛋白质工程」(强化蛋白) — 只能二选一！', icon:'⚖️' },
+    { check: s => s.techs.basicMetab.done && (s.bldCount('aminoSynth') > 0 || s.bldCount('ribosomeCluster') > 0) && !s.techs.nitrogenCycle?.done && !s.techs.proteinEng?.done, text:'▸ P2b · 互斥抉择｜菌主大人，选择科技路线：「氮循环工程」(强化固氮) 或「蛋白质工程」(强化蛋白) — 只能二选一！', icon:'⚖️' },
     // ★ 维护费教学
     { check: s => s.totalBuildings() >= 5 && Object.values(s._maintenanceCost||{}).reduce((a,b)=>a+b,0) > 0.3, text:'🔧 注意！每个建筑都需要维护费。建筑越多维护开销越大 — 悬停建筑查看维护详情，用邻接和传送带提升效率来覆盖维护成本！', icon:'🔧' },
   ],
   3: [
     // v2.0 §11.3: P3物流时代教学面板
-    { check: s => s._p3LogisticsTutorialPending, text:'🔧 物流时代｜自动管线已关闭，从现在起需要手动规划所有连接。端口是你的核心约束——合理分配每条管线！选中建筑→点击目标→连接', icon:'🔗', once:'p3LogisticsTutorial' },
+    { check: s => s._p3LogisticsTutorialPending, text:'🔧 物流时代｜菌主大人，自动管线已关闭，从现在起需要手动规划所有连接。端口是你的核心约束——合理分配每条管线！选中建筑→点击目标→连接', icon:'🔗', once:'p3LogisticsTutorial' },
     { check: s => !s.techs.biofilmTech.done, text:'研究「生物膜技术」— 解锁生物膜反应器，进入高级材料时代', icon:'📖' },
     { check: s => s.techs.biofilmTech.done && s.bldCount('biofilmReactor') === 0, text:'建造「生物膜反应器」— 需要葡萄糖+氮源+能量（三料输入），记得连传送带！', icon:'🧱' },
     // ★ 教学：生物膜反应器已建但同步度低时，引导玩家理解供给同步
@@ -1808,21 +1835,21 @@ const GUIDE = {
     // ★ 资源竞争教学（已激活后持续提示）
     { check: s => Object.values(s._competitionPenalty||{}).some(p => p < 0.95), text:'⚖️ 资源供需紧张！当消耗接近产出时效率会下降 — 查看「供需」指标，增产关键资源或拆除低效消费建筑！', icon:'⚖️' },
     // ★ Q4：变异实验室教学
-    { check: s => s._mutLabUnlocked && s._mutSlots.length === 0 && !s._mutBrewing, text:'🧬 变异实验室已解锁！在侧栏点击「培育突变」消耗DNA+蛋白质获取随机增益', icon:'🧬' },
+    { check: s => s._mutLabUnlocked && s._mutSlots.length === 0 && !s._mutBrewing, text:'🧬 菌主大人，变异实验室已解锁！在侧栏点击「培育突变」消耗DNA+蛋白质获取随机增益', icon:'🧬' },
     { check: s => s._mutLabUnlocked && s._mutOffers.length > 0, text:'🧬 突变培育完成！在变异实验室面板选择一个激活 — 不同稀有度效果差异巨大', icon:'✨' },
   ],
   4: [
-    { check: s => !s.techs.quorumSensing.done, text:'研究「群体感应」— 解锁QS信号系统，自动加速全产线', icon:'📖' },
+    { check: s => !s.techs.quorumSensing.done, text:'菌主大人，研究「群体感应」— 解锁QS信号系统，自动加速全产线', icon:'📖' },
     { check: s => s.techs.quorumSensing.done && s.bldCount('qsController') === 0, text:'建造「群体感应塔」(2⚡→0.8📡/s) — QS信号越多效率越高（上限+80%）', icon:'🗼' },
     { check: s => s.bldCount('qsController') > 0 && s.prestigeCount === 0, text:'QS信号自动加速全产线！继续推进到P5完成奇观才能首次转生 — 进化因子×5！', icon:'🚀' },
     { check: s => s.bldCount('qsController') > 0 && s.prestigeCount >= 1, text:'QS信号自动加速全产线，多多益善！可在P4快速转生，或推到P5拿5×进化因子', icon:'🚀' },
   ],
   5: [
-    { check: s => !s.techs.dysonTheory.done, text:'研究「微型戴森理论」— 终极科技！为建造奇观做准备', icon:'📖' },
-    { check: s => s.techs.dysonTheory.done && s.bldCount('microDyson') === 0, text:'建造终极奇观「微型戴森球」！全图仅限一座，0消耗→超强产出', icon:'🏛️' },
+    { check: s => !s.techs.dysonTheory.done, text:'菌主大人，研究「微型戴森理论」— 终极科技！为建造奇观做准备', icon:'📖' },
+    { check: s => s.techs.dysonTheory.done && s.bldCount('microDyson') === 0, text:'菌主大人，建造终极奇观「微型戴森球」！全图仅限一座，0消耗→超强产出', icon:'🏛️' },
     { check: s => s.bldCount('microDyson') > 0 && s.wBuild && !s._wonderEventPending, text:'奇观建造中...注意！每60秒会触发建造事件，需要你做出关键决策！', icon:'⚡' },
     { check: s => s.bldCount('microDyson') > 0 && s.wBuild && s._wonderEventPending, text:'⚠️ 建造事件！查看弹窗做出选择，建造暂停等待你的决策！', icon:'🔔' },
-    { check: s => s.wonderComplete, text:'🎉 你征服了微生物宇宙！游戏完成！', icon:'🌟' },
+    { check: s => s.wonderComplete, text:'🎉 菌主大人，你征服了微生物宇宙！帝国达到巅峰！', icon:'🌟' },
   ],
 };
 
@@ -2321,53 +2348,53 @@ const EVOLUTION_TASKS = {
 // ===== MORE RANDOM EVENTS (with choice events) =====
 const EVENTS_EXTRA = [
   // Simple bonus events
-  { n:'地热能涌动', d:'发现地热能源！能量+25', ty:'s', phase:1, fn:s=>{s.res.energy+=25} },
-  { n:'蛋白质矿脉', d:'发现蛋白质富集区！蛋白质+8', ty:'s', phase:2, fn:s=>{s.res.protein+=8} },
-  { n:'基因风暴', d:'宇宙射线带来有益突变！DNA+10 效率+2%', ty:'ev', phase:1, fn:s=>{s.res.dna+=10;s.gEff+=0.02} },
-  { n:'生物质沉积', d:'古老生物质层被发现！生物质+10', ty:'s', phase:3, fn:s=>{s.res.biomass+=10} },
-  { n:'紫外线照射！', d:'紫外线伤害！效率暂时-5%', ty:'e', phase:1, fn:s=>{s.gEff=Math.max(0.5,s.gEff-0.05)} },
-  { n:'干旱危机！', d:'水源枯竭！葡萄糖-15%', ty:'e', phase:2, fn:s=>{s.res.glucose*=0.85} },
-  { n:'抗生素污染！', d:'外来抗生素扩散！种群-10%', ty:'e', phase:2, fn:s=>{s.pop*=0.9} },
-  { n:'共振效应', d:'菌落同步共振！全局效率+4%', ty:'ev', phase:3, fn:s=>{s.gEff+=0.04} },
-  { n:'外来菌株', d:'友好菌株加入！种群+30', ty:'s', phase:2, fn:s=>{s.pop+=30} },
-  { n:'信号增幅', d:'QS信号被自然增幅！QS+4', ty:'s', phase:4, fn:s=>{s.res.qs=(s.res.qs||0)+4} },
+  { n:'地热能涌动', d:'菌主大人，发现地热能源！能量+25', ty:'s', phase:1, fn:s=>{s.res.energy+=25} },
+  { n:'蛋白质矿脉', d:'禀报菌主！发现蛋白质富集区！蛋白质+8', ty:'s', phase:2, fn:s=>{s.res.protein+=8} },
+  { n:'基因风暴', d:'菌主大人，宇宙射线带来有益突变！DNA+10 效率+2%', ty:'ev', phase:1, fn:s=>{s.res.dna+=10;s.gEff+=0.02} },
+  { n:'生物质沉积', d:'菌主大人，古老生物质层被发现！生物质+10', ty:'s', phase:3, fn:s=>{s.res.biomass+=10} },
+  { n:'紫外线照射！', d:'警告！菌主大人，紫外线伤害！效率暂时-5%', ty:'e', phase:1, fn:s=>{s.gEff=Math.max(0.5,s.gEff-0.05)} },
+  { n:'干旱危机！', d:'紧急！菌主大人，水源枯竭！葡萄糖-15%', ty:'e', phase:2, fn:s=>{s.res.glucose*=0.85} },
+  { n:'抗生素污染！', d:'紧急！菌主大人，外来抗生素扩散！种群-10%', ty:'e', phase:2, fn:s=>{s.pop*=0.9} },
+  { n:'共振效应', d:'菌主大人，菌落同步共振！全局效率+4%', ty:'ev', phase:3, fn:s=>{s.gEff+=0.04} },
+  { n:'外来菌株', d:'禀报菌主！友好菌株请求加入帝国！种群+30', ty:'s', phase:2, fn:s=>{s.pop+=30} },
+  { n:'信号增幅', d:'菌主大人，QS信号被自然增幅！QS+4', ty:'s', phase:4, fn:s=>{s.res.qs=(s.res.qs||0)+4} },
 ];
 
 // Choice events — 需要玩家做AB选择
 const CHOICE_EVENTS = [
   {
     n:'🧪 神秘孢子', phase:1,
-    d:'发现一个发光的神秘孢子！你要怎么做？',
+    d:'菌主大人，发现一个发光的神秘孢子！请示如何处置？',
     a:{ label:'培养它', desc:'获得10🧬DNA + 8⚡能量', fn:s=>{s.res.dna+=10;s.res.energy+=8} },
     b:{ label:'分解它', desc:'获得30🟢葡萄糖', fn:s=>{s.res.glucose+=30} },
   },
   {
     n:'⚗️ 未知化合物', phase:2,
-    d:'实验中意外合成了一种未知物质...',
+    d:'菌主大人，实验中意外合成了一种未知物质...等候您的指令！',
     a:{ label:'注入菌落', desc:'效率永久+5%，但风险失去8🧪', fn:s=>{s.gEff+=0.05;s.res.protein=Math.max(0,s.res.protein-8)} },
     b:{ label:'安全储存', desc:'获得15🧪蛋白质 + 6🧬', fn:s=>{s.res.protein+=15;s.res.dna+=6} },
   },
   {
     n:'🌀 异常代谢场', phase:3,
-    d:'培养皿边缘出现一片异常活跃的代谢区域，酶促反应速率远超正常水平...',
+    d:'菌主大人，培养皿边缘出现异常活跃的代谢区域，酶促反应速率远超正常水平...请下令！',
     a:{ label:'引导菌落扩散', desc:'获得20🧱生物质 + 效率+3%', fn:s=>{s.res.biomass+=20;s.gEff+=0.03} },
     b:{ label:'采样分析', desc:'获得40⚡ + 12🧬（更安全）', fn:s=>{s.res.energy+=40;s.res.dna+=12} },
   },
   {
     n:'🦠 变异菌株', phase:2,
-    d:'一个菌株发生了剧烈变异！',
+    d:'菌主大人，一个菌株发生了剧烈变异！请示处置方案！',
     a:{ label:'接纳变异', desc:'种群+50，效率+3%', fn:s=>{s.pop+=50;s.gEff+=0.03} },
     b:{ label:'隔离观察', desc:'获得20🧬DNA（稳妥路线）', fn:s=>{s.res.dna+=20} },
   },
   {
     n:'💎 晶体矿藏', phase:3,
-    d:'发现一处富含能量的晶体矿！',
+    d:'菌主大人，发现一处富含能量的晶体矿！如何开发？',
     a:{ label:'全力开采', desc:'获得80⚡ + 12🧱', fn:s=>{s.res.energy+=80;s.res.biomass+=12} },
     b:{ label:'研究晶体', desc:'获得18🧬 + 效率永久+4%', fn:s=>{s.res.dna+=18;s.gEff+=0.04} },
   },
   {
     n:'🔬 远古密码', phase:4,
-    d:'解码了一段远古微生物的基因密码！',
+    d:'菌主大人，解码了一段远古微生物的基因密码！请示如何利用？',
     a:{ label:'整合基因', desc:'效率+8%', fn:s=>{s.gEff+=0.08} },
     b:{ label:'提取资源', desc:'获得30🧬 + 15🧪 + 8📡', fn:s=>{s.res.dna+=30;s.res.protein+=15;s.res.qs=(s.res.qs||0)+8} },
   },
@@ -2377,7 +2404,7 @@ const CHOICE_EVENTS = [
 const WONDER_EVENTS = [
   {
     n:'⚡ 能量脉冲', trigger:60,
-    d:'戴森球外壳捕获了一次强烈的能量脉冲！如何利用？',
+    d:'菌主大人，戴森球外壳捕获了一次强烈的能量脉冲！如何利用？',
     a:{ label:'注入建造', desc:'建造加速10%（跳过剩余时间的10%）',
       fn:s=>{ const bd=BLDS[s.wBuild]; const wt=bd?.wonderTime||300; const skip=Math.ceil((wt-s.wProg)*0.10); s.wProg=Math.min(s.wProg+skip,wt); s.log(`⚡ 能量脉冲加速建造 +${skip}s`,'s'); }},
     b:{ label:'储存能量', desc:'获得100⚡ + 60🟢',
@@ -2385,7 +2412,7 @@ const WONDER_EVENTS = [
   },
   {
     n:'🧬 基因共振', trigger:120,
-    d:'建造场内的微生物DNA发生共振反应！',
+    d:'菌主大人，建造场内的微生物DNA发生共振反应！请下令！',
     a:{ label:'引导共振', desc:'建造加速12%，但消耗30🧬',
       fn:s=>{ if(s.res.dna>=30){ s.res.dna-=30; const bd=BLDS[s.wBuild]; const wt=bd?.wonderTime||300; const skip=Math.ceil((wt-s.wProg)*0.12); s.wProg=Math.min(s.wProg+skip,wt); s.log(`🧬 基因共振加速 +${skip}s（消耗30🧬）`,'s'); } else { s.log('🧬 DNA不足，共振失败！','w'); }}},
     b:{ label:'采集样本', desc:'获得25🧬 + 15🧪',
@@ -2393,7 +2420,7 @@ const WONDER_EVENTS = [
   },
   {
     n:'🌀 引力波动', trigger:180,
-    d:'微型戴森球产生引力波动，周围的物质被吸引聚集！',
+    d:'菌主大人，微型戴森球产生引力波动，周围物质被吸引聚集！如何处置？',
     a:{ label:'聚集物质', desc:'建造加速15%，效率临时+5%',
       fn:s=>{ const bd=BLDS[s.wBuild]; const wt=bd?.wonderTime||300; const skip=Math.ceil((wt-s.wProg)*0.15); s.wProg=Math.min(s.wProg+skip,wt); s.gEff+=0.05; s.log(`🌀 引力聚集加速 +${skip}s，效率+5%`,'s'); }},
     b:{ label:'释放能量', desc:'获得80⚡ + 20🧱 + 10📡',
@@ -2401,7 +2428,7 @@ const WONDER_EVENTS = [
   },
   {
     n:'🔬 结构缺陷', trigger:240,
-    d:'检测到戴森球外壳出现微裂纹！需要紧急修复！',
+    d:'紧急！菌主大人，检测到戴森球外壳出现微裂纹！需要立即修复！',
     a:{ label:'立即修复', desc:'消耗40🧱+20🧪，建造加速18%',
       fn:s=>{ if(s.res.biomass>=40&&s.res.protein>=20){ s.res.biomass-=40; s.res.protein-=20; const bd=BLDS[s.wBuild]; const wt=bd?.wonderTime||300; const skip=Math.ceil((wt-s.wProg)*0.18); s.wProg=Math.min(s.wProg+skip,wt); s.log(`🔬 紧急修复完成，加速 +${skip}s`,'s'); } else { s.log('🔬 材料不足，修复失败！建造减速10%','w'); const bd=BLDS[s.wBuild]; const wt=bd?.wonderTime||300; const penalty=Math.ceil((wt-s.wProg)*0.10); s.wProg=Math.max(0,s.wProg-penalty); }}},
     b:{ label:'暂时忽略', desc:'不消耗资源，但建造减速8%',
@@ -2409,7 +2436,7 @@ const WONDER_EVENTS = [
   },
   {
     n:'✨ 量子跃迁', trigger:270,
-    d:'戴森球核心即将达到临界状态！最终决策！',
+    d:'菌主大人，戴森球核心即将达到临界状态！最终决策在您手中！',
     a:{ label:'全力冲刺', desc:'建造加速25%！最终加速',
       fn:s=>{ const bd=BLDS[s.wBuild]; const wt=bd?.wonderTime||300; const skip=Math.ceil((wt-s.wProg)*0.25); s.wProg=Math.min(s.wProg+skip,wt); s.log(`✨ 量子跃迁！最终加速 +${skip}s！`,'s'); s.screenShake(8); }},
     b:{ label:'稳定核心', desc:'效率永久+8%，获得50🧬',
@@ -2638,7 +2665,7 @@ const G = {
   _dragIdx: null, _dragGhost: null, _dragOverIdx: null, _isDragging: false, _dragStartPos: null,
   // 框选系统
   _boxSelectMode: false, _boxSelectStart: null, _boxSelectRect: null,
-  _selectedCells: new Set(), _selectedBelts: new Set(), // 框选中的格子和传送带
+  _selectedCells: new Set(), _selectedBelts: new Set(), _groupBoundingBox: null, // 框选中的格子和传送带
   _isMultiDragging: false, _multiDragGhost: null, _multiDragStart: null, _multiDragOffset: null,
   milestones:{},
   achievements:{}, // 已解锁成就
@@ -2665,6 +2692,7 @@ const G = {
   removedBelts: {}, // { "min-max": true } 被撤销的自动传送带
   _beltConnectMode: false, // 手动连接传送带模式
   _beltConnectFrom: null, // 手动连接起点格子索引
+  _returnToBeltConnect: false, // 建造后是否恢复传送带模式
   // Prestige
   prestigeCurrency: 0,
   prestigeCount: 0,
@@ -2693,6 +2721,9 @@ const G = {
   // Power level system
   _foodPowerLevel: 1.0, // 1.0 = full power, 0.2 = minimum
   _powerWarningShown: false,
+  // ★ 菌主顾问系统 — 上下文情境提示
+  _advisorTimer: 0,
+  _advisorLastMsgId: '',
   // Choice event
   pendingChoice: null,
   // Population allocation system — 菌群分工
@@ -2746,6 +2777,7 @@ const G = {
   _p2PortTutorialPending: false,   // P2端口教学待显示
   _p3LogisticsTutorialPending: false, // P3物流时代教学待显示
   _adjPreviewShown: false,          // 邻接预览教学已显示
+  _boxSelectHintShown: false,       // 框选批量移动教学已显示
   _competitionEnabled: false,       // 资源竞争系统已启用
   _competitionTutorialShown: false, // 资源竞争教学已显示
   _portFullShown: false,            // 首次端口满提示已显示
@@ -5160,6 +5192,15 @@ const G = {
         adjBadge.style.display = 'none';
         cell.appendChild(adjBadge);
 
+        // ★ 供需竞争效率惩罚 badge（P3+产出建筑受竞争影响时显示）
+        if (bd.prod && Object.keys(bd.prod).length > 0) {
+          const compBadge = document.createElement('div');
+          compBadge.className = 'cell-competition-badge';
+          compBadge.id = 'compBadge-' + i;
+          compBadge.style.display = 'none';
+          cell.appendChild(compBadge);
+        }
+
         // v2.0 §4 — 端口UI视觉渲染（基于PORT_DEFS，P2+才显示）
         if (this.phase >= 2 && portDef && (portDef.maxIn > 0 || portDef.maxOut > 0)) {
           const techExtra = this._extraOutPorts || 0;
@@ -5212,6 +5253,21 @@ const G = {
           if (usedIn >= totalMaxIn && usedOut >= totalMaxOut) {
             cell.classList.add('ports-full');
           }
+
+          // ★ 端口数字计数指示器（底部显示 📥已用/总 📤已用/总）
+          const portCounter = document.createElement('div');
+          portCounter.className = 'port-counter';
+          const parts = [];
+          if (totalMaxIn > 0) {
+            const inFull = usedIn >= totalMaxIn;
+            parts.push(`<span class="pc-in${inFull ? ' pc-full' : ''}">📥${usedIn}/${totalMaxIn}</span>`);
+          }
+          if (totalMaxOut > 0) {
+            const outFull = usedOut >= totalMaxOut;
+            parts.push(`<span class="pc-out${outFull ? ' pc-full' : ''}">📤${usedOut}/${totalMaxOut}</span>`);
+          }
+          portCounter.innerHTML = parts.join(' ');
+          cell.appendChild(portCounter);
         }
 
         // v2.0 §10.3 — 已触发邻接加成指示器
@@ -5651,6 +5707,7 @@ const G = {
         if (Math.sqrt(dx*dx + dy*dy) > 5) {
           self._isMultiDragging = true;
           document.getElementById('tooltip').classList.remove('show');
+          self._removeGroupBoundingBox();
           self._createMultiDragGhost(e);
           self._selectedCells.forEach(si => {
             const sc = gridEl.children[si];
@@ -5735,6 +5792,37 @@ const G = {
           adjEl.style.display = 'none';
         }
       }
+
+      // ★ 供需竞争效率惩罚badge更新（P3+）
+      const compEl = document.getElementById('compBadge-' + idx);
+      const cellEl2 = document.getElementById('grid')?.children[idx];
+      if (compEl && cellEl2) {
+        const penalty = this._competitionPenalty || {};
+        const bd2 = BLDS[g.type];
+        let worstPenalty = 1;
+        let worstRes = '';
+        if (this.phase >= 3 && bd2 && bd2.prod) {
+          for (let pk in bd2.prod) {
+            if (penalty[pk] && penalty[pk] < worstPenalty) {
+              worstPenalty = penalty[pk];
+              worstRes = pk;
+            }
+          }
+        }
+        if (worstPenalty < 0.95) {
+          const pctVal = Math.round(worstPenalty * 100);
+          const isSevere = worstPenalty < 0.75;
+          const resIcon = RES[worstRes]?.icon || '⚖️';
+          compEl.textContent = `⚖️ ${resIcon}供需紧张 → 产出${pctVal}%`;
+          compEl.style.display = 'block';
+          compEl.classList.toggle('severe', isSevere);
+          cellEl2.classList.toggle('cell-competition', !isSevere);
+          cellEl2.classList.toggle('cell-competition-severe', isSevere);
+        } else {
+          compEl.style.display = 'none';
+          cellEl2.classList.remove('cell-competition', 'cell-competition-severe');
+        }
+      }
     });
 
     // 更新传送带连接按钮：有阻塞建筑时变红
@@ -5767,10 +5855,13 @@ const G = {
     }
   },
   selectBuilding(key) {
-    // ★ Q2：如果在传送带连接模式中，提示冲突后退出
+    // ★ Q2：如果在传送带连接模式中，记住状态，建完后恢复
     if (this._beltConnectMode) {
-      this.showCursorTooltip('已退出传送带模式 → 切换到建造', 'i');
+      this._returnToBeltConnect = true;
+      this.showCursorTooltip('建造后将自动回到传送带模式', 'i');
       this.cancelBeltConnect();
+    } else {
+      this._returnToBeltConnect = false;
     }
     if (this._petriMode) this.cancelPetriMode();
     this.sel = (this.sel === key) ? null : key;
@@ -5778,6 +5869,14 @@ const G = {
     document.querySelectorAll('.action-btn').forEach(b => {
       b.classList.toggle('active', b.dataset.b === this.sel);
     });
+
+    // 如果取消了建造选择，且之前是从传送带模式来的，恢复连接模式
+    if (!this.sel && this._returnToBeltConnect) {
+      this._returnToBeltConnect = false;
+      this.startBeltConnect();
+      this.showCursorTooltip('🔗 已回到传送带连接模式');
+      return;
+    }
 
     // v2.0 §10.2: 邻接放置预览热力图（所有阶段均可用）
     this._clearAdjPreview();
@@ -6275,6 +6374,57 @@ const G = {
     const bldCount = [...this._selectedCells].filter(i => this.grid[i]).length;
     if (bldCount > 0) {
       this.log(`▸ 框选了 ${bldCount} 个建筑${selectedBelts.size > 0 ? ` + ${selectedBelts.size} 条传送带` : ''} — 拖拽可整体移动`, 's');
+      this._drawGroupBoundingBox();
+    }
+  },
+
+  // 绘制框选整体外围框
+  _drawGroupBoundingBox() {
+    this._removeGroupBoundingBox();
+    if (!this._selectedCells || this._selectedCells.size === 0) return;
+
+    const gridEl = document.getElementById('grid');
+    if (!gridEl) return;
+    const gridRect = gridEl.getBoundingClientRect();
+    const parentEl = gridEl.parentElement;
+    const parentRect = parentEl.getBoundingClientRect();
+
+    // 计算选中格子的包围矩形
+    let minL = Infinity, minT = Infinity, maxR = -Infinity, maxB = -Infinity;
+    this._selectedCells.forEach(i => {
+      const cell = gridEl.children[i];
+      if (!cell) return;
+      const cr = cell.getBoundingClientRect();
+      minL = Math.min(minL, cr.left);
+      minT = Math.min(minT, cr.top);
+      maxR = Math.max(maxR, cr.right);
+      maxB = Math.max(maxB, cr.bottom);
+    });
+
+    if (minL === Infinity) return;
+
+    // 加padding让外围框稍微留出间距
+    const pad = 4;
+    const box = document.createElement('div');
+    box.className = 'box-select-group';
+    box.style.left = (minL - parentRect.left + parentEl.scrollLeft - pad) + 'px';
+    box.style.top = (minT - parentRect.top + parentEl.scrollTop - pad) + 'px';
+    box.style.width = (maxR - minL + pad * 2) + 'px';
+    box.style.height = (maxB - minT + pad * 2) + 'px';
+
+    // 在::before中显示选中数量
+    const bldCount = [...this._selectedCells].filter(i => this.grid[i]).length;
+    box.setAttribute('data-count', bldCount);
+    box.style.setProperty('--sel-count', `"🔲 已选中 ${bldCount} 个"`);
+
+    parentEl.appendChild(box);
+    this._groupBoundingBox = box;
+  },
+
+  _removeGroupBoundingBox() {
+    if (this._groupBoundingBox) {
+      this._groupBoundingBox.remove();
+      this._groupBoundingBox = null;
     }
   },
 
@@ -6285,6 +6435,7 @@ const G = {
     });
     this._selectedCells = new Set();
     this._selectedBelts = new Set();
+    this._removeGroupBoundingBox();
     if (this._boxSelectRect) {
       this._boxSelectRect.remove();
       this._boxSelectRect = null;
@@ -6600,7 +6751,7 @@ const G = {
     this.stats.totalBuilt++;
     // J3: 微叙事事件 — 首个建筑建成
     if (this.stats.totalBuilt === 1) {
-      this.showMilestone('🌱', '第一个采集菌诞生了...你的帝国从此刻开始。');
+      this.showMilestone('🌱', '菌主大人，第一个采集菌诞生了...帝国从此刻开始！');
     }
     this.buildBurst(idx);
     this.addCombo();
@@ -6609,6 +6760,19 @@ const G = {
     if (this._prevGuideKey === this.sel) {
       const score = this.calcScore();
       this.showUnlockFloat(`✓ ${bd.n} 完成！  +${formatNum(score)} 分`);
+    }
+
+    // ★ 建完后取消建造选择
+    this.sel = null;
+    document.querySelectorAll('.action-btn').forEach(b => b.classList.remove('active'));
+    this._clearAdjPreview();
+    document.getElementById('buildHint').textContent = '';
+
+    // ★ 如果之前是传送带连接模式，自动恢复
+    if (this._returnToBeltConnect) {
+      this._returnToBeltConnect = false;
+      this.startBeltConnect();
+      this.showCursorTooltip('🔗 已回到传送带连接模式');
     }
   },
 
@@ -6946,7 +7110,7 @@ const G = {
         const tier = a.tier || 'bronze';
         this.showAchievement(a.n, a.d, rewardParts.join(' '), tier);
         SFX.achieve();
-        this.log(`🏆 成就解锁: ${a.n} — ${a.d}`, 's');
+        this.log(`🏆 菌主大人，成就解锁: ${a.n} — ${a.d}`, 's');
         this.log(`   奖励: ${rewardParts.join(' ')}`, 'ev');
 
         // 等级化屏幕震动和飘字
@@ -7357,7 +7521,7 @@ const G = {
       this.res.dna = (this.res.dna || 0) + Math.floor(bigBonus * 0.3);
       this.res.energy = (this.res.energy || 0) + bigBonus;
       this.gEff += 0.02;
-      this.showEvent(`🎊 在线${bigMin}分钟大奖`, `奖励: +${bigBonus}⚡ +${Math.floor(bigBonus*0.3)}🧬\n全局效率永久+2%\n\n感谢你的坚持！`, 'var(--yellow)');
+      this.showEvent(`🎊 在线${bigMin}分钟大奖`, `菌主大人，感谢坚守帝国！\n\n奖励: +${bigBonus}⚡ +${Math.floor(bigBonus*0.3)}🧬\n全局效率永久+2%`, 'var(--yellow)');
       SFX.bigReward();
       this.log(`🎊 在线大奖: +${bigBonus}⚡ +${Math.floor(bigBonus*0.3)}🧬 效率+2%`, 's');
       this.screenShake(8);
@@ -7480,7 +7644,7 @@ const G = {
         }
         const { color } = this._scoreRank(score);
         this.log(`🏅 评级 ${rr.rank} 首次达成！奖励: ${parts.join(' ')}`, 's');
-        this.showEvent(`🏅 评级 ${rr.rank} 达成！`, `恭喜首次达到 ${rr.rank} 评级！\n\n🎁 奖励: ${parts.join(' ')}\n\n继续加油冲击更高评级！`, color);
+        this.showEvent(`🏅 评级 ${rr.rank} 达成！`, `菌主大人，恭喜首次达到 ${rr.rank} 评级！\n\n🎁 奖励: ${parts.join(' ')}\n\n继续冲击更高评级，扬我帝国声威！`, color);
         SFX.achieve();
         this.screenShake(6);
         // 持久化到 prestige 数据
@@ -7724,7 +7888,7 @@ const G = {
       el.textContent = this._playerName;
       el.style.color = 'var(--cyan)';
     } else {
-      el.textContent = '点击设置昵称';
+      el.textContent = '点击命名帝国';
       el.style.color = 'var(--dim)';
     }
   },
@@ -7747,7 +7911,10 @@ const G = {
     const pop = document.getElementById('nicknamePopup');
     if (!pop) return;
     const input = document.getElementById('nicknameInput');
-    if (input) input.value = this._playerName || '';
+    // 编辑模式：去掉"帝国"后缀只显示核心名
+    const storedName = this._playerName || '';
+    const coreName = storedName.replace(/帝国$/, '');
+    if (input) input.value = coreName;
     this._showPopup(pop);
     this._showBackdrop();
     if (input) setTimeout(() => input.focus(), 100);
@@ -7755,23 +7922,49 @@ const G = {
 
   confirmNickname() {
     const input = document.getElementById('nicknameInput');
-    const name = (input?.value || '').trim();
-    if (name.length < 2 || name.length > 12) {
-      this.showCursorTooltip('昵称需要 2-12 个字符');
+    const raw = (input?.value || '').trim();
+    if (raw.length < 2 || raw.length > 8) {
+      this.showCursorTooltip('帝国名需要 2-8 个字符');
       return;
     }
-    this._playerName = name;
-    localStorage.setItem('bioPlayerName', name);
+    // 去除玩家可能自行输入的"帝国"后缀，统一由系统添加
+    let coreName = raw.replace(/帝国$/, '');
+    if (coreName.length < 2) coreName = raw;
+    const fullName = coreName + '帝国';
+    this._playerName = fullName;
+    localStorage.setItem('bioPlayerName', fullName);
     this.closeNickname();
     this._updateNameDisplay();
-    this.log(`🧬 昵称设置为: ${name}`, 's');
-    this.showCursorTooltip(`昵称已设为「${name}」`);
+    this.log(`🧬 昵称设置为: ${fullName}`, 's');
+    this.showCursorTooltip(`昵称已设为「${fullName}」`);
     this.submitScore();
   },
 
   closeNickname() {
     this._hidePopup('nicknamePopup');
     this._hideBackdrop();
+  },
+
+  // 跳过昵称 → 随机生成一个帝国名
+  skipNickname() {
+    const raw = EMPIRE_NAME_GEN.generate();
+    const fullName = raw + '帝国';
+    this._playerName = fullName;
+    localStorage.setItem('bioPlayerName', fullName);
+    this._hidePopup('nicknamePopup');
+    this._hideBackdrop();
+    this._updateNameDisplay();
+    this.log(`🧬 随机帝国名: ${fullName}`, 's');
+    this.showCursorTooltip(`你的帝国名为「${fullName}」`);
+    this.submitScore();
+  },
+
+  // 随机填入一个帝国名（不关闭弹窗）
+  randomizeNickname() {
+    const raw = EMPIRE_NAME_GEN.generate();
+    const input = document.getElementById('nicknameInput');
+    if (input) input.value = raw;
+    SFX.select();
   },
 
   editNickname() {
@@ -9368,7 +9561,7 @@ const G = {
       if (effDelta > 0) {
         this.log(`  ↳ 全局效率 ${Math.round(oldEff*100)}% → ${Math.round(this.gEff*100)}%`, 'ev');
       }
-      this.showEvent('研究突破: ' + t.n, t.d + '\n\n效果: ' + effectDetail, 'var(--cyan)');
+      this.showEvent('研究突破: ' + t.n, '菌主大人，研究成果已就绪！\n\n' + t.d + '\n\n效果: ' + effectDetail, 'var(--cyan)');
       this.stats.totalTech++;
       this.screenShake(5);
       
@@ -9690,7 +9883,7 @@ const G = {
     const pct = Math.round(bonus * 100);
     this.log('◆ 进化到 Lv.' + this.eL + ' — 效率+' + pct + '%', 's');
     SFX.evolve();
-    this.showEvent('进化突破！', '菌落进化到等级 ' + this.eL + '\n全局效率提升' + pct + '%', 'var(--purple)');
+    this.showEvent('进化突破！', '菌主大人，菌落进化到等级 ' + this.eL + '！\n全局效率提升' + pct + '%', 'var(--purple)');
     this.stats.totalEvo++;
     this.screenShake(10);
     // 进化等级是阶段推进条件之一，检查是否可以升阶段
@@ -9787,8 +9980,8 @@ const G = {
 
       // ===== 阶段B: 延迟展示事件弹窗 =====
       setTimeout(() => {
-        this.showEvent('🏛️ 奇观落成！', bd.n + '\n\n' + bd.d + '\n\n你征服了微生物宇宙！这是文明的巅峰！', 'var(--purple)');
-        this.showMilestone('🌟', '游戏完成！微生物帝国达到巅峰！');
+        this.showEvent('🏛️ 奇观落成！', bd.n + '\n\n' + bd.d + '\n\n菌主大人，你征服了微生物宇宙！这是文明的巅峰！', 'var(--purple)');
+        this.showMilestone('🌟', '菌主大人，微生物帝国达到巅峰！伟大的统治者！');
       }, 1200);
 
       // ===== 阶段C: 文明编年史弹窗 =====
@@ -10744,14 +10937,14 @@ const G = {
       // ===== 原有后续逻辑 =====
       // 进入阶段3时停止帮助按钮脉冲
       if (this.phase >= 3) this._stopHelpPulse();
-      this.showMilestone(p.icon, '进入阶段 ' + p.id + ': ' + p.name);
+      this.showMilestone(p.icon, '菌主大人，帝国迈入阶段 ' + p.id + ': ' + p.name + '！');
       this.log('◆ 进入阶段 ' + p.id + ': ' + p.name + ' — ' + p.desc, 's');
       // J3: 微叙事 — 阶段升级
-      this.log('🌅 一个新时代降临...你的文明更加强大了。', 's');
+      this.log('🌅 菌主大人，一个新时代降临...帝国更加强大了。', 's');
       // 核心菌落升级提示
       if (cc) {
         this.log(`◆ 核心菌落进化: ${cc.name} ${cc.emoji}`, 's');
-        this.showEvent('核心进化: ' + cc.name, cc.desc + '\n\n你的帝国中枢变得更加强大！', cc.color);
+        this.showEvent('核心进化: ' + cc.name, cc.desc + '\n\n菌主大人，帝国中枢变得更加强大了！', cc.color);
       }
       this.updatePhase();
       this.renderResources();
@@ -11014,6 +11207,7 @@ const G = {
           if (key === 'p2PortTutorial') this._p2PortTutorialPending = false;
           if (key === 'p3LogisticsTutorial') this._p3LogisticsTutorialPending = false;
           if (key === 'adjPreviewHint') this._adjPreviewShown = true;
+          if (key === 'boxSelectHint') this._boxSelectHintShown = true;
           if (key === 'competitionTutorial') this._competitionTutorialShown = true;
         }
         break;
@@ -11035,25 +11229,66 @@ const G = {
 
     document.getElementById('guideText').textContent = guideText;
 
+    // ★ 检测引导目标面板是否被用户折叠 → 在引导条上追加展开提示
+    let collapsedHint = '';
+    if (guideText && currentIdx >= 0) {
+      const step = steps[currentIdx];
+      const txt = step.text;
+      const sectionMap = [
+        { match: () => txt.includes('研究') && txt.includes('「'), secId: 'techSection', name: '科技树' },
+        { match: () => txt.match(/建造「/), secId: 'secBuild', name: '建造面板' },
+        { match: () => txt.includes('进化') && (txt.includes('按钮') || txt.includes('Lv')), secId: 'evoSection', name: '进化面板' },
+        { match: () => txt.includes('变异实验室'), secId: 'mutLabSection', name: '变异面板' },
+      ];
+      for (const m of sectionMap) {
+        if (m.match()) {
+          const sec = document.getElementById(m.secId);
+          if (sec && sec.classList.contains('collapsed')) {
+            collapsedHint = ` 👈 请展开「${m.name}」`;
+          }
+          break;
+        }
+      }
+    }
+
     // ── 同步培养皿内引导提示条 ──
     const dishGuideBar = document.getElementById('dishGuideBar');
     const dishGuideText = document.getElementById('dishGuideText');
     const dishGuideIconEl = document.getElementById('dishGuideIcon');
     if (dishGuideBar && dishGuideText) {
-      // 提取简短文字（去掉破折号后面的补充说明）
-      const shortGuide = guideText.replace(/[—(（].*$/, '').trim();
+      // 提取简短文字（去掉破折号后面的补充说明）+ 折叠提示
+      const shortGuide = guideText.replace(/[—(（].*$/, '').trim() + collapsedHint;
       if (dishGuideText.textContent !== shortGuide) {
         dishGuideText.textContent = shortGuide;
-        if (dishGuideIconEl) dishGuideIconEl.textContent = guideIcon;
+        if (dishGuideIconEl) dishGuideIconEl.textContent = collapsedHint ? '📂' : guideIcon;
         // 闪烁动画
         dishGuideBar.classList.remove('flash');
         void dishGuideBar.offsetWidth; // force reflow
         dishGuideBar.classList.add('flash');
       }
-      // 点击提示条 → 展开右侧目标面板
+      // ★ 有折叠提示时高亮引导条边框
+      dishGuideBar.classList.toggle('collapsed-hint', !!collapsedHint);
+      // ★ 记录当前被折叠的目标面板 secId，供点击展开用
+      dishGuideBar._collapsedTarget = null;
+      if (collapsedHint && currentIdx >= 0) {
+        const txt = steps[currentIdx].text;
+        if (txt.includes('研究') && txt.includes('「')) dishGuideBar._collapsedTarget = 'techSection';
+        else if (txt.match(/建造「/)) dishGuideBar._collapsedTarget = 'secBuild';
+        else if (txt.includes('进化')) dishGuideBar._collapsedTarget = 'evoSection';
+        else if (txt.includes('变异实验室')) dishGuideBar._collapsedTarget = 'mutLabSection';
+      }
+      // 点击提示条 → 展开目标面板
       if (!dishGuideBar._bound) {
         dishGuideBar._bound = true;
         dishGuideBar.onclick = () => {
+          // ★ 如果有被折叠的目标面板，点击时展开它（并清除用户折叠标记）
+          if (dishGuideBar._collapsedTarget) {
+            const targetSec = document.getElementById(dishGuideBar._collapsedTarget);
+            if (targetSec && targetSec.classList.contains('collapsed')) {
+              delete G._userCollapsedSections[dishGuideBar._collapsedTarget];
+              G.toggleSection(dishGuideBar._collapsedTarget);
+            }
+          }
           const sec = document.getElementById('secGoal');
           if (sec && sec.classList.contains('collapsed')) G.toggleSection('secGoal');
           // 滚动到目标面板
@@ -11122,6 +11357,8 @@ const G = {
       this._lastGuideKey = guideKey;
       this._guideStuckTs = Date.now();
       this._guideStuckNotified = false;
+      // ★ 步骤变化时清除手动折叠记录，让新引导可以正常展开目标面板
+      this._userCollapsedSections = {};
       if (guideBox) {
         guideBox.style.transition = 'box-shadow 0.3s';
         guideBox.style.boxShadow = '0 0 12px rgba(6,214,160,0.5), inset 0 0 6px rgba(6,214,160,0.15)';
@@ -11296,6 +11533,13 @@ const G = {
             }
             if (penalty[k] >= 0.95) this._competitionWarningShown[k] = false;
           }
+        }
+
+        // ★ 菌主顾问系统 — 每45秒根据当前情境给出上下文提示
+        this._advisorTimer++;
+        if (this._advisorTimer >= 45) {
+          this._advisorTimer = 0;
+          this._tickAdvisor();
         }
 
         // QS信号自然衰减 — 按比例衰减（每秒扣当前值的3%）+ 最低衰减0.02/s
@@ -14024,9 +14268,14 @@ const G = {
     return secId === 'secBuild' || secId === 'techSection';
   },
 
+  /** ★ 记录用户手动折叠的 section，引导系统不再自动展开 */
+  _userCollapsedSections: {},
+
   /** 确保目标 section 处于展开状态（引导系统调用） */
   _ensureSectionExpanded(secId) {
     if (!secId) return;
+    // ★ 如果用户手动折叠了这个面板，尊重用户意愿，不强制展开
+    if (this._userCollapsedSections[secId]) return;
     const sec = document.getElementById(secId);
     if (!sec || !sec.classList.contains('collapsed')) return;
 
@@ -14179,10 +14428,18 @@ const G = {
       this._empireAutoCollapsed = false; // 手动操作后清除自动标记
       this._empireAlertExpanded = false; // 手动操作后清除告警展开标记
     }
+    // ★ 记录用户手动折叠意愿（阻止引导系统自动展开）
+    const nowCollapsed = sec.classList.contains('collapsed');
+    if (nowCollapsed) {
+      this._userCollapsedSections[secId] = true;
+    } else {
+      delete this._userCollapsedSections[secId];
+    }
+
     // 记住折叠状态
     try {
       const state = JSON.parse(localStorage.getItem('bioSphereSecState') || '{}');
-      state[secId] = sec.classList.contains('collapsed');
+      state[secId] = nowCollapsed;
       localStorage.setItem('bioSphereSecState', JSON.stringify(state));
     } catch(e) {}
   },
@@ -14235,6 +14492,21 @@ const G = {
     // 4. 培养皿实验按钮：阶段2+ 显示
     const petriRow = document.getElementById('petriExpRow');
     if (petriRow) petriRow.style.display = this.phase >= 2 ? '' : 'none';
+
+    // 4.5 ★ 邻接图鉴快捷按钮：有2+建筑时显示
+    const adjRow = document.getElementById('adjGuideRow');
+    if (adjRow) {
+      const showAdj = this.totalBuildings() >= 2;
+      adjRow.style.display = showAdj ? '' : 'none';
+      if (showAdj) {
+        const unlocked = this.getUnlockedAdjacencyCount();
+        const discovered = Object.keys(this._discoveredAdj || {}).length;
+        const descEl = document.getElementById('adjGuideDesc');
+        if (descEl) {
+          descEl.textContent = `已发现 ${discovered}/${unlocked} 条 · 点击查看全部规则`;
+        }
+      }
+    }
 
     // 5. ★ Q4：变异实验室面板
     const mutLabSec = document.getElementById('mutLabSection');
@@ -14512,6 +14784,13 @@ const G = {
       }
     } else if (target.type === 'research') {
       this._ensureSectionExpanded('techSection');
+      // ★ 如果科技树被用户折叠，不指向不可见的按钮
+      const techSec = document.getElementById('techSection');
+      if (techSec && techSec.classList.contains('collapsed')) {
+        hand.style.display = 'none';
+        ring.style.display = 'none';
+        return;
+      }
       targetEl = document.querySelector(`.tech-btn[data-t="${target.key}"]`);
       if (!targetEl) {
         // 尝试查找包含科技名的按钮
@@ -14845,6 +15124,110 @@ const G = {
       show: () => {
         const pop = document.getElementById('eventPopup');
         document.getElementById('eventTitle').textContent = title;
+        document.getElementById('eventDesc').textContent = desc;
+        pop.style.setProperty('--ev-color', color || 'var(--cyan)');
+        pop.classList.add('show');
+      },
+      hide: () => {
+        document.getElementById('eventPopup').classList.remove('show');
+      }
+    });
+  },
+
+  // ===== ★ 菌主顾问系统 — 上下文情境提示 =====
+  _tickAdvisor() {
+    // 收集所有候选提示
+    const msgs = [];
+    const emp = this._playerName || '你的帝国';
+
+    // ── 功率危机 ──
+    if (this._foodPowerLevel <= 0.4) {
+      msgs.push({ id:'pwr_crisis', text:`⚠️ ${emp}葡萄糖即将耗尽！功率仅剩${Math.round(this._foodPowerLevel*100)}%，种群正在流失！快建造碳源采集器`, priority: 10 });
+    } else if (this._foodPowerLevel <= 0.7) {
+      msgs.push({ id:'pwr_low', text:`⚡ ${emp}功率降至${Math.round(this._foodPowerLevel*100)}%，考虑多建一些碳源采集器保障供给`, priority: 6 });
+    }
+
+    // ── 维护费赤字 ──
+    if (this.phase >= 2) {
+      const mc = this._maintenanceCost || {};
+      let deficitRes = [];
+      for (let k in mc) {
+        if (mc[k] > 0 && (this.rates[k] || 0) < -0.01) {
+          deficitRes.push(RES[k]?.n || k);
+        }
+      }
+      if (deficitRes.length > 0) {
+        msgs.push({ id:'maint_deficit', text:`🔧 ${emp}的${deficitRes.join('、')}正在亏空！建筑维护费太高，考虑拆除低效建筑或升级产出建筑`, priority: 8 });
+      }
+    }
+
+    // ── 资源竞争 ──
+    if (this.phase >= 3) {
+      const penalty = this._competitionPenalty || {};
+      let tightRes = [];
+      for (let k in penalty) {
+        if (penalty[k] < 0.85) {
+          tightRes.push(`${RES[k]?.icon||''}${RES[k]?.n||k}`);
+        }
+      }
+      if (tightRes.length > 0) {
+        msgs.push({ id:'competition', text:`⚖️ ${emp}的${tightRes.join('、')}供给紧张，产出效率下降！增产或减少消耗来缓解`, priority: 7 });
+      }
+    }
+
+    // ── 闲置闲置建筑/空地 ──
+    const buildings = this.totalBuildings();
+    const emptySlots = this.grid.filter(c => !c).length;
+    if (buildings === 0 && this.phase >= 1 && emptySlots > 0) {
+      msgs.push({ id:'no_build', text:`🏗️ 菌主大人，还是一片空地呢！选择一个建筑开始你的帝国征程吧`, priority: 5 });
+    } else if (buildings > 0 && buildings < 4 && emptySlots > 3 && this.rt > 60) {
+      msgs.push({ id:'expand', text:`🏗️ ${emp}还有大量空地未开发，继续扩建帝国版图吧`, priority: 3 });
+    }
+
+    // ── 低科技 ──
+    const techDone = Object.values(this.techs || {}).filter(t => t.done).length;
+    const techTotal = Object.keys(this.techs || {}).length;
+    if (techDone === 0 && this.phase >= 1 && this.rt > 30) {
+      msgs.push({ id:'no_tech', text:`📖 菌主大人，开始研究科技吧！知识就是力量`, priority: 4 });
+    } else if (techTotal > 0 && techDone / techTotal < 0.3 && this.rt > 120) {
+      msgs.push({ id:'tech_lag', text:`📖 ${emp}科技发展较慢，加速研究可以解锁强力建筑`, priority: 2 });
+    }
+
+    // ── 鼓励性提示（正面反馈）──
+    if (this._foodPowerLevel >= 1.0 && buildings >= 8) {
+      msgs.push({ id:'empire_good', text:`🌟 ${emp}运转良好，帝国蒸蒸日上！继续扩张吧菌主大人`, priority: 1 });
+    }
+    if (this.gEff >= 2.0) {
+      msgs.push({ id:'eff_high', text:`📈 ${emp}效率惊人！全局效率${Math.round(this.gEff*100)}%，简直是帝国传奇`, priority: 1 });
+    }
+
+    // 按优先级排序，选择最高优先级的（且不与上次重复）
+    msgs.sort((a, b) => b.priority - a.priority);
+    const filtered = msgs.filter(m => m.id !== this._advisorLastMsgId);
+    const pick = filtered[0] || msgs[0];
+    if (!pick) return;
+
+    this._advisorLastMsgId = pick.id;
+    // 更新菌主形象状态文字
+    const statusEl = document.getElementById('hostAvatarStatus');
+    if (statusEl) {
+      statusEl.textContent = pick.text.replace(/^[\s\S]*?[帝国名]*?[的]*/,'').slice(0, 30);
+      statusEl.style.color = pick.priority >= 8 ? 'var(--red)' : pick.priority >= 5 ? 'var(--orange)' : 'var(--cyan)';
+    }
+    // 写入日志
+    if (pick.priority >= 5) {
+      this.log(pick.text, pick.priority >= 8 ? 'e' : 'w');
+    } else {
+      this.log(pick.text, 's');
+    }
+  },
+
+  showEvent(title, desc, color) {
+    this._enqueueNotify({
+      dur: 4000,
+      show: () => {
+        const pop = document.getElementById('eventPopup');
+        document.getElementById('eventTitle').textContent = title;
         document.getElementById('eventTitle').style.color = color || 'var(--cyan)';
         document.getElementById('eventDesc').textContent = desc;
         pop.classList.add('show');
@@ -15012,6 +15395,7 @@ const G = {
         _p2PortTutorialPending: this._p2PortTutorialPending,
         _p3LogisticsTutorialPending: this._p3LogisticsTutorialPending,
         _adjPreviewShown: this._adjPreviewShown,
+        _boxSelectHintShown: this._boxSelectHintShown,
         _competitionEnabled: this._competitionEnabled,
         _competitionTutorialShown: this._competitionTutorialShown,
         _portFullShown: this._portFullShown,
@@ -15166,6 +15550,7 @@ const G = {
       if ('_p2PortTutorialPending' in s) this._p2PortTutorialPending = s._p2PortTutorialPending;
       if ('_p3LogisticsTutorialPending' in s) this._p3LogisticsTutorialPending = s._p3LogisticsTutorialPending;
       if ('_adjPreviewShown' in s) this._adjPreviewShown = s._adjPreviewShown;
+      if ('_boxSelectHintShown' in s) this._boxSelectHintShown = s._boxSelectHintShown;
       if ('_competitionEnabled' in s) this._competitionEnabled = s._competitionEnabled;
       if ('_competitionTutorialShown' in s) this._competitionTutorialShown = s._competitionTutorialShown;
       if ('_portFullShown' in s) this._portFullShown = s._portFullShown;
@@ -15368,8 +15753,8 @@ const G = {
         rewardParts.push(`+${ch.reward[k]}${RES[k]?.icon||k}`);
       }
 
-      this.log(`✅ 挑战完成: ${ch.n} — 奖励: ${rewardParts.join(' ')}`, 's');
-      this.showEvent(`🎯 挑战完成！`, `${ch.n}\n\n${ch.d}\n\n🎁 奖励: ${rewardParts.join(' ')}`, 'var(--yellow)');
+      this.log(`✅ 菌主大人，挑战完成: ${ch.n} — 奖励: ${rewardParts.join(' ')}`, 's');
+      this.showEvent(`🎯 挑战完成！`, `菌主大人，干得漂亮！\n\n${ch.n}\n\n${ch.d}\n\n🎁 奖励: ${rewardParts.join(' ')}`, 'var(--yellow)');
       SFX.achieve();
       this.screenShake(8);
 

@@ -482,11 +482,11 @@ html,body{height:100%;overflow:hidden;font-family:var(--font-body);background:va
 .build-row{display:flex;gap:var(--sp-xs-sm);margin-bottom:var(--sp-xs-sm);align-items:stretch}
 .build-row .action-btn{margin-bottom:0;flex:1;min-width:0}
 .action-btn{
-  width:100%;padding:var(--sp-md-lg) var(--sp-lg);
+  width:100%;padding:var(--sp-lg) var(--sp-xl);
   border:1px solid var(--bdr);border-radius:4px;
   background:linear-gradient(135deg,rgba(8,16,28,0.9),rgba(6,12,22,0.9));
   color:var(--text);cursor:pointer;transition:all 0.2s;text-align:left;
-  display:flex;align-items:center;gap:var(--sp-md-lg);position:relative;overflow:hidden;
+  display:flex;align-items:center;gap:var(--sp-xl);position:relative;overflow:hidden;
 }
 .action-btn:hover:not(.locked){background:rgba(6,214,160,0.04);border-color:#1a4a50;transform:translateX(2px)}
 .action-btn.active{border-color:var(--cyan);background:rgba(6,214,160,0.06);box-shadow:0 0 10px rgba(6,214,160,0.08)}
@@ -496,32 +496,32 @@ html,body{height:100%;overflow:hidden;font-family:var(--font-body);background:va
 .action-btn.cant-afford:hover{opacity:0.65;filter:grayscale(0.2)}
 .action-btn.new{animation:newItem 0.5s ease-out}
 @keyframes newItem{0%{opacity:0;transform:translateY(-8px)}100%{opacity:1;transform:translateY(0)}}
-.act-icon{width:32px;height:32px;flex-shrink:0}
+.act-icon{width:42px;height:42px;flex-shrink:0}
 .act-icon svg{width:100%;height:100%}
-.act-name{font-weight:700;font-size:0.95em;line-height:1.25;display:flex;align-items:center;gap:4px;flex-wrap:wrap}
-.act-cost-inline{font-size:0.8em;color:var(--yellow);font-weight:600;opacity:0.85;margin-left:auto;white-space:nowrap}
-.act-prod-hint{font-size:0.78em;color:var(--color-info);font-family:'Share Tech Mono',monospace;opacity:0.7;margin-top:1px}
-.act-desc{font-size:0.95em;color:var(--dim)}
-.act-cost{font-size:0.95em;color:var(--yellow);font-weight:600}
+.act-name{font-weight:700;font-size:1.15em;line-height:1.25;display:flex;align-items:center;gap:5px;flex-wrap:wrap}
+.act-cost-inline{font-size:0.95em;color:var(--yellow);font-weight:600;opacity:0.85;margin-left:auto;white-space:nowrap}
+.act-prod-hint{font-size:1.05em;color:var(--color-info);font-family:'Share Tech Mono',monospace;opacity:0.8;margin-top:2px}
+.act-desc{font-size:1.05em;color:var(--dim)}
+.act-cost{font-size:1.05em;color:var(--yellow);font-weight:600}
 .act-tag{
-  position:absolute;top:3px;right:5px;font-size:0.7em;padding:var(--sp-2xs) var(--sp-sm);
+  position:absolute;top:3px;right:5px;font-size:0.82em;padding:var(--sp-2xs) var(--sp-sm);
   border-radius:8px;font-weight:700;letter-spacing:0.5px;
 }
 
 /* Build panel upgrade button */
 .build-upgrade-btn{
-  width:36px;flex-shrink:0;border:1px solid #1a3a4a;border-radius:4px;
+  width:44px;flex-shrink:0;border:1px solid #1a3a4a;border-radius:4px;
   background:linear-gradient(180deg,rgba(6,214,160,0.06),rgba(6,214,160,0.02));
   color:var(--cyan);cursor:pointer;transition:all 0.2s;
   display:flex;flex-direction:column;align-items:center;justify-content:center;gap:var(--sp-3xs);
-  padding:var(--sp-2xs) 0;position:relative;overflow:visible;
+  padding:var(--sp-xs) 0;position:relative;overflow:visible;
 }
 .build-upgrade-btn:hover{border-color:var(--cyan);background:rgba(6,214,160,0.10);
   box-shadow:0 0 8px rgba(6,214,160,0.12);transform:scale(1.05)}
 .build-upgrade-btn.maxed{opacity:0.3;cursor:default;pointer-events:none;
   border-color:#1a2a3a;color:#3a5a6a}
-.build-up-icon{font-size:1.15em;line-height:1}
-.build-up-label{font-size:0.7em;font-weight:700;font-family:'Share Tech Mono',monospace;letter-spacing:0.5px}
+.build-up-icon{font-size:1.3em;line-height:1}
+.build-up-label{font-size:0.82em;font-weight:700;font-family:'Share Tech Mono',monospace;letter-spacing:0.5px}
 
 /* Cursor tooltip for insufficient resources */
 .cursor-tooltip{
@@ -572,8 +572,8 @@ html,body{height:100%;overflow:hidden;font-family:var(--font-body);background:va
   filter:drop-shadow(0 0 4px rgba(249,115,22,0.3));
 }
 .belt-connect-text{display:flex;flex-direction:column;gap:var(--sp-3xs)}
-.belt-connect-name{font-weight:700;font-size:1.0em;color:#f97316}
-.belt-connect-desc{font-size:0.88em;color:var(--dim)}
+.belt-connect-name{font-weight:700;font-size:1.12em;color:#f97316}
+.belt-connect-desc{font-size:0.98em;color:var(--dim)}
 /* 有建筑阻塞时传送带按钮变红 */
 .belt-connect-action-btn.has-blocked{
   border-color:rgba(239,68,68,0.6);border-style:solid;
@@ -604,6 +604,20 @@ html,body{height:100%;overflow:hidden;font-family:var(--font-body);background:va
 .cell.box-selected::after{
   content:'';position:absolute;inset:0;
   background:rgba(6,214,160,0.05);border-radius:inherit;pointer-events:none;
+}
+/* Group selection bounding box — 框选整体外围框 */
+.box-select-group{
+  position:absolute;z-index:7;pointer-events:none;
+  border:2px dashed rgba(6,214,160,0.65);border-radius:6px;
+  background:rgba(6,214,160,0.03);
+  box-shadow:0 0 16px rgba(6,214,160,0.12),inset 0 0 20px rgba(6,214,160,0.04);
+  transition:all 0.25s ease;
+}
+.box-select-group::before{
+  content:var(--sel-count, '🔲 已选中');position:absolute;top:-22px;left:6px;
+  font-size:0.78em;font-weight:700;color:rgba(6,214,160,0.75);
+  font-family:'Share Tech Mono',monospace;letter-spacing:0.5px;
+  text-shadow:0 0 8px rgba(6,214,160,0.3);
 }
 /* Multi-drag ghost */
 .multi-drag-ghost{
@@ -640,6 +654,23 @@ html,body{height:100%;overflow:hidden;font-family:var(--font-body);background:va
 /* Belt action row (connect + upgrade inline) */
 .belt-action-row{display:flex;gap:var(--sp-xs-sm);margin-top:var(--sp-sm);align-items:stretch}
 .belt-action-row .belt-connect-action-btn{margin-top:0;flex:1;min-width:0}
+/* ★ 邻接图鉴快捷按钮 — 青色主题区分传送带 */
+.adj-guide-btn{
+  border-color:rgba(6,214,160,0.35) !important;border-style:dashed !important;
+  background:linear-gradient(135deg,rgba(6,214,160,0.06),rgba(20,184,166,0.04)) !important;
+}
+.adj-guide-btn:hover{
+  border-color:#06d6a0 !important;border-style:solid !important;
+  background:linear-gradient(135deg,rgba(6,214,160,0.12),rgba(20,184,166,0.08)) !important;
+  box-shadow:0 0 14px rgba(6,214,160,0.12) !important;
+}
+.adj-guide-btn .belt-connect-name{color:#06d6a0}
+.adj-guide-btn .belt-connect-desc{color:#14b8a6}
+.adj-guide-btn .belt-connect-icon{font-size:1.3em}
+.adj-guide-progress{
+  position:absolute;bottom:3px;right:8px;font-size:0.65em;
+  color:rgba(6,214,160,0.6);font-family:'Share Tech Mono',monospace;
+}
 .belt-upgrade-inline-btn{
   width:38px;flex-shrink:0;border:1px dashed #f9731650;border-radius:5px;
   background:linear-gradient(180deg,rgba(249,115,22,0.06),rgba(249,115,22,0.02));
@@ -957,6 +988,37 @@ html,body{height:100%;overflow:hidden;font-family:var(--font-body);background:va
   50%{border-color:rgba(239,68,68,0.8);box-shadow:0 0 12px rgba(239,68,68,0.25),inset 0 0 8px rgba(239,68,68,0.06)}
 }
 
+/* ★ 供需竞争效率惩罚badge — 顶部醒目标签 */
+.cell-competition-badge{
+  position:absolute;top:0;left:0;right:0;z-index:10;pointer-events:none;
+  text-align:center;font-size:0.46em;font-weight:800;
+  color:#fbbf24;background:rgba(120,53,15,0.82);
+  padding:var(--sp-3xs) 0;letter-spacing:0.3px;
+  border-radius:3px 3px 0 0;
+  text-shadow:0 1px 2px rgba(0,0,0,0.8);
+  animation:compBadgePulse 2s ease-in-out infinite;
+}
+.cell-competition-badge.severe{
+  color:#f87171;background:rgba(127,29,29,0.85);
+  animation:compBadgePulseSevere 1.5s ease-in-out infinite;
+}
+@keyframes compBadgePulse{
+  0%,100%{opacity:0.8}
+  50%{opacity:1;text-shadow:0 0 6px rgba(251,191,36,0.4)}
+}
+@keyframes compBadgePulseSevere{
+  0%,100%{opacity:0.85;text-shadow:0 0 4px rgba(248,113,113,0.3)}
+  50%{opacity:1;text-shadow:0 0 10px rgba(248,113,113,0.6)}
+}
+/* 竞争中的格子边框变色 */
+.cell.cell-competition{
+  border-color:rgba(251,191,36,0.5) !important;
+}
+.cell.cell-competition-severe{
+  border-color:rgba(239,68,68,0.5) !important;
+  animation:cellBlockedPulse 2s ease-in-out infinite;
+}
+
 /* v2.1 休眠状态badge — 灰色调顶部标签 */
 .cell-dormant-badge{
   position:absolute;top:0;left:0;right:0;z-index:10;pointer-events:none;
@@ -1012,6 +1074,20 @@ html,body{height:100%;overflow:hidden;font-family:var(--font-body);background:va
 }
 /* 游戏通关后隐藏 */
 .dish-guide-bar.hidden{display:none}
+/* ★ 引导目标面板被折叠时的提示高亮 */
+.dish-guide-bar.collapsed-hint{
+  background:linear-gradient(90deg,rgba(251,191,36,0.12),rgba(245,158,11,0.08),rgba(251,191,36,0.12));
+  border-bottom-color:rgba(251,191,36,0.3);
+  animation:guideCollapsedPulse 2s ease-in-out infinite;
+}
+.dish-guide-bar.collapsed-hint:hover{
+  background:linear-gradient(90deg,rgba(251,191,36,0.2),rgba(245,158,11,0.14),rgba(251,191,36,0.2));
+  box-shadow:inset 0 0 12px rgba(251,191,36,0.1);
+}
+@keyframes guideCollapsedPulse{
+  0%,100%{border-bottom-color:rgba(251,191,36,0.2)}
+  50%{border-bottom-color:rgba(251,191,36,0.5);box-shadow:inset 0 -2px 8px rgba(251,191,36,0.08)}
+}
 /* 告警信息合并到引导条右侧 */
 .dish-guide-sep{
   width:1px;height:14px;flex-shrink:0;
@@ -1200,6 +1276,22 @@ html,body{height:100%;overflow:hidden;font-family:var(--font-body);background:va
 }
 .port-group.in{left:0;top:50%;transform:translate(-50%,-50%)}
 .port-group.out{right:0;top:50%;transform:translate(50%,-50%)}
+
+/* ★ 端口数字计数指示器 */
+.port-counter{
+  position:absolute;bottom:1px;left:50%;transform:translateX(-50%);
+  z-index:9;pointer-events:none;white-space:nowrap;
+  font-size:0.62em;font-family:'Share Tech Mono',monospace;font-weight:700;
+  letter-spacing:0.3px;line-height:1;
+  display:flex;gap:4px;align-items:center;
+  padding:1px 3px;border-radius:3px;
+  background:rgba(0,0,0,0.65);
+  opacity:0.7;transition:opacity 0.2s;
+}
+.cell:hover .port-counter{opacity:1}
+.pc-in{color:#3b82f6}
+.pc-out{color:#22c55e}
+.pc-full{color:#facc15;text-shadow:0 0 4px rgba(250,204,21,0.4)}
 /* 手机端端口缩小 */
 @media(max-width:768px){
   .port{width:10px;height:10px}
@@ -3832,6 +3924,16 @@ html,body{height:100%;overflow:hidden;font-family:var(--font-body);background:va
               <span class="belt-up-label" id="beltUpgradeInlineLabel">升级</span>
             </button>
           </div>
+          <!-- Adjacency Guide Quick Button -->
+          <div class="belt-action-row" id="adjGuideRow" style="display:none">
+            <button class="belt-connect-action-btn adj-guide-btn" id="adjGuideBtn" onclick="G.showAdjGuide()">
+              <span class="belt-connect-icon">🔗</span>
+              <span class="belt-connect-text">
+                <span class="belt-connect-name">邻接图鉴</span>
+                <span class="belt-connect-desc" id="adjGuideDesc">查看所有邻接加成规则</span>
+              </span>
+            </button>
+          </div>
           <!-- Petri Experiment Button -->
           <div class="belt-action-row" id="petriExpRow" style="display:none">
             <button class="belt-connect-action-btn petri-exp-btn" id="petriExpBtnLeft" onclick="G.startPetriMode()">
@@ -3857,7 +3959,7 @@ html,body{height:100%;overflow:hidden;font-family:var(--font-body);background:va
     <!-- CENTER: PETRI DISH -->
     <div class="center">
       <div class="dish-header">
-        <div class="dish-name" id="dishName">培养皿 <span style="font-size:0.82em;color:var(--dim);font-family:'Rajdhani',sans-serif">· 拖拽移动 · 双击升级 · 右键回收 · 框选批量 · 快捷键: 空格暂停 / 1-3加速 / ESC关闭</span></div>
+        <div class="dish-name" id="dishName">培养皿 <span style="font-size:0.82em;color:var(--dim);font-family:'Rajdhani',sans-serif">· 拖拽移动 · 双击升级 · 右键回收 · <span style="color:var(--cyan);opacity:0.9">空白拖拽框选批量移动</span> · 快捷键: 空格暂停 / 1-3加速 / ESC关闭</span></div>
         <div class="dish-env">
           <span>pH <span class="val" id="envPH">7.0</span></span>
           <span>T° <span class="val" id="envT">37</span></span>
@@ -3987,7 +4089,7 @@ html,body{height:100%;overflow:hidden;font-family:var(--font-body);background:va
                 <!-- 玩家昵称 — 可点击改名 -->
                 <div class="csb-score-item honor-name-row" onclick="G.showNicknamePopup()" title="点击修改昵称" style="cursor:pointer">
                   <span class="s-label">🧬 昵称</span>
-                  <span class="s-val" id="playerNameDisplay" style="color:var(--cyan);font-weight:700">未设置</span>
+                  <span class="s-val" id="playerNameDisplay" style="color:var(--cyan);font-weight:700">点击命名帝国</span>
                   <span class="honor-name-edit" style="font-size:0.75em;color:var(--dim);opacity:0.5;justify-self:end;transition:all 0.2s">✏️</span>
                 </div>
                 <!-- 总分 + 评级徽章 -->
@@ -4350,7 +4452,7 @@ html,body{height:100%;overflow:hidden;font-family:var(--font-body);background:va
   <div class="intro-glow"></div>
   <div style="font-size:1.6em;margin-bottom:4px;position:relative">🧬</div>
   <div class="intro-title">BIOSPHERE</div>
-  <div class="intro-subtitle">微 生 物 帝 国</div>
+  <div class="intro-subtitle">微 生 物 帝 国 · 菌 主 觉 醒</div>
 
   <!-- Tab 切换栏 -->
   <div class="intro-tabs" role="tablist" aria-label="教程导航" id="introTabs">
@@ -4362,14 +4464,21 @@ html,body{height:100%;overflow:hidden;font-family:var(--font-body);background:va
 
   <!-- Page 1: 欢迎 -->
   <div class="intro-page active" id="introPageWelcome" data-page="welcome">
-    <div class="intro-story">
-      你是一团刚刚诞生的<b>原始液泡</b>——宇宙中最微小的生命形式。<br>
-      通过<b>采集资源、研究科技、建造设施</b>，从一无所有逐步进化，<br>
-      经历 <b>5 个文明阶段</b>，最终建造出终极生物奇观！
+    <div class="intro-story" style="text-align:left;line-height:1.7">
+      <div style="text-align:center;font-size:1.1em;margin-bottom:8px;color:#06d6a0;font-weight:700">👑 欢迎，菌主大人。</div>
+      你是这片培养皿中<b>唯一的意志</b>——一位刚刚觉醒的<b>菌主</b>。<br>
+      你的领地此刻只有一团原始液泡和无尽的可能性。<br><br>
+      作为菌主，你将：<br>
+      <span style="color:#22c55e">🌱</span> <b>建造</b>各种微生物设施，采集并转化资源<br>
+      <span style="color:#f97316">🔬</span> <b>研究</b>科技，解锁更强大的生物机制<br>
+      <span style="color:#3b82f6">⛓</span> <b>连接</b>传送带，构建自动化资源物流网络<br>
+      <span style="color:#a855f7">🧬</span> <b>进化</b>你的菌群，提升全局效率<br><br>
+      从一无所有，经历 <b style="color:#fbbf24">5 个文明阶段</b>，<br>
+      最终建造出终极生物奇观——<b style="color:#c084fc">征服整个微观宇宙</b>！
     </div>
     <div class="intro-goal">
-      <div class="intro-goal-label">🏛️ 终极目标</div>
-      <div class="intro-goal-text">建造「微型戴森球」— 征服微生物宇宙！</div>
+      <div class="intro-goal-label">👑 菌主的终极使命</div>
+      <div class="intro-goal-text">建造「微型戴森球」— 成为微观宇宙的主宰！</div>
     </div>
     <div class="intro-roadmap">
       <div class="intro-phase" style="border-color:var(--green)20">
@@ -4396,6 +4505,9 @@ html,body{height:100%;overflow:hidden;font-family:var(--font-body);background:va
         <div class="intro-phase-icon">🏛️</div>
         <div class="intro-phase-name" style="color:var(--purple)">奇观</div>
       </div>
+    </div>
+    <div style="text-align:center;font-size:0.68em;color:rgba(255,255,255,0.35);margin-top:6px;font-style:italic">
+      "一切伟大的帝国，都始于一颗不安分的菌。" — 菌主语录
     </div>
   </div>
 
@@ -4504,7 +4616,7 @@ html,body{height:100%;overflow:hidden;font-family:var(--font-body);background:va
     </div>
   </div>
 
-  <button class="intro-start-btn" onclick="G.closeIntro()" style="margin-top:10px">▸ 开始冒险</button>
+  <button class="intro-start-btn" onclick="G.closeIntro()" style="margin-top:10px">👑 觉醒吧，菌主！</button>
   <div style="font-size:0.6em;color:var(--dim);margin-top:8px;position:relative">顶部栏 ❓ 按钮可重新查看</div>
 </div>
 
@@ -4534,16 +4646,20 @@ html,body{height:100%;overflow:hidden;font-family:var(--font-body);background:va
     window.supaReady = false;
   }
 </script>
-<script src="game.js?v=20260321d"></script>
+<script src="game.js?v=20260322c"></script>
 <!-- Nickname Popup -->
-<div class="nickname-popup" id="nicknamePopup" role="dialog" aria-modal="true" aria-label="设置昵称" aria-hidden="true">
-  <div style="font-family:'Orbitron',monospace;font-size:0.85em;color:var(--cyan);letter-spacing:2px;margin-bottom:10px">🧬 设置昵称</div>
-  <div style="font-size:0.75em;color:var(--dim);margin-bottom:12px">给你的微生物帝国取个名字，好友可以在排行榜上看到你！</div>
-  <input type="text" id="nicknameInput" maxlength="12" placeholder="输入昵称（2-12字符）"
-    style="width:100%;padding:8px 12px;background:rgba(20,32,64,0.6);border:1px solid var(--cyan);border-radius:4px;color:var(--bright);font-size:0.85em;font-family:'Rajdhani',sans-serif;outline:none;text-align:center;margin-bottom:12px">
+<div class="nickname-popup" id="nicknamePopup" role="dialog" aria-modal="true" aria-label="命名你的帝国" aria-hidden="true">
+  <div style="font-family:'Orbitron',monospace;font-size:0.85em;color:var(--cyan);letter-spacing:2px;margin-bottom:10px">🧬 命名你的帝国</div>
+  <div style="font-size:0.75em;color:var(--dim);margin-bottom:12px">给你的微生物帝国取个名字，格式为「xx帝国」，好友可以在排行榜上看到你！</div>
+  <div style="display:flex;align-items:center;margin-bottom:12px;gap:0;width:100%;box-sizing:border-box">
+    <input type="text" id="nicknameInput" maxlength="8" placeholder="输入名称（2-8字符）"
+      style="flex:1;min-width:0;padding:8px 12px;background:rgba(20,32,64,0.6);border:1px solid var(--cyan);border-right:none;border-radius:4px 0 0 4px;color:var(--bright);font-size:0.85em;font-family:'Rajdhani',sans-serif;outline:none;text-align:center;box-sizing:border-box">
+    <span style="padding:8px 14px;background:rgba(6,214,160,0.12);border:1px solid var(--cyan);border-left:none;border-radius:0 4px 4px 0;color:var(--cyan);font-size:0.85em;font-family:'Rajdhani',sans-serif;font-weight:700;white-space:nowrap;flex-shrink:0">帝国</span>
+  </div>
   <div style="display:flex;gap:8px;justify-content:center">
+    <button onclick="G.randomizeNickname()" style="padding:6px 16px;background:rgba(168,85,247,0.15);border:1px solid rgba(168,85,247,0.5);color:#a855f7;border-radius:4px;cursor:pointer;font-family:'Rajdhani',sans-serif;font-weight:700;font-size:0.85em;transition:all 0.2s">🎲 随机</button>
     <button onclick="G.confirmNickname()" style="padding:6px 24px;background:rgba(6,214,160,0.15);border:1px solid var(--cyan);color:var(--cyan);border-radius:4px;cursor:pointer;font-family:'Rajdhani',sans-serif;font-weight:700;font-size:0.85em;transition:all 0.2s">确认</button>
-    <button onclick="G.closeNickname()" class="recycle-no">跳过</button>
+    <button onclick="G.skipNickname()" class="recycle-no">随机一个</button>
   </div>
 </div>
 
