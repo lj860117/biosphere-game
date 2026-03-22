@@ -46,6 +46,15 @@
   --cyan:#06d6a0;--green:#22c55e;--blue:#3b82f6;--purple:#a855f7;
   --orange:#f97316;--yellow:#eab308;--red:#ef4444;--pink:#ec4899;
   --text:#b8c8dc;--dim:#8da8c2;--bright:#e0f0ff;
+  /* ═══ 品牌色彩系统 2.0 ═══ */
+  --brand-primary:#06d6a0;        /* 生命青 — 品牌标识色 */
+  --brand-primary-light:#34d399;  /* 浅生命青 — 悬停态 */
+  --brand-primary-dark:#059669;   /* 深生命青 — 按下态 */
+  --brand-primary-glow:rgba(6,214,160,0.3);
+  --brand-primary-tint:rgba(6,214,160,0.06);
+  --brand-accent:#a855f7;  /* 进化紫 — 升级/进化/高等级 */
+  --brand-warm:#f97316;    /* 能量橙 — 活跃/能量/代谢 */
+  --brand-cool:#3b82f6;    /* 信息蓝 — 数据/物流/系统 */
   /* 语义色 — 用于 JS 动态样式统一引用 */
   --color-max:#a855f7;--color-upgrade:#fbbf24;--color-success:#22c55e;
   --color-info:#7fb8d8;--color-muted:#5a7a9a;--color-muted-dark:#3a5a6a;
@@ -59,10 +68,25 @@
   --status-reward:#fbbf24;   /* 成就/金色仅此用 */
   /* 字号阶梯 — 统一规范 */
   --fs-2xs:0.55em;--fs-xs:0.65em;--fs-sm:0.75em;--fs-md:0.85em;--fs-lg:0.95em;--fs-xl:1.05em;
+  --fs-2xl:1.3em;--fs-3xl:1.6em;--fs-hero:2.2em;  /* 扩展：面板标题/阶段名称/品牌仪式 */
   /* K4: 3档字体层级 — 标题/正文/辅助 */
-  --font-heading:'Orbitron',monospace;  /* 仅用于标题、数字强调 */
-  --font-body:'Rajdhani',sans-serif;    /* 正文、按钮、描述 */
-  --font-mono:'Share Tech Mono',monospace; /* 数据、速率、造价 */
+  --font-heading:'Orbitron','Noto Sans SC','PingFang SC','Microsoft YaHei',sans-serif;
+  --font-body:'Rajdhani','Noto Sans SC','PingFang SC','Microsoft YaHei',sans-serif;
+  --font-mono:'Share Tech Mono','Noto Sans Mono',monospace;
+  --font-cn:'Noto Sans SC','PingFang SC','Microsoft YaHei',sans-serif;
+  /* 字重规范 */
+  --fw-regular:400;--fw-medium:500;--fw-semibold:600;--fw-bold:700;--fw-black:900;
+  /* 行高规范 */
+  --lh-tight:1.15;--lh-normal:1.45;--lh-relaxed:1.65;
+  /* ═══ 品牌缓动函数 ═══ */
+  --ease-organic:cubic-bezier(0.25,0.8,0.25,1);    /* 有机生物感 — 默认 */
+  --ease-spring:cubic-bezier(0.34,1.56,0.64,1);    /* 弹性 — 建造/弹出 */
+  --ease-gentle:cubic-bezier(0.4,0,0.2,1);          /* 柔和 — 淡入淡出 */
+  --ease-sharp:cubic-bezier(0.16,1,0.3,1);          /* 锐利 — 科技感 */
+  --ease-bounce:cubic-bezier(0.68,-0.6,0.32,1.6);   /* 弹跳 — 奖励/成就 */
+  /* ═══ 品牌时长 Token ═══ */
+  --dur-instant:80ms;--dur-fast:150ms;--dur-normal:300ms;
+  --dur-slow:600ms;--dur-dramatic:1200ms;--dur-ceremony:3000ms;
   /* 间距阶梯 */
   --sp-3xs:1px;--sp-2xs:2px;--sp-xs:4px;--sp-xs-sm:3px;--sp-sm-md:5px;--sp-sm:6px;--sp-md:8px;--sp-md-lg:10px;--sp-lg:12px;--sp-xl:14px;--sp-2xl:16px;--sp-xl-2xl:18px;--sp-3xl:20px;--sp-4xl:24px;--sp-5xl:28px;
   /* 圆角 */
@@ -72,7 +96,7 @@
   /* 阶段动态色 — 通过JS在阶段切换时更新，实现"世界随文明进化而变色" */
   --phase-primary:#22c55e;
   --phase-glow:rgba(34,197,94,0.3);
-  --phase-bg-tint:rgba(34,197,94,0.02);
+  --phase-bg-tint:rgba(34,197,94,0.04);
   --phase-border:rgba(34,197,94,0.35);
 }
 /* K4: 字体层级实用类 */
@@ -83,6 +107,12 @@
 .t-label{font-size:var(--fs-sm);color:var(--dim)}
 .t-data{font-family:var(--font-mono);font-weight:700}
 html,body{height:100%;overflow:hidden;font-family:var(--font-body);background:var(--bg);color:var(--text)}
+/* 阶段背景氛围光 — 随阶段色变化 */
+body::after{
+  content:'';position:fixed;inset:0;z-index:-1;pointer-events:none;
+  background:radial-gradient(ellipse 60% 40% at 50% 100%,var(--phase-bg-tint),transparent 70%);
+  transition:background 1.5s var(--ease-gentle);
+}
 
 /* === LEADERBOARD & NICKNAME === */
 .nickname-popup,.leaderboard-popup{
@@ -149,11 +179,22 @@ html,body{height:100%;overflow:hidden;font-family:var(--font-body);background:va
 .topbar::after{content:'';position:absolute;bottom:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--phase-primary) 30%,transparent);transition:background 1.5s ease}
 .logo{
   width:var(--logo-size);height:var(--logo-size);border-radius:50%;flex-shrink:0;
-  background:radial-gradient(circle at 35% 35%,var(--cyan),#003a3a);
-  display:flex;align-items:center;justify-content:center;
-  box-shadow:0 0 15px rgba(6,214,160,0.25);
-  animation:pulse 3s ease-in-out infinite;
+  background:radial-gradient(circle at 55% 45%,var(--brand-primary) 20%,rgba(6,214,160,0.3) 40%,transparent 70%);
+  border:2px solid var(--brand-primary);
+  box-shadow:0 0 12px var(--brand-primary-glow);
+  position:relative;
+  animation:cellBreath 4s var(--ease-organic) infinite;
 }
+/* 品牌Logo — 细胞器(核) */
+.logo::before{
+  content:'';position:absolute;
+  width:10px;height:10px;border-radius:50%;
+  background:var(--brand-primary);
+  top:35%;left:40%;
+  animation:organelleFloat 6s var(--ease-organic) infinite;
+}
+@keyframes cellBreath{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
+@keyframes organelleFloat{0%,100%{transform:translate(0,0)}33%{transform:translate(2px,-1px)}66%{transform:translate(-1px,2px)}}
 @keyframes fadeIn{0%{opacity:0;transform:translateY(4px)}100%{opacity:1;transform:translateY(0)}}
 /* J1: 菌主形象常驻 */
 .host-avatar{
@@ -284,6 +325,18 @@ html,body{height:100%;overflow:hidden;font-family:var(--font-body);background:va
   100%{box-shadow:0 0 0 0 rgba(6,214,160,0);transform:scale(1)}
 }
 .res-card.res-unlock-anim{animation:resUnlockPulse 0.7s ease-out}
+/* ★ C3: 资源溢出提示 — 产量远超消耗时卡片边框脉冲 */
+.res-card.res-overflow{
+  border-color:rgba(251,191,36,0.3);
+  animation:resOverflowPulse 2s ease-in-out infinite;
+}
+.res-card.res-overflow .res-rate::after{
+  content:' ⚡溢出';font-size:0.85em;color:rgba(251,191,36,0.7);
+}
+@keyframes resOverflowPulse{
+  0%,100%{border-color:rgba(251,191,36,0.15)}
+  50%{border-color:rgba(251,191,36,0.35)}
+}
 .res-flash{position:absolute;inset:0;opacity:0;transition:opacity 0.25s;border-radius:var(--r-md);pointer-events:none}
 .res-flash.on{opacity:1}
 
@@ -491,6 +544,27 @@ html,body{height:100%;overflow:hidden;font-family:var(--font-body);background:va
 .action-btn:hover:not(.locked){background:rgba(6,214,160,0.04);border-color:#1a4a50;transform:translateX(2px)}
 .action-btn.active{border-color:var(--cyan);background:rgba(6,214,160,0.06);box-shadow:0 0 10px rgba(6,214,160,0.08)}
 .action-btn.locked{opacity:0.25;cursor:not-allowed;pointer-events:none}
+/* ★ D: 剪影建筑卡片 — 模糊神秘感 */
+.action-btn.bld-silhouette{
+  opacity:0.35;cursor:pointer;pointer-events:auto;
+  border:1px dashed rgba(255,255,255,0.08);
+  background:rgba(0,0,0,0.15);
+  transition:opacity 0.3s, border-color 0.3s;
+}
+.action-btn.bld-silhouette:hover{
+  opacity:0.5;border-color:rgba(255,255,255,0.15);
+}
+/* D: 下一个待解锁建筑 — 半透明但可点击 */
+.action-btn.bld-next-unlock{
+  opacity:0.45;cursor:pointer;pointer-events:auto;
+  border:1px dashed rgba(6,214,160,0.2);
+}
+.action-btn.bld-next-unlock:hover{
+  opacity:0.6;border-color:rgba(6,214,160,0.35);
+}
+.action-btn.bld-next-unlock .act-prod-hint{
+  color:var(--orange);opacity:0.9;
+}
 .action-btn.cant-afford{opacity:0.45;filter:grayscale(0.4)}
 .action-btn.cant-afford .act-cost{color:#ef4444}
 .action-btn.cant-afford:hover{opacity:0.65;filter:grayscale(0.2)}
@@ -794,6 +868,70 @@ html,body{height:100%;overflow:hidden;font-family:var(--font-body);background:va
   background:radial-gradient(ellipse at 30% 30%,rgba(6,214,160,0.08),transparent 70%);
   pointer-events:none;
 }
+/* 已完成科技 — 折叠态（默认） */
+.tt-node.done.collapsed{
+  padding:var(--sp-2xs) var(--sp-sm);cursor:pointer;
+}
+.tt-node.done.collapsed .tt-desc,
+.tt-node.done.collapsed .tt-cost,
+.tt-node.done.collapsed .tt-prereq{display:none}
+.tt-node.done.collapsed .tt-name{
+  font-size:0.82em;font-weight:600;
+}
+/* 折叠态效果标签行 */
+.tt-pills{display:flex;flex-wrap:wrap;gap:3px;margin-top:3px}
+.tt-pill{
+  display:inline-flex;align-items:center;gap:2px;
+  font-size:0.65em;font-weight:600;line-height:1;
+  padding:2px 6px;border-radius:10px;
+  background:rgba(6,214,160,0.1);color:#06d6a0;
+  border:1px solid rgba(6,214,160,0.2);
+  white-space:nowrap;
+}
+.tt-pill.unlock{background:rgba(168,85,247,0.1);color:#c084fc;border-color:rgba(168,85,247,0.2)}
+.tt-pill.boost{background:rgba(234,179,8,0.1);color:#eab308;border-color:rgba(234,179,8,0.2)}
+.tt-pill.special{background:rgba(56,189,248,0.1);color:#38bdf8;border-color:rgba(56,189,248,0.2)}
+/* 展开动画 */
+.tt-node.done .tt-detail{
+  max-height:0;overflow:hidden;opacity:0;
+  transition:max-height 0.3s var(--ease-organic,ease),opacity 0.2s ease;
+}
+.tt-node.done.expanded .tt-detail{
+  max-height:120px;opacity:1;
+}
+/* 折叠指示器 */
+.tt-fold-icon{
+  font-size:0.6em;color:var(--dim);margin-left:auto;
+  transition:transform 0.3s ease;
+}
+.tt-node.done.expanded .tt-fold-icon{transform:rotate(180deg)}
+/* 科技总览条 */
+.tt-overview{
+  display:flex;align-items:center;gap:var(--sp-sm);
+  padding:var(--sp-xs) var(--sp-sm);margin-bottom:var(--sp-xs);
+  background:linear-gradient(135deg,rgba(6,214,160,0.04),transparent);
+  border:1px solid rgba(6,214,160,0.12);border-radius:6px;
+  font-size:0.75em;color:var(--dim);
+}
+.tt-overview-bar{
+  flex:1;height:4px;background:rgba(255,255,255,0.06);border-radius:2px;overflow:hidden;
+}
+.tt-overview-fill{
+  height:100%;background:linear-gradient(90deg,#06d6a0,#38bdf8);border-radius:2px;
+  transition:width 0.5s var(--ease-organic,ease);
+}
+.tt-overview-route{
+  font-size:0.9em;color:var(--text);opacity:0.7;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:180px;
+}
+/* 活细胞呼吸 — 已完成科技 */
+.tt-node.done.collapsed{
+  animation:techBreath 4s ease-in-out infinite;
+}
+@keyframes techBreath{
+  0%,100%{box-shadow:0 0 0 rgba(6,214,160,0)}
+  50%{box-shadow:0 0 8px rgba(6,214,160,0.08)}
+}
 .tt-node.locked{opacity:0.25;cursor:not-allowed;pointer-events:none}
 /* v3.0 §3: 前置条件未满足 — 半透明但可交互（点击时弹提示） */
 .tt-node.prereq-locked{
@@ -860,6 +998,8 @@ html,body{height:100%;overflow:hidden;font-family:var(--font-body);background:va
 /* 分支选中高亮连线 */
 .tt-branches .tt-branch.chosen::before{background:rgba(6,214,160,0.4)}
 .tt-branches .tt-branch.rejected::before{background:rgba(239,68,68,0.2)}
+.tt-branches .tt-branch.chosen .tt-node{border-color:rgba(6,214,160,0.35)}
+.tt-branches .tt-branch.rejected .tt-node .tt-name{text-decoration:line-through;text-decoration-color:rgba(239,68,68,0.3)}
 
 /* === CENTER: PETRI DISH === */
 .center{
@@ -911,8 +1051,368 @@ html,body{height:100%;overflow:hidden;font-family:var(--font-body);background:va
 #bgCanvas{z-index:0}#partCanvas{z-index:5}
 .grid{
   position:relative;display:grid;gap:var(--sp-2xl);padding:var(--sp-2xl) var(--sp-4xl);z-index:2;
-  justify-content:center;align-content:start;touch-action:manipulation;
-  width:fit-content;min-width:100%;
+  justify-content:center;align-content:center;touch-action:manipulation;
+  width:fit-content;min-width:100%;min-height:100%;
+}
+
+/* ★ H1: 生物膜边界 — .grid::before 作为膜层 */
+.grid::before{
+  content:'';position:absolute;
+  inset:calc(var(--sp-2xl) - 6px) calc(var(--sp-4xl) - 6px);
+  border:2px solid var(--phase-primary-40, rgba(34,197,94,0.4));
+  border-radius:14px;
+  box-shadow:
+    0 0 14px var(--phase-primary-20, rgba(34,197,94,0.2)),
+    inset 0 0 10px var(--phase-primary-10, rgba(34,197,94,0.1));
+  animation:membraneBreathe var(--membrane-speed, 4s) ease-in-out infinite;
+  pointer-events:none;z-index:1;
+  transition:border-color 1s, box-shadow 1s;
+}
+@keyframes membraneBreathe{
+  0%,100%{
+    box-shadow:0 0 14px var(--phase-primary-20, rgba(34,197,94,0.2)),
+               inset 0 0 10px var(--phase-primary-10, rgba(34,197,94,0.1));
+    border-color:var(--phase-primary-30, rgba(34,197,94,0.3));
+    transform:scale(1);
+  }
+  50%{
+    box-shadow:0 0 22px var(--phase-primary-30, rgba(34,197,94,0.3)),
+               inset 0 0 14px var(--phase-primary-15, rgba(34,197,94,0.15));
+    border-color:var(--phase-primary-45, rgba(34,197,94,0.45));
+    transform:scale(1.003);
+  }
+}
+/* H1: 膜阶段视觉差异 — 随阶段变化颜色和呼吸速度 */
+.grid[data-phase="1"]::before{--membrane-speed:5s}
+.grid[data-phase="2"]::before{--membrane-speed:4s}
+.grid[data-phase="3"]::before{--membrane-speed:3.5s}
+.grid[data-phase="4"]::before{--membrane-speed:3s}
+.grid[data-phase="5"]::before{--membrane-speed:2.5s}
+
+/* ★ C2: 膜颤抖 — 占用率档位响应 */
+/* 中占用(40-70%): 微弱加速 */
+.grid[data-occupancy="1"]::before{
+  --membrane-speed:3.5s;
+}
+/* 高占用(70-90%): 明显颤抖 + 起泡 */
+.grid[data-occupancy="2"]::before{
+  --membrane-speed:2s;
+  border-width:2.5px;
+  animation:membraneTremble 2s ease-in-out infinite, membraneBubble 4s ease-in-out infinite;
+}
+/* 满溢(90%+): 剧烈颤抖 */
+.grid[data-occupancy="3"]::before{
+  --membrane-speed:1.2s;
+  border-width:3px;
+  animation:membraneTremble 1.2s ease-in-out infinite, membraneBubble 2.5s ease-in-out infinite;
+  filter:brightness(1.2);
+}
+@keyframes membraneTremble{
+  0%,100%{transform:scale(1)}
+  12%{transform:scale(1.004) skew(0.2deg)}
+  25%{transform:scale(0.998) skew(-0.1deg)}
+  37%{transform:scale(1.003)}
+  50%{transform:scale(1.005) skew(-0.15deg)}
+  62%{transform:scale(0.999) skew(0.1deg)}
+  75%{transform:scale(1.002)}
+  87%{transform:scale(0.997) skew(0.15deg)}
+}
+@keyframes membraneBubble{
+  0%,100%{border-radius:14px}
+  15%{border-radius:14px 16px 14px 12px}
+  35%{border-radius:12px 14px 16px 14px}
+  55%{border-radius:16px 12px 14px 15px}
+  75%{border-radius:14px 15px 12px 16px}
+}
+/* C2: 核心光效随占用率增强 */
+.grid[data-occupancy="2"] .core-cell{
+  box-shadow:inset 0 0 18px rgba(6,214,160,0.2), 0 0 24px rgba(6,214,160,0.15);
+}
+.grid[data-occupancy="3"] .core-cell{
+  box-shadow:inset 0 0 22px rgba(6,214,160,0.3), 0 0 32px rgba(6,214,160,0.2);
+  animation:coreOverflowPulse 1.5s ease-in-out infinite;
+}
+@keyframes coreOverflowPulse{
+  0%,100%{box-shadow:inset 0 0 22px rgba(6,214,160,0.3), 0 0 32px rgba(6,214,160,0.2)}
+  50%{box-shadow:inset 0 0 30px rgba(6,214,160,0.4), 0 0 40px rgba(6,214,160,0.3)}
+}
+
+/* ★ H2: 膜扩张动画序列 */
+/* Phase 1: 膜剧烈颤抖 */
+.grid.membrane-expanding::before{
+  animation:membraneExpandShake 0.4s ease-in-out infinite !important;
+  border-color:var(--phase-primary) !important;
+  border-width:3px !important;
+  filter:brightness(1.3);
+}
+@keyframes membraneExpandShake{
+  0%,100%{transform:scale(1)}
+  10%{transform:scale(1.01) skew(0.5deg)}
+  30%{transform:scale(0.99) skew(-0.3deg)}
+  50%{transform:scale(1.02) skew(0.4deg)}
+  70%{transform:scale(0.98) skew(-0.5deg)}
+  90%{transform:scale(1.01) skew(0.2deg)}
+}
+/* Phase 2: 膜起泡变形 */
+.grid.membrane-bursting::before{
+  animation:membraneBurstSwell 0.4s ease-in forwards !important;
+  filter:brightness(1.5);
+}
+@keyframes membraneBurstSwell{
+  0%{border-radius:14px;border-width:3px}
+  50%{border-radius:20px 10px 18px 12px;border-width:4px}
+  100%{border-radius:8px;border-width:5px;opacity:0.9}
+}
+/* Phase 3: 膜破裂 — 消失 */
+.grid.membrane-burst::before{
+  opacity:0 !important;
+  transition:opacity 0.2s;
+}
+/* H2: 膜破裂粒子 */
+.membrane-burst-particle{
+  position:fixed;width:6px;height:3px;border-radius:3px;
+  background:var(--phase-primary, rgba(6,214,160,0.6));
+  box-shadow:0 0 6px var(--phase-primary, rgba(6,214,160,0.4));
+  pointer-events:none;z-index:9999;
+  animation:membraneBurstFly 1s ease-out forwards;
+  transform-origin:center;
+}
+@keyframes membraneBurstFly{
+  0%{opacity:1;transform:translate(0,0) rotate(0deg)}
+  100%{opacity:0;transform:translate(var(--bx,0),var(--by,0)) rotate(180deg)}
+}
+/* Phase 4: 膜重组 — 新膜渐入 */
+.grid.membrane-reforming::before{
+  animation:membraneReform 0.8s ease-out forwards !important;
+}
+@keyframes membraneReform{
+  0%{opacity:0;border-width:0;transform:scale(1.1)}
+  40%{opacity:0.5;border-width:1px}
+  100%{opacity:1;border-width:1.5px;transform:scale(1)}
+}
+
+/* ★ H3: 膜外暗色培养基 — dish-scroll-inner 上的径向渐暗 */
+.dish-scroll-inner::after{
+  content:'';position:absolute;inset:0;z-index:1;pointer-events:none;
+  background:radial-gradient(
+    ellipse 55% 55% at 50% 50%,
+    transparent 0%,
+    rgba(0,0,0,0.15) 50%,
+    rgba(0,0,0,0.4) 75%,
+    rgba(0,0,0,0.55) 100%
+  );
+}
+
+/* ★ J2: 供能链接 SVG 叠加层 */
+.supply-link-svg{
+  position:absolute;top:0;left:0;width:100%;height:100%;
+  z-index:4;pointer-events:none;overflow:visible;
+}
+.supply-link-path{
+  fill:none;stroke-linecap:round;
+  animation:supplyLinkPulse 2s ease-in-out infinite;
+}
+@keyframes supplyLinkPulse{
+  0%,100%{opacity:0.6}
+  50%{opacity:0.9}
+}
+.supply-link-particle{
+  fill:var(--phase-primary, #22c55e);
+  filter:blur(1px);
+}
+
+/* ★ J1: 帝国核心格样式 */
+.cell.core-cell{
+  cursor:pointer;
+  border-width:2px;
+  border-color:var(--core-color, #4a6a5a) !important;
+  background:radial-gradient(circle,var(--core-glow, rgba(74,106,90,0.15)) 0%,rgba(8,14,24,0.8) 80%);
+  position:relative;
+  z-index:3;
+}
+.cell.core-cell::after{
+  content:'';position:absolute;inset:-6px;border-radius:6px;
+  background:radial-gradient(circle,var(--core-glow, rgba(74,106,90,0.15)) 0%,transparent 70%);
+  animation:corePulse 4s ease-in-out infinite;pointer-events:none;z-index:-1;
+}
+.cell.core-cell .core-emoji{
+  font-size:1.8em;filter:drop-shadow(0 0 8px var(--core-color, #4a6a5a));
+  animation:coreBreathe 4s ease-in-out infinite;
+}
+.cell.core-cell .core-label{
+  font-size:0.65em;color:var(--core-color, #4a6a5a);opacity:0.9;
+  text-shadow:0 0 4px var(--core-glow, rgba(74,106,90,0.15));
+}
+/* 核心搏动动画 */
+@keyframes corePulse{
+  0%,100%{opacity:0.4;transform:scale(1)}
+  50%{opacity:0.8;transform:scale(1.08)}
+}
+@keyframes coreBreathe{
+  0%,100%{transform:scale(1)}
+  50%{transform:scale(1.06)}
+}
+/* ★ J4: 核心5阶段视觉渐进 — 从微弱液泡到微型太阳 */
+/* P1 — 原始液泡：微弱绿色，几乎不溢出 */
+.core-phase-1::after{
+  animation-duration:4s;
+  inset:-4px;opacity:0.3;
+}
+.core-phase-1 .core-emoji{animation-duration:4s}
+.core-phase-1 .core-label{opacity:0.6}
+
+/* P2 — 原核聚落：明亮绿色，光芒溢出到邻近格子边缘 */
+.core-phase-2::after{
+  animation-duration:3s;inset:-10px;opacity:0.5;
+}
+.core-phase-2 .core-emoji{animation-duration:3s}
+.core-phase-2{
+  box-shadow:0 0 16px rgba(6,214,160,0.12);
+}
+
+/* P3 — 生物膜枢纽：蓝色光晕，呼吸节奏感 */
+.core-phase-3::after{
+  animation-duration:2.5s;inset:-14px;opacity:0.6;
+  background:radial-gradient(circle,rgba(56,189,248,0.2) 0%,transparent 70%);
+}
+.core-phase-3 .core-emoji{
+  animation-duration:2.5s;
+  filter:drop-shadow(0 0 8px rgba(56,189,248,0.6));
+}
+.core-phase-3{
+  box-shadow:0 0 20px rgba(56,189,248,0.12);
+}
+.core-phase-3 .core-label{color:rgba(56,189,248,0.9);text-shadow:0 0 4px rgba(56,189,248,0.3)}
+
+/* P4 — 菌落中枢：金色辐射，脉冲式心跳 */
+.core-phase-4::after{
+  animation-duration:2s;inset:-18px;opacity:0.7;
+  background:radial-gradient(circle,rgba(251,191,36,0.25) 0%,transparent 70%);
+}
+.core-phase-4 .core-emoji{
+  animation-duration:2s;
+  filter:drop-shadow(0 0 10px rgba(251,191,36,0.7));
+}
+.core-phase-4{
+  box-shadow:0 0 24px rgba(251,191,36,0.15);
+  border-color:rgba(251,191,36,0.4) !important;
+}
+.core-phase-4 .core-label{color:rgba(251,191,36,0.9);text-shadow:0 0 6px rgba(251,191,36,0.3)}
+
+/* P5 — 生命圣殿：紫色耀光+星尘粒子 */
+.core-phase-5::after{
+  animation-duration:1.5s;inset:-22px;opacity:0.8;
+  background:radial-gradient(circle,rgba(168,85,247,0.3) 0%,rgba(129,140,248,0.1) 50%,transparent 70%);
+}
+.core-phase-5 .core-emoji{
+  animation-duration:1.5s;
+  filter:drop-shadow(0 0 14px rgba(168,85,247,0.8));
+}
+.core-phase-5{
+  box-shadow:0 0 32px rgba(168,85,247,0.2), 0 0 64px rgba(168,85,247,0.08);
+  border-color:rgba(168,85,247,0.5) !important;
+}
+.core-phase-5 .core-label{color:rgba(168,85,247,0.9);text-shadow:0 0 8px rgba(168,85,247,0.4)}
+
+/* J4: P3+ 核心微粒子环绕 */
+.core-phase-3 .core-emoji::before,
+.core-phase-4 .core-emoji::before,
+.core-phase-5 .core-emoji::before{
+  content:'';position:absolute;inset:-8px;border-radius:50%;
+  border:1px dashed var(--core-color);opacity:0.2;
+  animation:coreOrbit 8s linear infinite;
+  pointer-events:none;
+}
+.core-phase-4 .core-emoji::before{
+  opacity:0.3;border-color:rgba(251,191,36,0.5);animation-duration:6s;
+}
+.core-phase-5 .core-emoji::before{
+  opacity:0.4;border-color:rgba(168,85,247,0.6);animation-duration:4s;
+  border-width:2px;inset:-12px;
+}
+@keyframes coreOrbit{
+  0%{transform:rotate(0deg)}
+  100%{transform:rotate(360deg)}
+}
+
+/* J4: P5 星尘粒子喷发 */
+.core-stardust{
+  position:absolute;inset:0;pointer-events:none;z-index:2;
+}
+.stardust-p{
+  position:absolute;left:50%;top:50%;
+  width:3px;height:3px;border-radius:50%;
+  background:rgba(168,85,247,0.8);
+  box-shadow:0 0 4px rgba(168,85,247,0.6);
+  animation:stardustFloat 3s ease-in-out var(--sd-delay,0s) infinite;
+  transform:rotate(var(--sd-angle,0deg)) translateX(0);
+}
+@keyframes stardustFloat{
+  0%{opacity:0;transform:rotate(var(--sd-angle,0deg)) translateX(4px)}
+  20%{opacity:1}
+  80%{opacity:0.6}
+  100%{opacity:0;transform:rotate(calc(var(--sd-angle,0deg) + 120deg)) translateX(24px)}
+}
+/* J4: P3+ 微粒子漂浮 */
+.core-micro-particles{
+  position:absolute;inset:0;pointer-events:none;z-index:1;
+}
+.core-mp{
+  position:absolute;width:2px;height:2px;border-radius:50%;
+  background:var(--mp-color, rgba(56,189,248,0.6));
+  box-shadow:0 0 3px var(--mp-color, rgba(56,189,248,0.4));
+  animation:coreMpDrift 4s ease-in-out calc(var(--mp-i,0) * 1.3s) infinite;
+}
+.core-mp:nth-child(1){left:25%;top:20%}
+.core-mp:nth-child(2){left:70%;top:35%}
+.core-mp:nth-child(3){left:45%;top:75%}
+@keyframes coreMpDrift{
+  0%,100%{opacity:0;transform:translate(0,0)}
+  20%{opacity:0.8}
+  50%{opacity:0.5;transform:translate(6px,-8px)}
+  80%{opacity:0.3;transform:translate(-4px,6px)}
+}
+
+/* J4: P4+ 邻接格子受供辉光 */
+.core-phase-4~.cell.occupied{
+  box-shadow:inset 0 0 4px rgba(251,191,36,0.05);
+}
+.core-phase-5~.cell.occupied{
+  box-shadow:inset 0 0 6px rgba(168,85,247,0.06);
+}
+
+/* ★ J3: 供能状态四档视觉反馈 */
+/* 空闲 — 核心在"等待" */
+.core-supply-idle .core-emoji{opacity:0.7}
+.core-supply-idle::after{animation-duration:5s !important;opacity:0.3}
+/* 部分供能 — 核心活跃起来 */
+.core-supply-partial .core-emoji{opacity:0.9}
+.core-supply-partial::after{opacity:0.6}
+/* 满载 — 核心全力运转 */
+.core-supply-full{
+  border-width:2.5px !important;
+}
+.core-supply-full .core-emoji{
+  opacity:1;
+  filter:drop-shadow(0 0 10px var(--core-color)) drop-shadow(0 0 20px var(--core-glow)) !important;
+}
+.core-supply-full::after{
+  opacity:0.9 !important;
+  animation-timing-function:ease-in-out !important;
+}
+/* 超载 — 核心吃力 */
+.core-supply-overload{
+  border-color:rgba(239,68,68,0.5) !important;
+}
+.core-supply-overload::after{
+  background:radial-gradient(circle,rgba(239,68,68,0.15) 0%,transparent 70%) !important;
+  animation:coreOverloadPulse 1s ease-in-out infinite !important;
+}
+@keyframes coreOverloadPulse{
+  0%,100%{opacity:0.4;transform:scale(1)}
+  25%{opacity:0.7;transform:scale(1.04)}
+  50%{opacity:0.5;transform:scale(1.02)}
+  75%{opacity:0.8;transform:scale(1.06)}
 }
 .cell{
   aspect-ratio:1;
@@ -934,6 +1434,25 @@ html,body{height:100%;overflow:hidden;font-family:var(--font-body);background:va
     radial-gradient(circle at 30% 40%, rgba(6,214,160,0.06) 0%, transparent 60%),
     radial-gradient(circle at 70% 65%, rgba(6,214,160,0.04) 0%, transparent 45%),
     rgba(6,214,160,0.03);
+}
+/* 培养基阶段纹理 — 空格子随阶段变化 */
+.grid[data-phase="1"] .cell:not(.occupied){
+  background:radial-gradient(circle at 30% 40%,rgba(34,197,94,0.03) 30%,transparent 70%),rgba(8,14,24,0.6);
+}
+.grid[data-phase="2"] .cell:not(.occupied){
+  background:radial-gradient(circle,rgba(249,115,22,0.04) 20%,rgba(34,197,94,0.02) 50%,transparent 70%),rgba(8,14,24,0.6);
+}
+.grid[data-phase="3"] .cell:not(.occupied){
+  background:radial-gradient(circle,rgba(59,130,246,0.04) 25%,transparent 60%),
+    repeating-conic-gradient(rgba(59,130,246,0.02) 0% 25%,transparent 0% 50%),rgba(8,14,24,0.6);
+}
+.grid[data-phase="4"] .cell:not(.occupied){
+  background:radial-gradient(circle,rgba(234,179,8,0.04) 20%,transparent 55%),
+    radial-gradient(circle at 70% 30%,rgba(234,179,8,0.02) 15%,transparent 50%),rgba(8,14,24,0.6);
+}
+.grid[data-phase="5"] .cell:not(.occupied){
+  background:radial-gradient(circle,rgba(168,85,247,0.05) 20%,transparent 55%),
+    radial-gradient(circle at 30% 70%,rgba(168,85,247,0.03) 15%,transparent 50%),rgba(8,14,24,0.6);
 }
 .cell.occupied{cursor:default;border-width:1.5px}
 .cell.occupied:hover{border-width:2px}
@@ -1017,6 +1536,44 @@ html,body{height:100%;overflow:hidden;font-family:var(--font-body);background:va
 .cell.cell-competition-severe{
   border-color:rgba(239,68,68,0.5) !important;
   animation:cellBlockedPulse 2s ease-in-out infinite;
+}
+
+/* ★ 闲置碳源标识 — 黄灰色调（阻塞红 > 闲置黄灰 > 休眠灰） */
+.cell.cell-idle-collector{
+  border-color:rgba(251,191,36,0.5) !important;
+  animation:cellIdlePulse 2.5s ease-in-out infinite;
+}
+.cell.cell-idle-collector .cell-emoji{opacity:0.5;filter:saturate(0.3)}
+.cell.cell-idle-collector .work-dot{background:#a0a0a0;box-shadow:0 0 3px #a0a0a0}
+.cell-idle-badge{
+  position:absolute;top:0;left:0;right:0;z-index:10;pointer-events:none;
+  text-align:center;font-size:0.48em;font-weight:800;
+  color:#fbbf24;background:rgba(100,80,20,0.82);
+  padding:var(--sp-3xs) 0;letter-spacing:0.5px;
+  border-radius:3px 3px 0 0;
+  text-shadow:0 1px 2px rgba(0,0,0,0.8);
+  animation:cellIdleBadgePulse 2.5s ease-in-out infinite;
+}
+@keyframes cellIdlePulse{
+  0%,100%{border-color:rgba(251,191,36,0.35);box-shadow:0 0 3px rgba(251,191,36,0.08)}
+  50%{border-color:rgba(251,191,36,0.6);box-shadow:0 0 10px rgba(251,191,36,0.15)}
+}
+@keyframes cellIdleBadgePulse{
+  0%,100%{opacity:0.8}
+  50%{opacity:1;text-shadow:0 0 5px rgba(251,191,36,0.35)}
+}
+
+/* ★ 核心可升级标识 — 核心格上的升级提示 */
+.core-upgrade-hint{
+  position:absolute;bottom:2px;left:0;right:0;z-index:12;pointer-events:none;
+  text-align:center;font-size:0.44em;font-weight:800;
+  color:#06d6a0;
+  text-shadow:0 0 6px rgba(6,214,160,0.5);
+  animation:coreUpgradeHintPulse 1.8s ease-in-out infinite;
+}
+@keyframes coreUpgradeHintPulse{
+  0%,100%{opacity:0.7;transform:translateY(0)}
+  50%{opacity:1;transform:translateY(-1px);text-shadow:0 0 10px rgba(6,214,160,0.7)}
 }
 
 /* v2.1 休眠状态badge — 灰色调顶部标签 */
@@ -1103,6 +1660,76 @@ html,body{height:100%;overflow:hidden;font-family:var(--font-body);background:va
 .dish-guide-alert.level-warn{color:#fdba74}
 .dish-guide-alert.level-danger{color:#fca5a5;animation:alertTextPulse 1.5s ease-in-out infinite}
 @keyframes alertTextPulse{0%,100%{opacity:0.8}50%{opacity:1}}
+
+/* ★ I1: 引导气泡 — 浮动在格子旁的就近引导 */
+.guide-bubble{
+  position:fixed;z-index:10005;
+  max-width:220px;padding:10px 14px;
+  background:rgba(6,30,50,0.92);
+  border:1.5px solid rgba(6,214,160,0.45);
+  border-radius:10px;
+  box-shadow:0 0 18px rgba(6,214,160,0.15), 0 4px 16px rgba(0,0,0,0.4);
+  backdrop-filter:blur(8px);
+  pointer-events:none;
+  opacity:0;transform:scale(0.9);
+  transition:opacity 0.35s ease, transform 0.35s ease;
+}
+.guide-bubble.active{
+  opacity:1;transform:scale(1);pointer-events:auto;
+}
+.guide-bubble-text{
+  font-family:'Rajdhani',sans-serif;font-size:0.85em;line-height:1.45;
+  color:rgba(255,255,255,0.92);letter-spacing:0.5px;
+}
+/* 箭头 — 四个方向 */
+.guide-bubble-arrow{
+  position:absolute;width:0;height:0;
+  border:7px solid transparent;
+}
+.guide-bubble[data-dir="right"] .guide-bubble-arrow{
+  left:-14px;top:50%;transform:translateY(-50%);
+  border-right-color:rgba(6,214,160,0.45);
+}
+.guide-bubble[data-dir="left"] .guide-bubble-arrow{
+  right:-14px;top:50%;transform:translateY(-50%);
+  border-left-color:rgba(6,214,160,0.45);
+}
+.guide-bubble[data-dir="bottom"] .guide-bubble-arrow{
+  top:-14px;left:50%;transform:translateX(-50%);
+  border-bottom-color:rgba(6,214,160,0.45);
+}
+.guide-bubble[data-dir="top"] .guide-bubble-arrow{
+  bottom:-14px;left:50%;transform:translateX(-50%);
+  border-top-color:rgba(6,214,160,0.45);
+}
+/* 气泡呼吸 */
+.guide-bubble.active{
+  animation:guideBubbleBreathe 3s ease-in-out infinite;
+}
+@keyframes guideBubbleBreathe{
+  0%,100%{box-shadow:0 0 18px rgba(6,214,160,0.15), 0 4px 16px rgba(0,0,0,0.4)}
+  50%{box-shadow:0 0 26px rgba(6,214,160,0.25), 0 4px 20px rgba(0,0,0,0.4)}
+}
+/* 推荐格子高亮 */
+.cell.guide-target{
+  box-shadow:0 0 12px rgba(6,214,160,0.3), inset 0 0 8px rgba(6,214,160,0.15);
+  animation:guideTargetPulse 2s ease-in-out infinite;
+}
+@keyframes guideTargetPulse{
+  0%,100%{box-shadow:0 0 12px rgba(6,214,160,0.3), inset 0 0 8px rgba(6,214,160,0.15)}
+  50%{box-shadow:0 0 20px rgba(6,214,160,0.45), inset 0 0 12px rgba(6,214,160,0.25)}
+}
+
+/* ★ C1b: 邻接啊哈 — 菌丝连接脉冲效果 */
+.cell.aha-adjacency{
+  animation:ahaAdjPulse 0.6s ease-out 3;
+  box-shadow:0 0 16px rgba(6,214,160,0.5), inset 0 0 10px rgba(6,214,160,0.2);
+}
+@keyframes ahaAdjPulse{
+  0%{box-shadow:0 0 6px rgba(6,214,160,0.2), inset 0 0 4px rgba(6,214,160,0.1);transform:scale(1)}
+  50%{box-shadow:0 0 20px rgba(6,214,160,0.6), inset 0 0 12px rgba(6,214,160,0.3);transform:scale(1.04)}
+  100%{box-shadow:0 0 6px rgba(6,214,160,0.2), inset 0 0 4px rgba(6,214,160,0.1);transform:scale(1)}
+}
 
 /* 滚动提示渐变阴影 — 在 dish-view-wrap 的伪元素上实现，不受 dish-view 滚动影响 */
 .dish-view-wrap{position:relative;flex:1;min-height:45vh;display:flex;flex-direction:column}
@@ -1581,12 +2208,12 @@ html,body{height:100%;overflow:hidden;font-family:var(--font-body);background:va
 }
 .event-popup.show{display:block;animation:popIn .3s ease-out}
 @keyframes popIn{0%{opacity:0;transform:translate(-50%,-50%) scale(0.9)}100%{opacity:1;transform:translate(-50%,-50%) scale(1)}}
-.event-popup h3{font-family:'Orbitron',monospace;font-size:0.9em;margin-bottom:var(--sp-sm)}
-.event-popup p{font-size:0.8em;color:#8aa0c0;margin-bottom:var(--sp-lg);line-height:1.3}
+.event-popup h3{font-family:'Orbitron',monospace;font-size:1.1em;margin-bottom:var(--sp-sm)}
+.event-popup p{font-size:0.95em;color:#8aa0c0;margin-bottom:var(--sp-lg);line-height:1.4}
 .event-popup button{
-  padding:var(--sp-sm) var(--sp-3xl);background:rgba(6,214,160,0.12);border:1px solid var(--cyan);
+  padding:var(--sp-sm-md) var(--sp-3xl);background:rgba(6,214,160,0.12);border:1px solid var(--cyan);
   color:var(--cyan);border-radius:4px;cursor:pointer;font-family:'Rajdhani',sans-serif;
-  font-weight:700;font-size:0.8em;transition:all 0.2s;
+  font-weight:700;font-size:0.95em;transition:all 0.2s;
 }
 .event-popup button:hover{background:rgba(6,214,160,0.2)}
 
@@ -1600,7 +2227,7 @@ html,body{height:100%;overflow:hidden;font-family:var(--font-body);background:va
 .milestone.show{display:block;animation:slideDown 0.4s ease-out}
 @keyframes slideDown{0%{opacity:0;transform:translate(-50%,-20px)}100%{opacity:1;transform:translate(-50%,0)}}
 .milestone .icon{font-size:1.5em;margin-bottom:var(--sp-2xs)}
-.milestone .text{font-family:'Orbitron',monospace;font-size:0.7em;color:var(--cyan);letter-spacing:1px}
+.milestone .text{font-family:'Orbitron',monospace;font-size:0.85em;color:var(--cyan);letter-spacing:1px}
 
 /* Tooltip */
 .tooltip{
@@ -2315,7 +2942,7 @@ html,body{height:100%;overflow:hidden;font-family:var(--font-body);background:va
   font-size:0.72em;font-weight:700;color:var(--bright);margin-bottom:var(--sp-xs-sm);
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:200px;
 }
-.belt-action-info{font-size:0.62em;color:var(--dim);margin-bottom:var(--sp-md)}
+.belt-action-info{font-size:0.78em;color:var(--dim);margin-bottom:var(--sp-md)}
 .belt-action-btns{display:flex;flex-direction:column;gap:var(--sp-xs)}
 .belt-action-btn{
   padding:var(--sp-sm-md) var(--sp-md-lg);border-radius:4px;cursor:pointer;
@@ -2599,19 +3226,19 @@ html,body{height:100%;overflow:hidden;font-family:var(--font-body);background:va
   box-shadow:0 0 40px rgba(239,68,68,0.2);display:none;
 }
 .reset-popup.show{display:block;animation:popIn .25s ease-out}
-.reset-title{font-family:'Orbitron',monospace;font-size:0.85em;color:var(--red);margin-bottom:var(--sp-md-lg);letter-spacing:1px}
-.reset-msg{font-size:0.72em;color:var(--dim);margin-bottom:var(--sp-xl);line-height:1.6}
+.reset-title{font-family:'Orbitron',monospace;font-size:1.05em;color:var(--red);margin-bottom:var(--sp-md-lg);letter-spacing:1px}
+.reset-msg{font-size:0.88em;color:var(--dim);margin-bottom:var(--sp-xl);line-height:1.6}
 .reset-btns{display:flex;gap:var(--sp-md);justify-content:center}
 .reset-yes{
-  padding:var(--sp-sm) var(--sp-xl-2xl);background:rgba(239,68,68,0.15);border:1px solid var(--red);
+  padding:var(--sp-sm-md) var(--sp-xl-2xl);background:rgba(239,68,68,0.15);border:1px solid var(--red);
   color:var(--red);border-radius:4px;cursor:pointer;font-family:'Rajdhani',sans-serif;
-  font-weight:700;font-size:0.78em;transition:all 0.2s;
+  font-weight:700;font-size:0.92em;transition:all 0.2s;
 }
 .reset-yes:hover{background:rgba(239,68,68,0.3)}
 .reset-no{
-  padding:var(--sp-sm) var(--sp-xl-2xl);background:rgba(60,80,100,0.15);border:1px solid var(--bdr);
+  padding:var(--sp-sm-md) var(--sp-xl-2xl);background:rgba(60,80,100,0.15);border:1px solid var(--bdr);
   color:var(--dim);border-radius:4px;cursor:pointer;font-family:'Rajdhani',sans-serif;
-  font-weight:600;font-size:0.78em;transition:all 0.2s;
+  font-weight:600;font-size:0.92em;transition:all 0.2s;
 }
 .reset-no:hover{background:rgba(60,80,100,0.25);color:var(--text)}
 
@@ -2623,20 +3250,20 @@ html,body{height:100%;overflow:hidden;font-family:var(--font-body);background:va
   box-shadow:0 0 30px rgba(249,115,22,0.15);display:none;
 }
 .recycle-popup.show{display:block;animation:popIn .25s ease-out}
-.recycle-title{font-family:'Orbitron',monospace;font-size:0.8em;color:var(--orange);margin-bottom:var(--sp-md);letter-spacing:1px}
-.recycle-name{font-size:0.85em;color:var(--bright);font-weight:700;margin-bottom:var(--sp-sm)}
-.recycle-refund{font-size:0.72em;color:var(--green);margin-bottom:var(--sp-lg)}
+.recycle-title{font-family:'Orbitron',monospace;font-size:0.95em;color:var(--orange);margin-bottom:var(--sp-md);letter-spacing:1px}
+.recycle-name{font-size:1em;color:var(--bright);font-weight:700;margin-bottom:var(--sp-sm)}
+.recycle-refund{font-size:0.88em;color:var(--green);margin-bottom:var(--sp-lg)}
 .recycle-btns{display:flex;gap:var(--sp-md);justify-content:center}
 .recycle-yes{
   padding:var(--sp-sm-md) var(--sp-2xl);background:rgba(249,115,22,0.15);border:1px solid var(--orange);
   color:var(--orange);border-radius:4px;cursor:pointer;font-family:'Rajdhani',sans-serif;
-  font-weight:700;font-size:0.78em;transition:all 0.2s;
+  font-weight:700;font-size:0.92em;transition:all 0.2s;
 }
 .recycle-yes:hover{background:rgba(249,115,22,0.25)}
 .recycle-no{
   padding:var(--sp-sm-md) var(--sp-2xl);background:rgba(60,80,100,0.15);border:1px solid var(--bdr);
   color:var(--dim);border-radius:4px;cursor:pointer;font-family:'Rajdhani',sans-serif;
-  font-weight:700;font-size:0.78em;transition:all 0.2s;
+  font-weight:700;font-size:0.92em;transition:all 0.2s;
 }
 .recycle-no:hover{background:rgba(60,80,100,0.25)}
 
@@ -2746,6 +3373,122 @@ html,body{height:100%;overflow:hidden;font-family:var(--font-body);background:va
   border-radius:3px;cursor:pointer;font-family:'Rajdhani',sans-serif;font-weight:600;transition:all 0.2s;
 }
 .challenge-skip:hover{border-color:var(--red);color:var(--red)}
+
+/* ===== ★ A: 叙事化开场覆盖层 ===== */
+.narrative-overlay{
+  position:fixed;inset:0;z-index:10010;
+  display:none;align-items:center;justify-content:center;
+  background:#000;
+}
+.narrative-overlay.show{display:flex}
+.narrative-bg{position:absolute;inset:0;background:#000}
+.narrative-frame{
+  position:absolute;inset:0;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  opacity:0;transition:opacity 0.8s ease;pointer-events:none;
+}
+.narrative-frame.active{opacity:1;pointer-events:auto}
+.narrative-text{
+  font-family:'Rajdhani',sans-serif;font-size:1.3em;color:rgba(255,255,255,0.85);
+  letter-spacing:2px;margin-top:32px;
+  animation:narrativeFade 1.5s ease-out forwards;
+  opacity:0;
+}
+@keyframes narrativeFade{0%{opacity:0;transform:translateY(12px)}100%{opacity:1;transform:translateY(0)}}
+
+/* 第1帧：水滴涟漪 */
+.narrative-ripple{
+  width:120px;height:120px;border-radius:50%;
+  border:2px solid rgba(6,214,160,0.3);
+  animation:narrativeRipple 2s ease-out infinite;
+  position:relative;
+}
+.narrative-ripple::before,.narrative-ripple::after{
+  content:'';position:absolute;inset:0;border-radius:50%;
+  border:1.5px solid rgba(6,214,160,0.2);
+}
+.narrative-ripple::before{animation:narrativeRipple 2s ease-out 0.4s infinite}
+.narrative-ripple::after{animation:narrativeRipple 2s ease-out 0.8s infinite}
+@keyframes narrativeRipple{
+  0%{transform:scale(0.3);opacity:0.8}
+  100%{transform:scale(2);opacity:0}
+}
+
+/* 第2帧：核心苏醒 */
+.narrative-core-glow{
+  width:80px;height:80px;border-radius:50%;
+  background:radial-gradient(circle,rgba(6,214,160,0.25) 0%,rgba(6,214,160,0.05) 60%,transparent 100%);
+  animation:narrativeCoreGlow 2s ease-in-out infinite;
+  position:absolute;
+}
+.narrative-core-emoji{
+  font-size:3em;
+  filter:drop-shadow(0 0 20px rgba(6,214,160,0.5));
+  animation:narrativeCorePulse 2.5s ease-in-out infinite;
+}
+@keyframes narrativeCoreGlow{
+  0%,100%{transform:scale(1);opacity:0.5}
+  50%{transform:scale(1.3);opacity:0.9}
+}
+@keyframes narrativeCorePulse{
+  0%,100%{transform:scale(1)}
+  50%{transform:scale(1.08)}
+}
+
+/* 第3帧：网格预览 */
+.narrative-grid-preview{
+  display:grid;grid-template-columns:repeat(3,52px);grid-template-rows:repeat(3,52px);
+  gap:6px;
+}
+.ng-cell{
+  width:52px;height:52px;border-radius:4px;
+  border:1px solid rgba(30,50,70,0.3);
+  background:rgba(8,14,24,0.6);
+  opacity:0;transform:scale(0.6);
+  animation:ngCellAppear 0.5s ease-out forwards;
+}
+.ng-c{
+  animation-delay:0s;
+  border-color:rgba(6,214,160,0.5);
+  background:radial-gradient(circle,rgba(6,214,160,0.15) 0%,rgba(8,14,24,0.8) 80%);
+  display:flex;align-items:center;justify-content:center;
+  font-size:1.6em;
+}
+.ng-c::after{content:'🔮'}
+.ng-adj{animation-delay:0.3s}
+.ng-corner{animation-delay:0.6s}
+@keyframes ngCellAppear{
+  0%{opacity:0;transform:scale(0.6)}
+  60%{opacity:0.8;transform:scale(1.05)}
+  100%{opacity:1;transform:scale(1)}
+}
+
+/* 第4帧：进入按钮 */
+.narrative-text-final{font-size:1.5em;color:rgba(6,214,160,0.9);margin-bottom:24px}
+.narrative-enter-btn{
+  font-family:'Rajdhani',sans-serif;font-size:1.1em;font-weight:600;
+  color:#06d6a0;background:transparent;
+  border:1.5px solid rgba(6,214,160,0.4);border-radius:8px;
+  padding:10px 36px;cursor:pointer;letter-spacing:2px;
+  transition:all 0.3s;
+  animation:narrativeBtnPulse 2s ease-in-out infinite;
+}
+.narrative-enter-btn:hover{
+  background:rgba(6,214,160,0.1);border-color:rgba(6,214,160,0.7);
+  box-shadow:0 0 16px rgba(6,214,160,0.2);
+}
+@keyframes narrativeBtnPulse{
+  0%,100%{border-color:rgba(6,214,160,0.4)}
+  50%{border-color:rgba(6,214,160,0.7);box-shadow:0 0 12px rgba(6,214,160,0.15)}
+}
+/* 叙事覆盖层淡出 */
+.narrative-overlay.fade-out{
+  animation:narrativeOverlayFadeOut 1s ease-out forwards;
+}
+@keyframes narrativeOverlayFadeOut{
+  0%{opacity:1}
+  100%{opacity:0}
+}
 
 /* ===== INTRO / WELCOME POPUP ===== */
 .intro-popup{
@@ -2899,7 +3642,7 @@ html,body{height:100%;overflow:hidden;font-family:var(--font-body);background:va
 }
 .wb-status-grid{
   display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;
-  font-size:0.72em;color:#8aa0c0;
+  font-size:0.85em;color:#8aa0c0;
   background:rgba(6,214,160,0.04);border:1px solid rgba(6,214,160,0.1);
   border-radius:6px;padding:8px 12px;text-align:left;
 }
@@ -2912,7 +3655,7 @@ html,body{height:100%;overflow:hidden;font-family:var(--font-body);background:va
   position:relative;z-index:1;padding:8px 28px;
   background:linear-gradient(135deg,rgba(6,214,160,0.15),rgba(6,214,160,0.08));
   border:1px solid var(--cyan);color:var(--cyan);border-radius:5px;
-  cursor:pointer;font-family:'Rajdhani',sans-serif;font-weight:700;font-size:0.85em;
+  cursor:pointer;font-family:'Rajdhani',sans-serif;font-weight:700;font-size:0.95em;
   letter-spacing:1px;transition:all 0.2s;
 }
 .wb-continue-btn:hover{
@@ -2949,8 +3692,8 @@ html,body{height:100%;overflow:hidden;font-family:var(--font-body);background:va
   background:rgba(168,85,247,0.06);border:1.5px solid rgba(168,85,247,0.3);
 }
 .choice-b:hover{background:rgba(168,85,247,0.12);border-color:var(--purple);transform:translateY(-2px)}
-.choice-label{font-size:0.85em;font-weight:700;color:var(--bright);margin-bottom:var(--sp-xs)}
-.choice-desc{font-size:0.6em;color:var(--dim);line-height:1.3}
+.choice-label{font-size:1em;font-weight:700;color:var(--bright);margin-bottom:var(--sp-xs)}
+.choice-desc{font-size:0.78em;color:var(--dim);line-height:1.4}
 .choice-a:hover .choice-label{color:var(--cyan)}
 .choice-b:hover .choice-label{color:var(--purple)}
 
@@ -3794,6 +4537,16 @@ html,body{height:100%;overflow:hidden;font-family:var(--font-body);background:va
 .phase-ceremony-overlay.title-in .phase-ceremony-desc{
   opacity:1;transform:translateY(0);
 }
+/* ★ E: 核心变化描述脉冲效果 */
+.phase-ceremony-desc.core-change-pulse{
+  color:var(--phase-primary);
+  text-shadow:0 0 12px var(--phase-glow);
+  animation:coreChangePulse 1s ease-in-out 2;
+}
+@keyframes coreChangePulse{
+  0%,100%{transform:translateY(0) scale(1);opacity:1}
+  50%{transform:translateY(-2px) scale(1.05);opacity:0.9}
+}
 /* 核心菌落进化光效 */
 .core-evolving{
   animation:coreEvolve 1.5s ease-in-out !important;
@@ -3829,6 +4582,93 @@ html,body{height:100%;overflow:hidden;font-family:var(--font-body);background:va
   100%{opacity:0}
 }
 
+/* ═══ 品牌签名动效 ═══ */
+/* 细胞分裂建造 — 新建筑放置时的标识性动效 */
+@keyframes cellDivision{
+  0%{transform:scale(0);border-radius:50%;opacity:0}
+  15%{transform:scale(0.6);border-radius:50%;opacity:1}
+  30%{transform:scale(0.8) scaleX(1.3);border-radius:40%}
+  45%{transform:scale(0.75) scaleX(1.4);border-radius:35%}
+  55%{transform:scale(0.9) scaleX(1.1);border-radius:20%}
+  70%{transform:scale(1.05);border-radius:var(--r-md)}
+  85%{transform:scale(0.98)}
+  100%{transform:scale(1);border-radius:var(--r-md)}
+}
+/* 膜渗透出现 — 面板/弹窗出现时的有机感动效 */
+@keyframes membranePermeation{
+  0%{clip-path:circle(0% at 50% 50%);filter:blur(8px)}
+  40%{clip-path:circle(45% at 50% 50%);filter:blur(2px)}
+  70%{clip-path:circle(60% at 48% 52%);filter:blur(0)}
+  100%{clip-path:circle(100% at 50% 50%);filter:none}
+}
+/* 通用参数化脉冲 — 替代各色独立pulse */
+@keyframes pulseColor{
+  0%,100%{box-shadow:0 0 0 var(--pulse-color,rgba(6,214,160,0.3))}
+  50%{box-shadow:0 0 12px var(--pulse-color,rgba(6,214,160,0.4))}
+}
+/* 新建筑放置类 */
+.cell-just-built{animation:cellDivision var(--dur-dramatic) var(--ease-spring) forwards}
+/* ★ F1: 放置波纹扩散 */
+.place-ripple{
+  position:absolute;inset:-4px;border-radius:50%;pointer-events:none;z-index:5;
+  border:2px solid var(--phase-primary, rgba(6,214,160,0.4));
+  animation:placeRippleExpand 0.6s ease-out forwards;
+  opacity:0.6;
+}
+@keyframes placeRippleExpand{
+  0%{inset:30%;opacity:0.7;border-width:2px}
+  60%{opacity:0.3}
+  100%{inset:-14px;opacity:0;border-width:1px}
+}
+/* F1: 邻居受波纹影响闪亮 */
+.cell.place-ripple-hit{
+  animation:placeNeighborFlash 0.5s ease-out;
+}
+@keyframes placeNeighborFlash{
+  0%{box-shadow:inset 0 0 0 transparent}
+  30%{box-shadow:inset 0 0 10px rgba(6,214,160,0.2)}
+  100%{box-shadow:inset 0 0 0 transparent}
+}
+/* ★ F2: 空格子生命迹象 — 被建筑包围的空格子微粒子漂移 */
+.cell-alive{
+  position:relative;
+}
+.cell-alive::before{
+  content:'';position:absolute;
+  width:2px;height:2px;border-radius:50%;
+  background:var(--phase-primary, rgba(6,214,160,0.3));
+  opacity:0;
+  top:40%;left:30%;
+  animation:cellAliveDrift 5s ease-in-out infinite;
+  pointer-events:none;z-index:1;
+}
+.cell-alive::after{
+  content:'';position:absolute;
+  width:1.5px;height:1.5px;border-radius:50%;
+  background:var(--phase-primary, rgba(6,214,160,0.25));
+  opacity:0;
+  top:60%;left:65%;
+  animation:cellAliveDrift 6s ease-in-out 2s infinite;
+  pointer-events:none;z-index:1;
+}
+@keyframes cellAliveDrift{
+  0%,100%{opacity:0;transform:translate(0,0)}
+  15%{opacity:0.5}
+  50%{opacity:0.3;transform:translate(4px,-6px)}
+  85%{opacity:0.15;transform:translate(-3px,5px)}
+}
+
+/* ★ G3: 网格扩张时新格子入场动画 */
+.cell-newborn{
+  animation:cellNewborn 0.6s ease-out forwards;
+  opacity:0;
+}
+@keyframes cellNewborn{
+  0%{opacity:0;transform:scale(0.6);border-color:transparent}
+  60%{opacity:0.8;transform:scale(1.05);border-color:var(--phase-primary, #22c55e)}
+  100%{opacity:1;transform:scale(1);border-color:rgba(30,50,70,0.35)}
+}
+
 /* === P0: 尊重用户减弱动画偏好 === */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
@@ -3859,15 +4699,7 @@ html,body{height:100%;overflow:hidden;font-family:var(--font-body);background:va
 <div class="app">
   <!-- TOP BAR -->
   <div class="topbar">
-    <div class="logo">
-      <svg viewBox="0 0 24 24" fill="none">
-        <circle cx="12" cy="12" r="6" stroke="#003a3a" stroke-width="1.5" fill="none"/>
-        <circle cx="12" cy="12" r="3" fill="#004a4a" opacity="0.6"/>
-        <circle cx="12" cy="8" r="1.5" fill="#006a6a"/>
-        <circle cx="15" cy="14" r="1.2" fill="#006a6a"/>
-        <circle cx="9" cy="14" r="1" fill="#006a6a"/>
-      </svg>
-    </div>
+    <div class="logo"></div>
     <!-- J1: 菌主形象常驻 -->
     <div class="host-avatar" id="hostAvatar">
       <span class="host-avatar-icon" id="hostAvatarIcon">🦠</span>
@@ -4141,7 +4973,14 @@ html,body{height:100%;overflow:hidden;font-family:var(--font-body);background:va
           <canvas id="bgCanvas"></canvas>
           <canvas id="partCanvas"></canvas>
           <div class="grid" id="grid"></div>
+          <svg class="supply-link-svg" id="supplyLinkSvg" aria-hidden="true"></svg>
         </div>
+        <!-- ★ I1: 引导气泡（浮动在格子旁） -->
+        <div class="guide-bubble" id="guideBubble" aria-hidden="true">
+          <div class="guide-bubble-arrow"></div>
+          <div class="guide-bubble-text" id="guideBubbleText"></div>
+        </div>
+
         <!-- Achievement Popup — 培养皿内顶部 toast -->
         <div class="achieve-popup" id="achievePopup" role="alertdialog" aria-modal="true" aria-label="成就达成" aria-hidden="true">
           <div class="achieve-glow"></div>
@@ -4225,7 +5064,7 @@ html,body{height:100%;overflow:hidden;font-family:var(--font-body);background:va
       <!-- Production Chains -->
       <div class="section" id="chainSection" style="display:none">
         <div class="section-title">🏭 流水线 · 传送带</div>
-        <div id="chainList" style="font-size:0.72em;color:var(--dim)"></div>
+        <div id="chainList" style="font-size:0.92em;color:var(--dim)"></div>
       </div>
 
       <!-- Stats — G4: 默认折叠 -->
@@ -4337,8 +5176,8 @@ html,body{height:100%;overflow:hidden;font-family:var(--font-body);background:va
     <span style="font-size:0.82em;color:var(--cyan);font-weight:700;background:rgba(6,214,160,0.12);padding:2px 8px;border-radius:6px" id="upgradeLevel"></span>
   </div>
   <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">
-    <span style="font-size:0.72em;color:#8aa0c0" id="upgradeEffect"></span>
-    <span style="font-size:0.75em;color:var(--yellow);font-weight:600" id="upgradeCost"></span>
+    <span style="font-size:0.88em;color:#8aa0c0" id="upgradeEffect"></span>
+    <span style="font-size:0.9em;color:var(--yellow);font-weight:600" id="upgradeCost"></span>
   </div>
   <div style="display:flex;gap:8px;justify-content:center">
     <button class="recycle-yes" id="upgradeYes" onclick="G.confirmUpgrade()" style="border-color:var(--cyan);color:var(--cyan);background:rgba(6,214,160,0.12)">升级 ✓</button>
@@ -4348,12 +5187,12 @@ html,body{height:100%;overflow:hidden;font-family:var(--font-body);background:va
 
 <!-- Belt Upgrade Popup -->
 <div class="upgrade-popup" id="beltUpgradePopup" role="dialog" aria-modal="true" aria-label="传送带升级" aria-hidden="true">
-  <div style="font-family:'Orbitron',monospace;font-size:0.75em;color:#f97316;letter-spacing:2px;margin-bottom:6px">⛓ 传送带升级</div>
+  <div style="font-family:'Orbitron',monospace;font-size:0.88em;color:#f97316;letter-spacing:2px;margin-bottom:6px">⛓ 传送带升级</div>
   <div style="font-size:0.95em;font-weight:700;color:var(--bright);margin-bottom:4px" id="beltUpgradeName"></div>
-  <div style="font-size:0.8em;color:#f97316;font-weight:700;margin-bottom:4px" id="beltUpgradeLevel"></div>
-  <div style="font-size:0.72em;color:#8aa0c0;margin-bottom:4px" id="beltUpgradeEffect"></div>
-  <div style="font-size:0.65em;color:#5a7a90;margin-bottom:4px">传输效率影响目标建筑的产出速率</div>
-  <div style="font-size:0.72em;color:var(--yellow);margin-bottom:12px" id="beltUpgradeCost"></div>
+  <div style="font-size:0.92em;color:#f97316;font-weight:700;margin-bottom:4px" id="beltUpgradeLevel"></div>
+  <div style="font-size:0.85em;color:#8aa0c0;margin-bottom:4px" id="beltUpgradeEffect"></div>
+  <div style="font-size:0.78em;color:#5a7a90;margin-bottom:4px">传输效率影响目标建筑的产出速率</div>
+  <div style="font-size:0.85em;color:var(--yellow);margin-bottom:12px" id="beltUpgradeCost"></div>
   <div style="display:flex;gap:8px;justify-content:center">
     <button class="recycle-yes" id="beltUpgradeYes" onclick="G.confirmBeltUpgrade()" style="border-color:#f97316;color:#f97316;background:rgba(249,115,22,0.12)">确认升级</button>
     <button class="recycle-no" onclick="G.cancelBeltUpgrade()">取消</button>
@@ -4362,24 +5201,24 @@ html,body{height:100%;overflow:hidden;font-family:var(--font-body);background:va
 
 <!-- Building Type Selector Popup -->
 <div class="bld-type-selector" id="bldTypeSelector" role="dialog" aria-modal="true" aria-label="建筑类型选择" aria-hidden="true">
-  <div style="font-family:'Orbitron',monospace;font-size:0.75em;color:var(--cyan);letter-spacing:2px;margin-bottom:4px">⬆ 快速升级</div>
-  <div style="font-size:0.55em;color:#5a7a90;margin-bottom:8px">点击直接升级 · 无需确认</div>
+  <div style="font-family:'Orbitron',monospace;font-size:0.88em;color:var(--cyan);letter-spacing:2px;margin-bottom:4px">⬆ 快速升级</div>
+  <div style="font-size:0.7em;color:#5a7a90;margin-bottom:8px">点击直接升级 · 无需确认</div>
   <div class="bld-type-list" id="bldTypeList"></div>
   <div style="margin-top:10px;display:flex;gap:6px;justify-content:center;align-items:center;flex-wrap:wrap">
-    <button class="recycle-yes" id="upgradeAllBtn" onclick="G.upgradeAllOfType()" style="border-color:var(--cyan);color:var(--cyan);background:rgba(6,214,160,0.12);font-size:0.72em;padding:6px 14px;display:none">⬆ 全部升1级 <span id="upgradeAllCost" style="font-size:0.85em;opacity:0.8"></span></button>
-    <button class="recycle-yes" id="upgradeMaxBtn" onclick="G.upgradeAllToMax()" style="border-color:var(--purple);color:var(--purple);background:rgba(168,85,247,0.12);font-size:0.72em;padding:6px 14px;display:none">🌟 全部升满 <span id="upgradeMaxCost" style="font-size:0.85em;opacity:0.8"></span></button>
+    <button class="recycle-yes" id="upgradeAllBtn" onclick="G.upgradeAllOfType()" style="border-color:var(--cyan);color:var(--cyan);background:rgba(6,214,160,0.12);font-size:0.85em;padding:6px 14px;display:none">⬆ 全部升1级 <span id="upgradeAllCost" style="font-size:0.9em;opacity:0.8"></span></button>
+    <button class="recycle-yes" id="upgradeMaxBtn" onclick="G.upgradeAllToMax()" style="border-color:var(--purple);color:var(--purple);background:rgba(168,85,247,0.12);font-size:0.85em;padding:6px 14px;display:none">🌟 全部升满 <span id="upgradeMaxCost" style="font-size:0.9em;opacity:0.8"></span></button>
     <button class="recycle-no" onclick="G.closeBldTypeSelector()">关闭</button>
   </div>
 </div>
 
 <!-- Belt Type Selector Popup -->
 <div class="belt-type-selector" id="beltTypeSelector">
-  <div style="font-family:'Orbitron',monospace;font-size:0.75em;color:#f97316;letter-spacing:2px;margin-bottom:4px">⛓ 快速升级传送带</div>
-  <div style="font-size:0.55em;color:#5a7a90;margin-bottom:8px">点击直接升级 · 无需确认</div>
+  <div style="font-family:'Orbitron',monospace;font-size:0.88em;color:#f97316;letter-spacing:2px;margin-bottom:4px">⛓ 快速升级传送带</div>
+  <div style="font-size:0.7em;color:#5a7a90;margin-bottom:8px">点击直接升级 · 无需确认</div>
   <div class="belt-type-list" id="beltTypeList"></div>
   <div style="margin-top:10px;display:flex;gap:6px;justify-content:center;align-items:center;flex-wrap:wrap">
-    <button class="recycle-yes" id="beltUpgradeAllBtn" onclick="G.upgradeAllBelts()" style="border-color:#f97316;color:#f97316;background:rgba(249,115,22,0.12);font-size:0.72em;padding:6px 14px;display:none">⬆ 全部升1级 <span id="beltUpgradeAllCost" style="font-size:0.85em;opacity:0.8"></span></button>
-    <button class="recycle-yes" id="beltUpgradeMaxBtn" onclick="G.upgradeAllBeltsToMax()" style="border-color:var(--purple);color:var(--purple);background:rgba(168,85,247,0.12);font-size:0.72em;padding:6px 14px;display:none">🌟 全部升满 <span id="beltUpgradeMaxCost" style="font-size:0.85em;opacity:0.8"></span></button>
+    <button class="recycle-yes" id="beltUpgradeAllBtn" onclick="G.upgradeAllBelts()" style="border-color:#f97316;color:#f97316;background:rgba(249,115,22,0.12);font-size:0.85em;padding:6px 14px;display:none">⬆ 全部升1级 <span id="beltUpgradeAllCost" style="font-size:0.9em;opacity:0.8"></span></button>
+    <button class="recycle-yes" id="beltUpgradeMaxBtn" onclick="G.upgradeAllBeltsToMax()" style="border-color:var(--purple);color:var(--purple);background:rgba(168,85,247,0.12);font-size:0.85em;padding:6px 14px;display:none">🌟 全部升满 <span id="beltUpgradeMaxCost" style="font-size:0.9em;opacity:0.8"></span></button>
     <button class="recycle-no" onclick="G.closeBeltTypeSelector()">关闭</button>
   </div>
 </div>
@@ -4399,8 +5238,8 @@ html,body{height:100%;overflow:hidden;font-family:var(--font-body);background:va
 <!-- Choice Event Popup -->
 <div class="choice-popup" id="choicePopup" role="dialog" aria-modal="true" aria-label="选择决策" aria-hidden="true">
   <div style="font-size:1.2em;margin-bottom:4px">🔮</div>
-  <h3 id="choiceTitle" style="font-family:'Orbitron',monospace;font-size:0.85em;color:var(--cyan);margin-bottom:6px"></h3>
-  <p id="choiceDesc" style="font-size:0.78em;color:#8aa0c0;margin-bottom:14px;line-height:1.3"></p>
+  <h3 id="choiceTitle" style="font-family:'Orbitron',monospace;font-size:1.05em;color:var(--cyan);margin-bottom:6px"></h3>
+  <p id="choiceDesc" style="font-size:0.9em;color:#8aa0c0;margin-bottom:14px;line-height:1.4"></p>
   <div style="display:flex;gap:8px">
     <button class="choice-btn choice-a" onclick="G.chooseA()">
       <div class="choice-label" id="choiceALabel"></div>
@@ -4448,6 +5287,42 @@ html,body{height:100%;overflow:hidden;font-family:var(--font-body);background:va
 </div>
 
 <!-- Intro / Welcome Popup -->
+<!-- ★ A: 叙事化开场序列覆盖层 -->
+<div id="narrativeOverlay" class="narrative-overlay" aria-hidden="true">
+  <div class="narrative-bg"></div>
+  <!-- 第1帧：水滴涟漪 -->
+  <div class="narrative-frame" data-frame="1">
+    <div class="narrative-ripple"></div>
+    <div class="narrative-text">在一滴温暖的水中…</div>
+  </div>
+  <!-- 第2帧：核心苏醒 -->
+  <div class="narrative-frame" data-frame="2">
+    <div class="narrative-core-glow"></div>
+    <div class="narrative-core-emoji">🔮</div>
+    <div class="narrative-text">某种东西…开始了。</div>
+  </div>
+  <!-- 第3帧：网格亮起+膜形成 -->
+  <div class="narrative-frame" data-frame="3">
+    <div class="narrative-grid-preview">
+      <div class="ng-cell ng-c" data-delay="0"></div>
+      <div class="ng-cell ng-adj" data-delay="1"></div>
+      <div class="ng-cell ng-adj" data-delay="1"></div>
+      <div class="ng-cell ng-adj" data-delay="1"></div>
+      <div class="ng-cell ng-adj" data-delay="1"></div>
+      <div class="ng-cell ng-corner" data-delay="2"></div>
+      <div class="ng-cell ng-corner" data-delay="2"></div>
+      <div class="ng-cell ng-corner" data-delay="2"></div>
+      <div class="ng-cell ng-corner" data-delay="2"></div>
+    </div>
+    <div class="narrative-text">你的领地…正在成形。</div>
+  </div>
+  <!-- 第4帧：引导进入游戏 -->
+  <div class="narrative-frame" data-frame="4">
+    <div class="narrative-text narrative-text-final">它需要食物。</div>
+    <button class="narrative-enter-btn" id="narrativeEnterBtn">▸ 开始培养</button>
+  </div>
+</div>
+
 <div class="intro-popup" id="introPopup" role="dialog" aria-modal="true" aria-label="游戏介绍" aria-hidden="true">
   <div class="intro-glow"></div>
   <div style="font-size:1.6em;margin-bottom:4px;position:relative">🧬</div>

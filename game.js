@@ -364,14 +364,26 @@ const SFX = (() => {
       playTone(523, 0.4, 'triangle', 0.08, 5, 0.36);
     },
 
-    // 游戏启动
+    // 游戏启动 — 品牌Jingle：低鸣→生命脉冲→上行琶音→品牌和弦
     boot() {
       if (!sfxOn) return;
-      playTone(200, 0.15, 'sine', 0.08);
-      playTone(300, 0.12, 'sine', 0.08, 0, 0.1);
-      playTone(450, 0.15, 'sine', 0.1, 0, 0.2);
-      playTone(600, 0.2, 'sine', 0.08, 0, 0.3);
-      playNoise(0.1, 0.03, 'highpass', 6000, 0.2);
+      // Phase 1: 低鸣 — 休眠微生物 (0~0.8s)
+      playTone(80, 0.8, 'sine', 0.06);
+      playTone(120, 0.6, 'sine', 0.04, 0, 0.1);
+      // Phase 2: 生命脉冲 — 心跳 (0.8~1.6s)
+      playTone(150, 0.12, 'sine', 0.10, 0, 0.8);
+      playTone(150, 0.10, 'sine', 0.07, 0, 1.1);
+      playNoise(0.08, 0.03, 'highpass', 4000, 0.85);
+      playNoise(0.06, 0.02, 'highpass', 4000, 1.15);
+      // Phase 3: 上行琶音 — 觉醒 C4→E4→G4→C5 (1.6~2.8s)
+      playTone(262, 0.25, 'sine', 0.10, 0, 1.6);
+      playTone(330, 0.25, 'sine', 0.10, 0, 1.9);
+      playTone(392, 0.25, 'sine', 0.12, 0, 2.2);
+      playTone(523, 0.35, 'sine', 0.14, 0, 2.5);
+      // Phase 4: 品牌和弦 — C5+E5+G5 持续 (2.8~3.5s)
+      playTone(523, 0.7, 'sine', 0.08, 0, 2.8);
+      playTone(659, 0.7, 'triangle', 0.06, 0, 2.8);
+      playTone(784, 0.7, 'triangle', 0.05, 0, 2.85);
     },
   };
 
@@ -533,7 +545,23 @@ const SFX = (() => {
   function updateBGMPhase(phase) {
     if (bgmPhase === phase) return;
     bgmPhase = phase;
-    if (bgmOn && bgmNodes) startBGM(phase);
+    if (bgmOn && bgmNodes) crossfadeBGM(phase);
+  }
+
+  // 品牌BGM交叉淡入淡出 — 1.5s渐出 + 0.5s重叠 + 1s渐入
+  function crossfadeBGM(newPhase) {
+    if (!bgmNodes) { startBGM(newPhase); return; }
+    const ctx = getCtx();
+    if (!ctx) { stopBGM(); startBGM(newPhase); return; }
+    // 渐出当前BGM
+    const fadeGain = ctx.createGain();
+    fadeGain.gain.setValueAtTime(1, ctx.currentTime);
+    fadeGain.gain.linearRampToValueAtTime(0, ctx.currentTime + 1.5);
+    // 1s后开始新BGM（0.5s重叠）
+    setTimeout(() => {
+      stopBGM();
+      startBGM(newPhase);
+    }, 1000);
   }
 
   function setBgmVol(v) {
@@ -730,6 +758,8 @@ function hasAvailablePort(idx, direction) {
   if (!type) return false;
   const def = PORT_DEFS[type];
   if (!def) return true;
+  // ★ v3.1 C4: P3a前期端口豁免 — 手动管线不足5条时不限端口
+  if (G.phase === 3 && Object.keys(G.manualBelts || {}).length < 5) return true;
   // 科技加成：自适应物流 +1 输出端口
   const techExtra = (direction === 'out' && G._extraOutPorts) ? G._extraOutPorts : 0;
   // v2.1 §9.2/§9.3: 突变+转生端口加成
@@ -768,12 +798,25 @@ function getPortEfficiencyDiscount(idx) {
   return 1.0 - discount;
 }
 
-// ===== v2.0 BELT MODE — P2 hybrid传送带模式 =====
-const BELT_MODE = {
-  1: 'auto',      // P1: 纯自动
-  2: 'hybrid',    // P2: 自动+可选手动
-  3: 'manual',    // P3+: 纯手动
-};
+// ===== v3.1 BELT MODE — P2渐退三拍 + P3软着陆 =====
+// 替代旧 BELT_MODE 常量，根据游戏状态动态决定管线模式
+// P1: auto | P2 bld<4: auto+引导 | P2 bld≥4: hybrid(新建筑手动) | P2 bld≥6: degraded(旧管线衰减)
+// P3: softLanding(遗留管线逐步退化) → manual
+function getBeltMode() {
+  if (G.phase <= 1) return 'auto';
+  if (G.phase >= 3) {
+    // P3软着陆：如果还有遗留管线未退完，返回 softLanding
+    if (G._p3LegacyBelts && Object.keys(G._p3LegacyBelts).length > 0) return 'softLanding';
+    return 'manual';
+  }
+  // P2 渐退三拍
+  const bldCount = G.totalBuildings();
+  if (bldCount < 4) return 'auto';       // 第一拍：全自动+引导
+  if (bldCount < 6) return 'hybrid';     // 第二拍：新建筑手动
+  return 'degraded';                      // 第三拍：旧管线衰减
+}
+// 兼容旧引用
+const BELT_MODE = { 1: 'auto', 2: 'hybrid', 3: 'manual' };
 
 /**
  * v2.0 §10.2 — 计算某格子放置指定建筑后的邻接加成数
@@ -851,13 +894,45 @@ const PHASES = [
   { id:5, name:'奇观', color:'var(--purple)', desc:'建造终极生物奇观！', icon:'🏛️' },
 ];
 
+// ★ E: 阶段转换叙事 — 每个阶段升级的专属故事
+const PHASE_NARRATIVES = {
+  2: {
+    title: '代谢觉醒',
+    story: '你的菌落第一次感受到了外界的化学信号…\n空气中弥漫着氮的气息。一个新的时代即将开始。',
+    coreChange: '🔮→🦠 核心进化！供能上限提升至4台',
+    expand: '膜在颤抖——你的领地正在扩张！',
+    flavor: '从此，你不再只是采集——你开始创造。'
+  },
+  3: {
+    title: '物流帝国',
+    story: '单个细胞的力量已经到达极限。\n你的菌落开始编织菌丝网络，将分散的力量连为一体。',
+    coreChange: '🦠→🔬 核心重构！微管网络形成',
+    expand: '菌丝突破了边界，培养皿在你脚下延伸。',
+    flavor: '从独立的个体，到协作的帝国。'
+  },
+  4: {
+    title: '群体意识',
+    story: '菌丝网络传来了一个从未有过的信号——\n不是化学分子，而是一种…意志。',
+    coreChange: '🔬→🏗️ 核心觉醒！金色能量网络扩展',
+    expand: '意识所及之处，皆为领土。',
+    flavor: '当个体足够多，集体智慧便会觉醒。'
+  },
+  5: {
+    title: '超越',
+    story: '在这个微小的世界里，你创造了一个奇迹。\n从一团原始液泡到一个有意识的文明——\n生命的力量超越了一切尺度。',
+    coreChange: '🏗️→✨ 核心超越！生命圣殿绽放紫色光辉',
+    expand: '整个培养皿都是你的星球。',
+    flavor: '最宏大的帝国，始于最渺小的一滴。'
+  }
+};
+
 // ===== PHASE COLORS — 阶段色彩演变系统（Phase A 视觉叙事） =====
 const PHASE_COLORS = {
-  1: { primary:'#22c55e', glow:'rgba(34,197,94,0.3)',  tint:'rgba(34,197,94,0.02)',  border:'rgba(34,197,94,0.35)' },
-  2: { primary:'#f97316', glow:'rgba(249,115,22,0.3)', tint:'rgba(249,115,22,0.02)', border:'rgba(249,115,22,0.35)' },
-  3: { primary:'#3b82f6', glow:'rgba(59,130,246,0.3)', tint:'rgba(59,130,246,0.02)', border:'rgba(59,130,246,0.35)' },
-  4: { primary:'#eab308', glow:'rgba(234,179,8,0.3)',  tint:'rgba(234,179,8,0.02)',  border:'rgba(234,179,8,0.35)' },
-  5: { primary:'#a855f7', glow:'rgba(168,85,247,0.3)', tint:'rgba(168,85,247,0.02)', border:'rgba(168,85,247,0.35)' },
+  1: { primary:'#22c55e', glow:'rgba(34,197,94,0.3)',  tint:'rgba(34,197,94,0.04)',  border:'rgba(34,197,94,0.35)' },
+  2: { primary:'#f97316', glow:'rgba(249,115,22,0.3)', tint:'rgba(249,115,22,0.04)', border:'rgba(249,115,22,0.35)' },
+  3: { primary:'#3b82f6', glow:'rgba(59,130,246,0.3)', tint:'rgba(59,130,246,0.04)', border:'rgba(59,130,246,0.35)' },
+  4: { primary:'#eab308', glow:'rgba(234,179,8,0.3)',  tint:'rgba(234,179,8,0.04)',  border:'rgba(234,179,8,0.35)' },
+  5: { primary:'#a855f7', glow:'rgba(168,85,247,0.3)', tint:'rgba(168,85,247,0.04)', border:'rgba(168,85,247,0.35)' },
 };
 
 /** 将阶段色彩应用到 CSS 变量 — 界面色调在1.5秒内平滑过渡 */
@@ -868,6 +943,23 @@ function setPhaseColors(phase) {
   root.style.setProperty('--phase-glow', c.glow);
   root.style.setProperty('--phase-bg-tint', c.tint);
   root.style.setProperty('--phase-border', c.border);
+
+  // ★ H1: 膜边界需要的各透明度阶段色变体
+  // 从 primary hex 解析 RGB，生成 rgba 变体
+  const hex = c.primary.replace('#','');
+  const r = parseInt(hex.substring(0,2),16);
+  const g = parseInt(hex.substring(2,4),16);
+  const b = parseInt(hex.substring(4,6),16);
+  root.style.setProperty('--phase-primary-10', `rgba(${r},${g},${b},0.10)`);
+  root.style.setProperty('--phase-primary-15', `rgba(${r},${g},${b},0.15)`);
+  root.style.setProperty('--phase-primary-20', `rgba(${r},${g},${b},0.20)`);
+  root.style.setProperty('--phase-primary-30', `rgba(${r},${g},${b},0.30)`);
+  root.style.setProperty('--phase-primary-40', `rgba(${r},${g},${b},0.40)`);
+  root.style.setProperty('--phase-primary-45', `rgba(${r},${g},${b},0.45)`);
+
+  // 为grid容器设置阶段属性，驱动培养基纹理变化
+  const grid = document.getElementById('grid');
+  if (grid) grid.dataset.phase = phase;
 }
 
 // ===== CORE COLONY — 主建筑，随阶段进化外观升级 =====
@@ -879,13 +971,13 @@ const CORE_COLONY = {
   4: { emoji:'🏗️', name:'菌落中枢',   desc:'高度组织化的微生物城市核心',           color:'#eab308', bg:'bg-core-4', glow:'rgba(234,179,8,0.25)', maxCollectors:8 },
   5: { emoji:'✨', name:'生命圣殿',   desc:'微生物帝国的终极神殿，散发着耀眼光芒', color:'#a855f7', bg:'bg-core-5', glow:'rgba(168,85,247,0.3)', maxCollectors:10 },
 };
-// CORE_IDX removed — 核心菌落现在在格子上方独立展示
+// ★ 帝国核心在网格中心格，随阶段进化外观升级
 
 // ===== RESOURCES =====
 const RES = {
   glucose:  { n:'葡萄糖', c:'#22c55e', icon:'🟢', phase:1 },
   energy:   { n:'ATP能量', c:'#f97316', icon:'⚡', phase:1 },
-  dna:      { n:'DNA',    c:'#a855f7', icon:'🧬', phase:1 },  // Phase 1 就可见！
+  dna:      { n:'DNA',    c:'#818cf8', icon:'🧬', phase:1 },  // Phase 1 就可见！(冷紫靛蓝，区分P5进化紫)
   nitrogen: { n:'氮源',   c:'#3b82f6', icon:'🔵', phase:2 },
   protein:  { n:'蛋白质', c:'#ec4899', icon:'🧪', phase:2 },
   biomass:  { n:'生物质', c:'#10b981', icon:'🧱', phase:3 },
@@ -1038,7 +1130,7 @@ const BLDS = {
     ratio:'0.5🧱 + 0.3🧪 → 2.0⚡/s',
     cost:{ biomass:20, protein:15, energy:35 },
     prod:{ energy:2.0 }, cons:{ biomass:0.5, protein:0.3 },
-    color:'#f59e0b', bg:'bg-amber', emoji:'🫧', tier:3, techReq:'biofilmTech',
+    color:'#f59e0b', bg:'bg-amber', emoji:'🍶', tier:3, techReq:'biofilmTech',
   },
 
   // Phase 3 — v3.0 §5: 信号中继站（P3b物流辅助）
@@ -1791,13 +1883,13 @@ const EVENTS = [
 // ===== GUIDE MESSAGES =====
 const GUIDE = {
   1: [
-    { check: s => s.bldCount('glucoseCollector') === 0, text:'菌主大人，建造「碳源采集器」— 帝国核心免费供能，采集葡萄糖（一切资源的起点！）', icon:'🌱' },
-    { check: s => s.bldCount('glucoseCollector') > 0 && s.bldCount('energyStation') === 0, text:'建造「ATP合成酶」把葡萄糖→能量 (1🟢→2.5⚡/s) — 几乎所有设施都需要能量驱动', icon:'🔋' },
-    { check: s => s.bldCount('energyStation') > 0 && s.bldCount('simpleExtractor') === 0, text:'建造「简易提取器」用葡萄糖+能量合成DNA (2🟢+1.5⚡→0.4🧬/s) — DNA是进化和研究的关键', icon:'🧬' },
-    { check: s => s.bldCount('simpleExtractor') > 0 && s.res.dna < 3, text:'DNA正在合成中...攒到3就能研究科技（小手会指路！）', icon:'🔬' },
-    { check: s => s.res.dna >= 3 && !s.techs.pureCulture.done, text:'菌主大人，DNA够了！点左侧「研究」→「纯培养技术」— 全局效率+10%，第一个科技里程碑', icon:'🧫' },
-    { check: s => s.techs.pureCulture.done && s.eL < 2 && !s.canEvolve(), text:'纯培养技术✓（效率+10%）→ 攒够DNA后进化到Lv.2，解锁更多建筑！', icon:'📈' },
-    { check: s => s.techs.pureCulture.done && s.eL < 2 && s.canEvolve(), text:'菌主大人，资源就绪！点击右栏「进化」按钮升到Lv.2 — 将解锁固氮装置和蛋白质工厂', icon:'✨' },
+    { check: s => s.bldCount('glucoseCollector') === 0, text:'🌱 它需要食物。建造「碳源采集器」— 核心会为它免费供能。', icon:'🌱' },
+    { check: s => s.bldCount('glucoseCollector') > 0 && s.bldCount('energyStation') === 0, text:'有了食物，但细胞需要能量才能动。建造🔋「ATP合成酶」— 它会把葡萄糖变成动力。', icon:'🔋' },
+    { check: s => s.bldCount('energyStation') > 0 && s.bldCount('simpleExtractor') === 0, text:'你的细胞在分裂了…但还缺少遗传密码。建造🔬「简易提取器」— 提取第一段DNA。', icon:'🧬' },
+    { check: s => s.bldCount('simpleExtractor') > 0 && s.res.dna < 3, text:'🧬 DNA正在缓慢编织…当密码足够，你的细胞将迎来第一次觉醒。', icon:'🔬' },
+    { check: s => s.res.dna >= 3 && !s.techs.pureCulture.done, text:'DNA就绪！点击「研究」→🧫「纯培养技术」— 你的菌落将学会自我净化。这是进化的第一步。', icon:'🧫' },
+    { check: s => s.techs.pureCulture.done && s.eL < 2 && !s.canEvolve(), text:'纯培养技术✓ 效率+10%！继续积累资源…进化正在召唤你。', icon:'📈' },
+    { check: s => s.techs.pureCulture.done && s.eL < 2 && s.canEvolve(), text:'✨ 细胞已准备好蜕变！点击「进化」— 突破边界，解锁更广阔的世界。', icon:'✨' },
   ],
   2: [
     // v2.0 §11.2: P2预热期端口教学
@@ -1962,7 +2054,7 @@ const FLOW_MAP = [
   { from:'nitrogenFixer',    to:'signalRelay',         res:'nitrogen', icon:'🔵', color:'#3b82f6', label:'氮源' },
   { from:'proteinFactory',   to:'signalRelay',         res:'protein',  icon:'🧪', color:'#ec4899', label:'蛋白质' },
   { from:'aminoSynth',       to:'signalRelay',         res:'protein',  icon:'🧪', color:'#f472b6', label:'蛋白质' },
-  { from:'geneExtractor',    to:'signalRelay',         res:'dna',      icon:'🧬', color:'#a855f7', label:'DNA' },
+  { from:'geneExtractor',    to:'signalRelay',         res:'dna',      icon:'🧬', color:'#818cf8', label:'DNA' },
   { from:'biofilmReactor',   to:'signalRelay',         res:'biomass',  icon:'🧱', color:'#14b8a6', label:'生物质' },
   { from:'sporeSower',       to:'signalRelay',         res:'dna',      icon:'🧬', color:'#34d399', label:'DNA' },
   { from:'qsController',     to:'signalRelay',         res:'qs',       icon:'📡', color:'#eab308', label:'QS信号' },
@@ -2037,7 +2129,7 @@ const PETRI_RECIPES = [
     reward:{ energy:30 } },
   { id:'r_gene', name:'基因萃取', icon:'🧬', desc:'提取器和合成酶的邻接形成了高效的基因链', phase:2,
     requires:{ geneExtractor:1, energyStation:1, glucoseCollector:1 }, minBuildings:3,
-    buff:{ type:'resMult_dna', value:0.25, duration:45, name:'基因萃取', icon:'🧬', color:'#a855f7' },
+    buff:{ type:'resMult_dna', value:0.25, duration:45, name:'基因萃取', icon:'🧬', color:'#818cf8' },
     reward:{ dna:8 } },
   { id:'r_nitrogen', name:'氮源聚合', icon:'🔵', desc:'固氮装置的磁场在区域内形成了氮富集层', phase:2,
     requires:{ nitrogenFixer:2, energyStation:1 }, minBuildings:3,
@@ -2654,7 +2746,8 @@ const CATALYSTS = [
 
 // ===== GAME STATE =====
 const G = {
-  res:{}, rates:{}, grid:[], gridSize:20, gridCols:20, gridRows:20,
+  res:{}, rates:{}, grid:[], gridSize:3, gridCols:3, gridRows:3,
+  _gridExpansionHistory: [], // 已触发的扩张事件记录
   pop:0, gEff:1, lEff:1, qsLv:0,
   eL:1, eP:0,
   phase:1, sel:null, paused:false, spd:1, rt:0,
@@ -2790,6 +2883,7 @@ const G = {
     this.res.glucose = 50; this.res.energy = 35;
     for (let k in RES) this.rates[k] = 0;
     this.grid = new Array(this.gridCols * this.gridRows).fill(null);
+    this.placeCoreInGrid(); // ★ J1: 核心入格 — 中心格放置帝国核心
     for (let k in TECHS) this.techs[k] = { done:false };
 
     this.load();           // 先加载存档（恢复 grid 数据和 gridSize）
@@ -2801,6 +2895,9 @@ const G = {
     this.updateSectionUnlocks(); // 初始解锁检查（不触发飘字）
     this._updateSaveHint();      // 更新"不保存"提示
     this._gameReady = true;      // 标记游戏就绪（之后的解锁才触发飘字）
+    // ★ C1+C1b: 老存档已有建筑时，标记啊哈为已展示
+    if (this.bldCount('glucoseCollector') > 0) this._ahaSupplyShown = true;
+    if (this.stats.totalBuilt >= 2) this._ahaAdjacencyShown = true;
     this.calcOfflineEarnings();
     this.startLoop();
     this.animLoop();
@@ -3645,13 +3742,99 @@ const G = {
     if (btn) btn.classList.remove('help-pulse');
   },
 
-  // 检查是否需要显示开场引导（仅首次进入）
+  // ★ A: 叙事化开场序列 — 替代原tab弹窗的首次体验
   _checkShowIntro() {
     const seen = localStorage.getItem('bioIntroSeen');
     if (!seen) {
-      // 延迟一点让页面渲染完再弹
-      setTimeout(() => this.showIntro(), 600);
+      // ★ 首次进入 → 展示叙事化开场序列
+      setTimeout(() => this._startNarrativeOpening(), 300);
     }
+  },
+
+  /** ★ A: 启动叙事化开场序列 (4帧) */
+  _startNarrativeOpening() {
+    const overlay = document.getElementById('narrativeOverlay');
+    if (!overlay) { this.showIntro(); return; } // fallback
+    overlay.classList.add('show');
+    overlay.setAttribute('aria-hidden', 'false');
+
+    const frames = overlay.querySelectorAll('.narrative-frame');
+    let currentFrame = 0;
+
+    const showFrame = (idx) => {
+      frames.forEach(f => f.classList.remove('active'));
+      if (frames[idx]) {
+        frames[idx].classList.add('active');
+        // 重置子元素动画
+        frames[idx].querySelectorAll('.narrative-text').forEach(t => {
+          t.style.animation = 'none';
+          t.offsetHeight; // reflow
+          t.style.animation = '';
+        });
+      }
+    };
+
+    // 帧1：水滴涟漪 (0s)
+    showFrame(0);
+    SFX.initOnInteraction(); // 提前初始化音频
+
+    // 帧2：核心苏醒 (2.5s)
+    setTimeout(() => { showFrame(1); currentFrame = 1; }, 2500);
+
+    // 帧3：网格亮起 (5.5s)
+    setTimeout(() => {
+      showFrame(2);
+      currentFrame = 2;
+      // 网格格子逐个亮起（通过CSS animation-delay驱动）
+    }, 5500);
+
+    // 帧4：引导进入 (8.5s)
+    setTimeout(() => {
+      showFrame(3);
+      currentFrame = 3;
+    }, 8500);
+
+    // 点击任意位置跳过（帧1-3），或点击进入按钮（帧4）
+    const enterBtn = document.getElementById('narrativeEnterBtn');
+    const handleEnter = () => {
+      this._endNarrativeOpening(overlay);
+    };
+    if (enterBtn) enterBtn.addEventListener('click', handleEnter, { once: true });
+
+    // 允许点击跳过前几帧
+    overlay.addEventListener('click', (e) => {
+      if (e.target === enterBtn || e.target.closest('.narrative-enter-btn')) return;
+      if (currentFrame < 3) {
+        // 快进到帧4
+        frames.forEach(f => f.classList.remove('active'));
+        showFrame(3);
+        currentFrame = 3;
+      }
+    });
+  },
+
+  /** ★ A: 叙事序列结束 → 进入游戏 */
+  _endNarrativeOpening(overlay) {
+    overlay.classList.add('fade-out');
+    localStorage.setItem('bioIntroSeen', '1');
+    SFX.updateBGMPhase(this.phase);
+    this._startHelpPulse();
+
+    setTimeout(() => {
+      overlay.classList.remove('show', 'fade-out');
+      overlay.setAttribute('aria-hidden', 'true');
+
+      // 自动选中碳源采集器，引导玩家放置第一个建筑
+      if (this.totalBuildings() === 0) {
+        this.selectBuilding('glucoseCollector');
+        // ★ I1: 引导气泡 — 指向核心右边的空格子
+        this._showGuideBubble(
+          '🌱 它需要食物。点击这个格子，放下碳源采集器。',
+          { dx: 1, dy: 0 },
+          { highlightCell: true }
+        );
+      }
+    }, 1000);
   },
 
   // ===== BUILD UI =====
@@ -3774,6 +3957,7 @@ const G = {
     let _p2bDividerShown = false; // P2b分隔符是否已插入
     let _p3aDividerShown = false; // P3a分隔符
     let _p3bDividerShown = false; // P3b分隔符
+    let _nextLockedPerPhase = {};  // ★ D: 每个阶段的「下一个待解锁」追踪
     for (let key in BLDS) {
       const b = BLDS[key];
       if (b.phase > this.phase) continue;
@@ -3833,13 +4017,47 @@ const G = {
       const isP3bLocked = b.phase === 3 && P3B_BUILDINGS.has(key) && !this._p3bUnlocked;
       const locked = isP3bLocked || (b.techReq && !this.techs[b.techReq]?.done);
 
+      // ★ D: 渐进揭示 — 被锁定的建筑分为「下一个待解锁」和「剪影」
+      let isSilhouette = false;
+      if (locked) {
+        const phKey = b.phase;
+        if (!_nextLockedPerPhase[phKey]) {
+          // 第一个被锁定的 = 下一个待解锁，正常带锁显示
+          _nextLockedPerPhase[phKey] = key;
+        } else {
+          // 后续被锁定的 = 剪影
+          isSilhouette = true;
+        }
+      }
+
+      // ★ D: 剪影建筑 — 问号卡片
+      if (isSilhouette) {
+        const silRow = document.createElement('div');
+        silRow.className = 'build-row';
+        const silBtn = document.createElement('button');
+        silBtn.className = 'action-btn locked bld-silhouette';
+        silBtn.innerHTML = `
+          <div class="act-icon" style="filter:blur(3px) brightness(0.3);opacity:0.5">${SVG[key]||'❓'}</div>
+          <div style="flex:1;min-width:0">
+            <div class="act-name" style="color:var(--dim);opacity:0.5">??? · 未知建筑</div>
+            <div class="act-prod-hint" style="opacity:0.3">继续探索来揭示…</div>
+          </div>
+        `;
+        silBtn.onclick = () => {
+          this.showEvent('🔮 未知建筑', '继续解锁科技和探索，新的建筑将逐渐浮现。\n\n每一次研究，都离真相更近一步。', 'var(--dim)');
+        };
+        silRow.appendChild(silBtn);
+        list.appendChild(silRow);
+        continue; // 跳过正常渲染
+      }
+
       // 外层容器，包含建筑按钮 + 升级按钮
       const row = document.createElement('div');
       row.className = 'build-row';
 
       const btn = document.createElement('button');
       const canAfford = !locked && this.checkRes(this.scaledCost(key));
-      btn.className = 'action-btn' + (locked ? ' locked' : '') + (!locked && !canAfford ? ' cant-afford' : '') + (this.sel === key ? ' active' : '');
+      btn.className = 'action-btn' + (locked ? ' locked' : '') + (!locked && !canAfford ? ' cant-afford' : '') + (this.sel === key ? ' active' : '') + (locked && !isSilhouette ? ' bld-next-unlock' : '');
       btn.dataset.b = key;
 
       // 动态递增造价
@@ -3856,7 +4074,14 @@ const G = {
       const tooltipDesc = b.d + (b.corePowered ? ` | 🏠 核心供能上限: ${(CORE_COLONY[this.phase]||CORE_COLONY[1]).maxCollectors}台` : '');
       // 提取主产出简写（取 prod 的第一个资源）
       const mainProd = Object.entries(b.prod || {})[0];
-      const prodHint = mainProd ? `+${mainProd[1]}${RES[mainProd[0]]?.icon||mainProd[0]}/s` : '';
+      let prodHint = mainProd ? `+${mainProd[1]}${RES[mainProd[0]]?.icon||mainProd[0]}/s` : '';
+      // ★ D: 「下一个待解锁」建筑显示解锁条件
+      if (locked && !isSilhouette) {
+        const techName = b.techReq ? (this.techs[b.techReq]?.n || b.techReq) : '';
+        prodHint = isP3bLocked
+          ? '🔒 需完成P3a探索'
+          : (techName ? `🔒 需研究「${techName}」` : '🔒 需解锁前置科技');
+      }
       btn.innerHTML = `
         <div class="act-icon">${SVG[key]||''}</div>
         <div style="flex:1;min-width:0">
@@ -4668,6 +4893,24 @@ const G = {
       list.appendChild(badge);
     }
 
+    // 科技总览条
+    const techTotal = Object.keys(TECHS).length;
+    const techDone = Object.values(this.techs).filter(t => t.done).length;
+    const pct = techTotal > 0 ? Math.round(techDone / techTotal * 100) : 0;
+    // 提取已选路线名
+    const routeNames = [];
+    for (const key in TECHS) {
+      if (this.techs[key]?.done && TECHS[key].exclusive) routeNames.push(TECHS[key].n);
+    }
+    const overview = document.createElement('div');
+    overview.className = 'tt-overview';
+    overview.innerHTML = `
+      <span>📖 ${techDone}/${techTotal}</span>
+      <div class="tt-overview-bar"><div class="tt-overview-fill" style="width:${pct}%"></div></div>
+      ${routeNames.length ? `<span class="tt-overview-route" title="${routeNames.join(' → ')}">${routeNames.join(' → ')}</span>` : ''}
+    `;
+    list.appendChild(overview);
+
     // 按阶段组织科技树数据
     const phaseMap = {}; // { phase: { trunk: key, branches: [keyA, keyB] } }
     for (const key in TECHS) {
@@ -4683,6 +4926,25 @@ const G = {
 
     const phases = Object.keys(phaseMap).map(Number).sort((a, b) => a - b);
     let hasVisible = false;
+
+    // 辅助：将ef文字转为pill标签HTML
+    const efToPills = (ef) => {
+      if (!ef || typeof ef !== 'string') return '';
+      const pills = [];
+      // 解锁类
+      ef.replace(/解锁(.+?)(?:[，,]|$)/g, (_, m) => { pills.push({ text: '🔓 ' + m.trim(), cls: 'unlock' }); });
+      // 百分比加成
+      ef.replace(/(.{1,6}?)([+\-]?\d+%)/g, (_, label, pct) => {
+        if (!pills.some(p => p.text.includes(pct))) pills.push({ text: label.replace(/[，,]/g,'').trim() + pct, cls: 'boost' });
+      });
+      // 翻倍/特殊
+      if (/翻倍/.test(ef)) pills.push({ text: '×2', cls: 'special' });
+      // +N 数值类（端口、种群上限等）
+      ef.replace(/([+]?\d+)([^\d%,，]*?(?:端口|上限))/g, (_, n, label) => { pills.push({ text: '+' + n + label.trim(), cls: 'special' }); });
+      // 如果没解析出任何pill，回退为一个完整文字pill
+      if (pills.length === 0) pills.push({ text: ef, cls: '' });
+      return '<div class="tt-pills">' + pills.map(p => `<span class="tt-pill ${p.cls}">${p.text}</span>`).join('') + '</div>';
+    };
 
     // 辅助：创建科技节点 DOM
     const mkNode = (key) => {
@@ -4706,7 +4968,7 @@ const G = {
 
       const node = document.createElement('div');
       let cls = 'tt-node';
-      if (done) cls += ' done';
+      if (done) cls += ' done collapsed'; // 已完成默认折叠
       else if (exclusiveLocked) cls += ' exclusive-locked';
       else if (locked) cls += ' locked';
       else if (prereqLocked) cls += ' prereq-locked';
@@ -4716,10 +4978,27 @@ const G = {
 
       const costStr = Object.entries(t.cost).map(([k, v]) => `${formatNum(v)} ${RES[k]?.icon || k}`).join(' + ');
 
-      let statusStr;
+      // === 已完成科技：折叠/展开双态 ===
       if (done) {
-        statusStr = '<span class="status-done">✦ 已生效</span>';
-      } else if (exclusiveLocked) {
+        const pillsHTML = efToPills(t.ef);
+        node.innerHTML = `
+          <div class="tt-name"><span class="done-mark">✓</span>${t.n}${pillsHTML}<span class="tt-fold-icon">▾</span></div>
+          <div class="tt-detail">
+            <div class="tt-desc">${t.d} — ${t.ef}</div>
+            <div class="tt-cost"><span class="status-done">✦ 已生效</span></div>
+          </div>
+        `;
+        node.onclick = (e) => {
+          e.stopPropagation();
+          node.classList.toggle('collapsed');
+          node.classList.toggle('expanded');
+        };
+        return { node, done, exclusiveLocked };
+      }
+
+      // === 未完成科技：保持原有逻辑 ===
+      let statusStr;
+      if (exclusiveLocked) {
         statusStr = `<span class="status-locked">🔒 被「${exclusiveBy}」互斥</span>`;
       } else {
         statusStr = `${costStr} · ${t.time}s`;
@@ -4727,7 +5006,7 @@ const G = {
 
       // v3.0 §3: 前置条件显示行
       let prereqHTML = '';
-      if (prereq.hasPrereq && !done && !exclusiveLocked) {
+      if (prereq.hasPrereq && !exclusiveLocked) {
         if (prereq.met) {
           prereqHTML = `<div class="tt-prereq met">✅ ${prereq.icon} ${prereq.label}</div>`;
         } else {
@@ -4740,21 +5019,25 @@ const G = {
       }
 
       let branchTag = '';
-      if (t.exclusive && !done && !exclusiveLocked) {
+      if (t.exclusive && !exclusiveLocked) {
         branchTag = this._multiStrainUnlocked
           ? '<span class="tt-exclusive-tag" style="background:rgba(34,197,94,0.15);color:#22c55e;border-color:rgba(34,197,94,0.3)">🌐 可同时研究</span>'
           : '<span class="tt-exclusive-tag">⚡二选一</span>';
       }
 
+      // 未完成科技也显示pill预览
+      const pillsPreview = efToPills(t.ef);
+
       node.innerHTML = `
-        <div class="tt-name">${done ? '<span class="done-mark">✓</span>' : ''}${t.n}${branchTag}</div>
-        <div class="tt-desc">${t.d} — ${t.ef}</div>
+        <div class="tt-name">${t.n}${branchTag}</div>
+        <div class="tt-desc">${t.d}</div>
+        ${pillsPreview}
         ${prereqHTML}
         <div class="tt-cost">${statusStr}</div>
         ${isResearching ? `<div class="prog-wrap"><div class="prog-bar"><div class="prog-fill" id="techFill-${key}" style="width:0%;background:var(--cyan)"></div></div></div>` : ''}
       `;
 
-      if (!locked && !done && !exclusiveLocked && !prereqLocked) {
+      if (!locked && !exclusiveLocked && !prereqLocked) {
         node.onclick = () => this.startResearch(key);
       } else if (prereqLocked && !locked && !exclusiveLocked) {
         // v3.0 §3: 点击前置条件锁定科技时弹出友好提示
@@ -4949,7 +5232,8 @@ const G = {
     return { cellSize, cols: this.gridCols };
   },
 
-  /* 动态调整网格大小（支持非正方形），保留原有建筑位置 */
+  /* 动态调整网格大小（支持非正方形），保留原有建筑位置
+   * ★ 动机引擎改造：居中扩张模式 — 旧建筑映射到新网格的中心区域 */
   _resizeGrid(newCols, newRows) {
     const oldCols = this.gridCols;
     const oldRows = this.gridRows;
@@ -4958,36 +5242,64 @@ const G = {
     const newGrid = new Array(newLen).fill(null);
     const newLevels = {};
 
-    // 把旧建筑按 (row, col) 映射到新网格
+    // ★ 居中扩张：旧网格映射到新网格的中心区域
+    const offsetR = Math.floor((newRows - oldRows) / 2);
+    const offsetC = Math.floor((newCols - oldCols) / 2);
+
+    // 旧→新索引映射（居中偏移）
+    const idxMap = {}; // old idx → new idx
     for (let i = 0; i < oldGrid.length; i++) {
-      if (!oldGrid[i]) continue;
       const r = Math.floor(i / oldCols);
       const c = i % oldCols;
-      if (r < newRows && c < newCols) {
-        const ni = r * newCols + c;
-        newGrid[ni] = oldGrid[i];
-        if (this.buildingLevels[i] !== undefined) {
-          newLevels[ni] = this.buildingLevels[i];
+      const nr = r + offsetR;
+      const nc = c + offsetC;
+      if (nr >= 0 && nr < newRows && nc >= 0 && nc < newCols) {
+        const ni = nr * newCols + nc;
+        idxMap[i] = ni;
+        if (oldGrid[i]) {
+          newGrid[ni] = oldGrid[i];
+          if (this.buildingLevels[i] !== undefined) {
+            newLevels[ni] = this.buildingLevels[i];
+          }
         }
       }
     }
 
-    // 迁移传送带的 key (索引对)
+    // 迁移传送带的 key (索引对) — 使用居中映射
     const migrateBeltMap = (map) => {
       const result = {};
       for (const [key, v] of Object.entries(map || {})) {
         const [a, b] = key.split('-').map(Number);
-        const ar = Math.floor(a / oldCols), ac = a % oldCols;
-        const br = Math.floor(b / oldCols), bc = b % oldCols;
-        if (ar < newRows && ac < newCols && br < newRows && bc < newCols) {
-          const na = ar * newCols + ac;
-          const nb = br * newCols + bc;
+        const na = idxMap[a];
+        const nb = idxMap[b];
+        if (na !== undefined && nb !== undefined) {
           const nk = Math.min(na, nb) + '-' + Math.max(na, nb);
           result[nk] = v;
         }
       }
       return result;
     };
+
+    // 迁移建筑特化索引
+    const newSpecs = {};
+    for (const [idx, spec] of Object.entries(this._specializations || {})) {
+      const ni = idxMap[+idx];
+      if (ni !== undefined) newSpecs[ni] = spec;
+    }
+
+    // 迁移同步加成索引
+    const newSyncBonuses = {};
+    for (const [idx, sync] of Object.entries(this._syncBonuses || {})) {
+      const ni = idxMap[+idx];
+      if (ni !== undefined) newSyncBonuses[ni] = sync;
+    }
+
+    // 迁移休眠格子索引
+    const newDormant = {};
+    for (const [idx, v] of Object.entries(this._dormantCells || {})) {
+      const ni = idxMap[+idx];
+      if (ni !== undefined) newDormant[ni] = v;
+    }
 
     this.gridCols = newCols;
     this.gridRows = newRows;
@@ -4997,7 +5309,194 @@ const G = {
     this.beltLevels = migrateBeltMap(this.beltLevels);
     this.manualBelts = migrateBeltMap(this.manualBelts);
     this.removedBelts = migrateBeltMap(this.removedBelts);
+    this._specializations = newSpecs;
+    this._syncBonuses = newSyncBonuses;
+    this._dormantCells = newDormant;
     this._chainsDirty = true;
+    this._gridInitialized = false; // 强制 renderGrid 重建 DOM
+  },
+
+  // ===== ★ 帝国核心入格系统 (动机引擎 J1) =====
+
+  /** 获取网格正中心索引（核心始终占据此位置） */
+  getCoreIdx() {
+    const centerR = Math.floor(this.gridRows / 2);
+    const centerC = Math.floor(this.gridCols / 2);
+    return centerR * this.gridCols + centerC;
+  },
+
+  /** 判断某格子是否是核心格 */
+  isCoreCell(idx) {
+    return idx === this.getCoreIdx();
+  },
+
+  /** 在网格中心放置核心（如果中心有建筑则移走） */
+  placeCoreInGrid() {
+    const ci = this.getCoreIdx();
+    // 如果中心格已有普通建筑，移到最近的空格子
+    if (this.grid[ci] && this.grid[ci].type !== '_coreColony') {
+      const displaced = this.grid[ci];
+      const displacedLevel = this.buildingLevels[ci];
+      this.grid[ci] = null;
+      delete this.buildingLevels[ci];
+      // 找最近的空格子
+      const neighbors = this.getNeighbors(ci);
+      let placed = false;
+      for (const ni of neighbors) {
+        if (!this.grid[ni]) {
+          this.grid[ni] = displaced;
+          if (displacedLevel) this.buildingLevels[ni] = displacedLevel;
+          placed = true;
+          break;
+        }
+      }
+      if (!placed) {
+        // 邻居都满了，扫描全格找空位
+        for (let i = 0; i < this.grid.length; i++) {
+          if (!this.grid[i] && i !== ci) {
+            this.grid[i] = displaced;
+            if (displacedLevel) this.buildingLevels[i] = displacedLevel;
+            break;
+          }
+        }
+      }
+    }
+    // 放置核心标记
+    this.grid[ci] = { type: '_coreColony' };
+  },
+
+  /** 将相对核心的偏移量转为格子索引 (引导系统用) */
+  coreOffsetToIdx(dx, dy) {
+    const centerR = Math.floor(this.gridRows / 2);
+    const centerC = Math.floor(this.gridCols / 2);
+    const tr = centerR + dy;
+    const tc = centerC + dx;
+    if (tr < 0 || tr >= this.gridRows || tc < 0 || tc >= this.gridCols) return -1;
+    return tr * this.gridCols + tc;
+  },
+
+  // ===== ★ J2: 供能链接 SVG 渲染系统 =====
+  
+  /** 
+   * 绘制核心到被供能碳源采集器之间的能量丝 
+   * 调用时机：renderGrid 结尾 / cellClick 建筑放置后 / updateRates 后
+   */
+  _renderSupplyLinks() {
+    const svg = document.getElementById('supplyLinkSvg');
+    const gridEl = document.getElementById('grid');
+    if (!svg || !gridEl) return;
+
+    const suppliedIndices = this._coreSuppliedIndices || [];
+    const coreIdx = this.getCoreIdx();
+    const cc = CORE_COLONY[this.phase] || CORE_COLONY[1];
+
+    // 如果链接数和上次一样且格子没变，跳过重绘
+    const linkKey = suppliedIndices.join(',') + '|' + this.gridCols + '|' + this.phase;
+    if (this._lastLinkKey === linkKey) return;
+    this._lastLinkKey = linkKey;
+
+    svg.innerHTML = '';
+    if (suppliedIndices.length === 0) return;
+
+    // 获取核心格和各碳源格的中心坐标（相对于 dish-scroll-inner）
+    const getCellCenter = (idx) => {
+      const cell = gridEl.children[idx];
+      if (!cell) return null;
+      // 相对于 dish-scroll-inner
+      const inner = gridEl.parentElement;
+      const cellRect = cell.getBoundingClientRect();
+      const innerRect = inner.getBoundingClientRect();
+      return {
+        x: cellRect.left - innerRect.left + cellRect.width / 2,
+        y: cellRect.top - innerRect.top + cellRect.height / 2
+      };
+    };
+
+    const coreCenter = getCellCenter(coreIdx);
+    if (!coreCenter) return;
+
+    // SVG 与 dish-scroll-inner 对齐
+    const inner = gridEl.parentElement;
+    svg.setAttribute('width', inner.scrollWidth);
+    svg.setAttribute('height', inner.scrollHeight);
+    svg.setAttribute('viewBox', `0 0 ${inner.scrollWidth} ${inner.scrollHeight}`);
+
+    // SVG 命名空间
+    const NS = 'http://www.w3.org/2000/svg';
+
+    // 创建 defs 用于粒子动画
+    const defs = document.createElementNS(NS, 'defs');
+    svg.appendChild(defs);
+
+    suppliedIndices.forEach((targetIdx, i) => {
+      const target = getCellCenter(targetIdx);
+      if (!target) return;
+
+      // 贝塞尔曲线控制点计算 — 有机弯曲（像微管/菌丝）
+      const dx = target.x - coreCenter.x;
+      const dy = target.y - coreCenter.y;
+      const dist = Math.sqrt(dx*dx + dy*dy);
+      
+      // 垂直偏移方向（每条链接略不同，避免重叠）
+      const perpSign = (i % 2 === 0) ? 1 : -1;
+      const curvature = Math.min(dist * 0.25, 30); // 弯曲程度
+      const perpX = -dy / dist * curvature * perpSign;
+      const perpY = dx / dist * curvature * perpSign;
+
+      // 两个控制点（让曲线有机弯曲）
+      const cp1x = coreCenter.x + dx * 0.3 + perpX;
+      const cp1y = coreCenter.y + dy * 0.3 + perpY;
+      const cp2x = coreCenter.x + dx * 0.7 + perpX * 0.5;
+      const cp2y = coreCenter.y + dy * 0.7 + perpY * 0.5;
+
+      const pathD = `M ${coreCenter.x} ${coreCenter.y} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${target.x} ${target.y}`;
+
+      // 路径 ID（用于 animateMotion）
+      const pathId = `supplyPath${i}`;
+
+      // 绘制能量丝
+      const path = document.createElementNS(NS, 'path');
+      path.setAttribute('id', pathId);
+      path.setAttribute('d', pathD);
+      path.setAttribute('class', 'supply-link-path');
+      path.setAttribute('stroke', cc.color);
+      path.setAttribute('stroke-width', '2');
+      path.setAttribute('stroke-opacity', '0.5');
+      path.setAttribute('stroke-dasharray', '6 4');
+      // 流动动画
+      path.innerHTML = `<animate attributeName="stroke-dashoffset" from="0" to="-20" dur="1.5s" repeatCount="indefinite"/>`;
+      svg.appendChild(path);
+
+      // 绘制流动光点粒子（2-3个沿路径移动）
+      const numParticles = 2;
+      for (let p = 0; p < numParticles; p++) {
+        const particle = document.createElementNS(NS, 'circle');
+        particle.setAttribute('r', '3');
+        particle.setAttribute('class', 'supply-link-particle');
+        particle.setAttribute('fill', cc.color);
+        particle.setAttribute('opacity', '0.8');
+        const motion = document.createElementNS(NS, 'animateMotion');
+        motion.setAttribute('dur', `${1.2 + p * 0.4}s`);
+        motion.setAttribute('repeatCount', 'indefinite');
+        motion.setAttribute('begin', `${p * 0.6}s`);
+        const mpath = document.createElementNS(NS, 'mpath');
+        mpath.setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', `#${pathId}`);
+        motion.appendChild(mpath);
+        particle.appendChild(motion);
+        svg.appendChild(particle);
+      }
+
+      // 连接端点光晕（碳源端）
+      const glow = document.createElementNS(NS, 'circle');
+      glow.setAttribute('cx', target.x);
+      glow.setAttribute('cy', target.y);
+      glow.setAttribute('r', '8');
+      glow.setAttribute('fill', cc.color);
+      glow.setAttribute('opacity', '0.15');
+      glow.innerHTML = `<animate attributeName="r" values="6;10;6" dur="2s" repeatCount="indefinite"/>
+        <animate attributeName="opacity" values="0.1;0.25;0.1" dur="2s" repeatCount="indefinite"/>`;
+      svg.appendChild(glow);
+    });
   },
 
   // ===== 增量更新 renderGrid =====
@@ -5045,8 +5544,9 @@ const G = {
       const cell = gridEl.children[i];
       if (!cell) continue;
 
-      // 清除无效的格子数据（旧存档残留，含旧版核心菌落）
-      if (this.grid[i] && (this.grid[i].type === '_coreColony' || !this.grid[i].type || !BLDS[this.grid[i].type])) {
+      // 清除无效的格子数据（旧存档残留）
+      // ★ J1: _coreColony 不再被清除 — 核心格有专门的渲染逻辑
+      if (this.grid[i] && this.grid[i].type !== '_coreColony' && (!this.grid[i].type || !BLDS[this.grid[i].type])) {
         this.grid[i] = null;
       }
 
@@ -5055,7 +5555,7 @@ const G = {
       const curLv = this.grid[i] ? (this.buildingLevels[i] || 1) : 0;
       const curSeq = seqMap[i] || 0;
       const prevKey = cell._rkey || '';
-      const newKey = curType + '|' + curLv + '|' + curSeq + '|' + (seqCounters[curType] || 0);
+      const newKey = curType + '|' + curLv + '|' + curSeq + '|' + (seqCounters[curType] || 0) + '|' + this.phase;
       if (prevKey === newKey) continue; // 无变化，跳过
       cell._rkey = newKey;
 
@@ -5065,6 +5565,76 @@ const G = {
       cell.innerHTML = '';
       cell.style.borderColor = '';
       delete cell.dataset.btype;
+
+      // ★ J1: 帝国核心格 — 特殊渲染
+      if (this.grid[i] && this.grid[i].type === '_coreColony') {
+        const cc = CORE_COLONY[this.phase] || CORE_COLONY[1];
+        cell.classList.add('occupied', 'core-cell');
+        cell.style.borderColor = cc.color + '90';
+        cell.style.setProperty('--core-color', cc.color);
+        cell.style.setProperty('--core-glow', cc.glow);
+
+        // 核心emoji（大号）
+        const emojiEl = document.createElement('div');
+        emojiEl.className = 'cell-emoji core-emoji';
+        emojiEl.textContent = cc.emoji;
+        cell.appendChild(emojiEl);
+
+        // 核心名称
+        const label = document.createElement('div');
+        label.className = 'label core-label';
+        label.textContent = cc.name;
+        cell.appendChild(label);
+
+        // 核心光效伪元素通过CSS class驱动
+        cell.classList.add('core-phase-' + this.phase);
+
+        // ★ J4: P5 星尘粒子喷发效果
+        if (this.phase >= 5 && !cell.querySelector('.core-stardust')) {
+          const stardust = document.createElement('div');
+          stardust.className = 'core-stardust';
+          stardust.innerHTML = Array.from({length: 6}, (_, j) =>
+            `<span class="stardust-p" style="--sd-i:${j};--sd-delay:${j * 0.5}s;--sd-angle:${j * 60}deg"></span>`
+          ).join('');
+          cell.appendChild(stardust);
+        }
+        // ★ J4: P3+ 微粒子漂浮（蓝/金/紫色小点）
+        if (this.phase >= 3 && !cell.querySelector('.core-micro-particles')) {
+          const mpEl = document.createElement('div');
+          mpEl.className = 'core-micro-particles';
+          const mpColors = { 3: 'rgba(56,189,248,0.6)', 4: 'rgba(251,191,36,0.6)', 5: 'rgba(168,85,247,0.7)' };
+          const mpColor = mpColors[this.phase] || mpColors[3];
+          mpEl.innerHTML = Array.from({length: 3}, (_, j) =>
+            `<span class="core-mp" style="--mp-i:${j};--mp-color:${mpColor}"></span>`
+          ).join('');
+          cell.appendChild(mpEl);
+        }
+
+        // ★ J3: 供能状态视觉反馈
+        const supUsed = this._coreSupplyUsed || 0;
+        const supMax = cc.maxCollectors || 2;
+        if (supUsed === 0) {
+          cell.classList.add('core-supply-idle');
+        } else if (supUsed < supMax) {
+          cell.classList.add('core-supply-partial');
+        } else if (supUsed === supMax) {
+          cell.classList.add('core-supply-full');
+        } else {
+          cell.classList.add('core-supply-overload');
+        }
+
+        cell.dataset.btype = '_coreColony';
+
+        // ★ 核心可升级提示（底部闪烁标签）
+        const upHint = document.createElement('div');
+        upHint.className = 'core-upgrade-hint';
+        upHint.id = 'coreUpgradeHint';
+        upHint.textContent = '⬆ 可升级';
+        upHint.style.display = 'none';
+        cell.appendChild(upHint);
+
+        continue;
+      }
 
       if (this.grid[i]) {
         const bd = BLDS[this.grid[i].type];
@@ -5096,6 +5666,16 @@ const G = {
         dormBadge.textContent = '💤 休眠中';
         dormBadge.style.display = this._dormantCells[i] ? 'block' : 'none';
         cell.appendChild(dormBadge);
+
+        // ★ 闲置碳源badge（核心供能超出上限时显示）
+        if (bd.corePowered) {
+          const idleBadge = document.createElement('div');
+          idleBadge.className = 'cell-idle-badge';
+          idleBadge.id = 'idleBadge-' + i;
+          idleBadge.textContent = '⚡ 闲置';
+          idleBadge.style.display = 'none';
+          cell.appendChild(idleBadge);
+        }
 
         // 主题色 L 型色标（左竖条 + 顶横条）
         const stripe = document.createElement('div');
@@ -5296,6 +5876,28 @@ const G = {
     }
     // 渲染完毕后刷新滚动指示器
     if (this._updateScrollHints) setTimeout(this._updateScrollHints, 50);
+
+    // ★ F2: 空格子生命迹象 — 被≥2个建筑包围的空格子添加微粒子漂移
+    for (let i = 0; i < this.grid.length; i++) {
+      if (this.grid[i]) continue; // 跳过占用格
+      const cell = gridEl.children[i];
+      if (!cell) continue;
+      const r = Math.floor(i / this.gridCols);
+      const c = i % this.gridCols;
+      let neighborCount = 0;
+      const dirs4 = [[-1,0],[1,0],[0,-1],[0,1]];
+      for (const [dr, dc] of dirs4) {
+        const nr = r + dr, nc = c + dc;
+        if (nr >= 0 && nr < this.gridRows && nc >= 0 && nc < this.gridCols) {
+          const ni = nr * this.gridCols + nc;
+          if (this.grid[ni]) neighborCount++;
+        }
+      }
+      if (neighborCount >= 2) {
+        cell.classList.add('cell-alive');
+      }
+    }
+
     // 恢复培养皿实验高亮（renderGrid会重置className，需重新应用）
     if (this._petriActiveZone && this._petriBuff) {
       for (const idx of this._petriActiveZone) {
@@ -5306,6 +5908,9 @@ const G = {
         }
       }
     }
+
+    // ★ J2: 更新供能链接 SVG
+    requestAnimationFrame(() => this._renderSupplyLinks());
   },
 
   // ===== 事件委托：统一在 gridEl 上监听，通过 dataset.i 获取 idx =====
@@ -5332,7 +5937,7 @@ const G = {
       if (self._selectedCells.size > 0 && !self._selectedCells.has(idx)) {
         self._clearBoxSelection();
       }
-      if (self.grid[idx] && !self.sel) {
+      if (self.grid[idx] && !self.sel && !self.isCoreCell(idx)) {
         self._dragStartPos = { x: e.clientX, y: e.clientY };
         self._dragIdx = idx;
         self._isDragging = false;
@@ -5753,6 +6358,13 @@ const G = {
       // 核心供能建筑：超出上限标记闲置
       if (bd.corePowered) {
         collectorSeq++;
+        // ★ 闲置碳源网格标识
+        const isIdle = collectorSeq > maxC;
+        const idleBadgeEl = document.getElementById('idleBadge-' + idx);
+        const gridEl2 = document.getElementById('grid');
+        const cellEl2 = gridEl2 && gridEl2.children[idx];
+        if (cellEl2) cellEl2.classList.toggle('cell-idle-collector', isIdle);
+        if (idleBadgeEl) idleBadgeEl.style.display = isIdle ? 'block' : 'none';
       }
 
       // 更新资源阻塞状态（休眠建筑排除——它是主动停机，不是阻塞）
@@ -6069,6 +6681,11 @@ const G = {
 
   _completeDrag(fromIdx, toIdx) {
     if (fromIdx === toIdx) { this._cancelDrag(); return; }
+    // ★ J1: 核心格不可拖拽
+    if (this.isCoreCell(fromIdx) || this.isCoreCell(toIdx)) {
+      this.log('🔮 核心格不可移动', 'w');
+      this._cancelDrag(); return;
+    }
     const srcBuilding = this.grid[fromIdx];
     if (!srcBuilding) { this._cancelDrag(); return; }
 
@@ -6580,6 +7197,26 @@ const G = {
 
   // ===== CELL CLICK =====
   cellClick(idx) {
+    // ★ J1: 核心格拦截 — 不可在核心格上建造/拆除
+    if (this.isCoreCell(idx)) {
+      if (this.sel) {
+        this.log('🔮 核心格不可放置建筑', 'w');
+        SFX.buildFail();
+        return;
+      }
+      // 点击核心格 → 展示核心信息（复用现有面板交互）
+      const cc = CORE_COLONY[this.phase] || CORE_COLONY[1];
+      this.log(`🔮 ${cc.name} — ${cc.desc} | 供能上限: ${cc.maxCollectors}台碳源`, 'ev');
+      // 清除旧选中，高亮核心格
+      document.querySelectorAll('.cell.cell-selected').forEach(c => c.classList.remove('cell-selected'));
+      const cell = document.querySelector(`.cell[data-i="${idx}"]`);
+      if (cell) {
+        cell.classList.add('cell-selected');
+        clearTimeout(this._cellSelTimer);
+        this._cellSelTimer = setTimeout(() => cell.classList.remove('cell-selected'), 3000);
+      }
+      return;
+    }
     // 培养皿实验模式
     if (this._petriMode) {
       this.handlePetriClick(idx);
@@ -6670,6 +7307,9 @@ const G = {
     this._invalidateAdjStats();
     const _prevAdjTotal = this._getAdjStats().totalBonus;
 
+    // ★ I1: 放置建筑时隐藏上一个引导气泡
+    this._hideGuideBubble();
+
     this.spend(actualCost);
     this.grid[idx] = { type: this.sel };
 
@@ -6685,11 +7325,23 @@ const G = {
     }
 
     this.renderGrid();
+    // 品牌动效：新建筑细胞分裂动画
+    const justBuiltCell = document.querySelector(`.cell[data-i="${idx}"]`);
+    if (justBuiltCell) {
+      justBuiltCell.classList.add('cell-just-built');
+      justBuiltCell.addEventListener('animationend', () => justBuiltCell.classList.remove('cell-just-built'), { once: true });
+
+      // ★ F1: 放置波纹扩散
+      this._spawnPlaceRipple(idx, justBuiltCell);
+    }
     this.updateRates();
     this.checkPhaseUp();
     this.renderBuildings();
     this.updateUI();
     this.log('▸ 建造 ' + bd.n + ' | ' + bd.ratio, 's');
+    // ★ J2: 放置建筑后立即更新供能链接（updateRates 已更新 _coreSuppliedIndices）
+    this._lastLinkKey = null; // 强制重绘
+    requestAnimationFrame(() => this._renderSupplyLinks());
 
     // 核心供给超限警告
     if (bd.corePowered) {
@@ -6702,37 +7354,68 @@ const G = {
       }
     }
 
-    // v2.0 §8.4: 传送带连接提示 — P1自动 / P2 hybrid / P3+手动
+    // v3.1: 传送带连接提示 — 动态模式
     const beltInfoAfter = this._checkBeltConnections(idx, this.sel);
-    const currentBeltMode = BELT_MODE[Math.min(this.phase, 3)] || 'manual';
+    const currentBeltMode = getBeltMode();
+    const hasFlowRole = FLOW_TYPES_FROM.has(this.sel) || FLOW_TYPES_TO.has(this.sel);
     if (currentBeltMode === 'auto') {
-      // P1: 保留自动连接，新手友好
+      // P1 或 P2前期：全自动
       if (beltInfoAfter.count > 0) {
         this.log(`🔗 传送带已自动连接 ×${beltInfoAfter.count}`, 's');
-      } else {
-        const hasFlowRole = FLOW_TYPES_FROM.has(this.sel) || FLOW_TYPES_TO.has(this.sel);
-        if (hasFlowRole) {
-          this.log('🔗 传送带已自动规划，放心建造！', 's');
-        }
+      } else if (hasFlowRole) {
+        this.log('🔗 传送带已自动规划，放心建造！', 's');
+      }
+      // ★ C1第一拍：P2刚进入(bld<4)时主动引导手动连接
+      if (this.phase === 2 && !this._p2BeltNudgeShown && this.totalBuildings() >= 2) {
+        this._p2BeltNudgeShown = true;
+        setTimeout(() => {
+          this._showGuideBubble(
+            '🔗 这条管线是系统帮你连的。试试自己连一条？点底部「连接管线」按钮',
+            idx,
+            { duration: 6000, highlightCell: false }
+          );
+        }, 800);
       }
     } else if (currentBeltMode === 'hybrid') {
-      // P2: 自动传送带仍在，但可手动添加优化
-      if (beltInfoAfter.count > 0) {
-        this.log(`🔗 自动连接 ×${beltInfoAfter.count} | 💡 你也可以手动添加管线来优化产线`, 's');
+      // ★ C1第二拍：P2 bld≥4 — 新建筑不再自动连接
+      if (this._p2ManualBldSet && this._p2ManualBldSet.has(idx)) {
+        // 新建筑需要手动连
+        this.log('🧬 新细胞器需要手动连接管线！', 'w');
+        if (hasFlowRole) this._showBeltGuide(idx, bd);
+      } else if (beltInfoAfter.count > 0) {
+        this.log(`🔗 自动连接 ×${beltInfoAfter.count}`, 's');
       }
-      const hasFlowRole = FLOW_TYPES_FROM.has(this.sel) || FLOW_TYPES_TO.has(this.sel);
-      if (hasFlowRole) {
-        this._showBeltGuide(idx, bd);
+    } else if (currentBeltMode === 'degraded') {
+      // ★ C1第三拍：P2 bld≥6 — 新建筑手动 + 旧管线衰减
+      if (this._p2ManualBldSet && this._p2ManualBldSet.has(idx)) {
+        this.log('🧬 新细胞器需要手动连接管线！', 'w');
+        if (hasFlowRole) this._showBeltGuide(idx, bd);
+      } else if (beltInfoAfter.count > 0) {
+        this.log(`🔗 自动连接 ×${beltInfoAfter.count} (⚠ 老化中 -50%效率)`, 'w');
       }
-    } else {
-      // P3+: 纯手动
+      // 首次进入第三拍时提示
+      if (!this._p2DegradedShown) {
+        this._p2DegradedShown = true;
+        setTimeout(() => {
+          this._showGuideBubble(
+            '⚡ 自动管线开始老化，效率下降50%！用手动管线替换它们可恢复满效率 +10%加成',
+            idx,
+            { duration: 7000, highlightCell: false }
+          );
+        }, 500);
+      }
+    } else if (currentBeltMode === 'softLanding') {
+      // ★ C2: P3软着陆期间
       if (beltInfoAfter.count > 0) {
         this.log(`🔗 检测到 ${beltInfoAfter.count} 条可用连接`, 's');
       }
-      const hasFlowRole = FLOW_TYPES_FROM.has(this.sel) || FLOW_TYPES_TO.has(this.sel);
-      if (hasFlowRole) {
-        this._showBeltGuide(idx, bd);
+      if (hasFlowRole) this._showBeltGuide(idx, bd);
+    } else {
+      // P3+ 纯手动
+      if (beltInfoAfter.count > 0) {
+        this.log(`🔗 检测到 ${beltInfoAfter.count} 条可用连接`, 's');
       }
+      if (hasFlowRole) this._showBeltGuide(idx, bd);
     }
 
     // v2.0: 放置后清除邻接预览
@@ -6749,9 +7432,55 @@ const G = {
 
     // 爽感系统
     this.stats.totalBuilt++;
+    // ★ v3.1 C1: P2新建筑追踪
+    this._trackP2NewBuilding(idx);
     // J3: 微叙事事件 — 首个建筑建成
     if (this.stats.totalBuilt === 1) {
       this.showMilestone('🌱', '菌主大人，第一个采集菌诞生了...帝国从此刻开始！');
+    }
+
+    // ★ C1: 供能链接啊哈时刻 — 第1个碳源采集器放下后
+    if (this.bldCount('glucoseCollector') === 1 && bd.corePowered && !this._ahaSupplyShown) {
+      this._ahaSupplyShown = true;
+      // 延迟一点让供能链接SVG先渲染出来
+      setTimeout(() => {
+        this._showGuideBubble(
+          '🔮→🌱 供能连接！核心在为它提供能量。',
+          idx,
+          { duration: 4500, highlightCell: false }
+        );
+        SFX.milestone();
+        // 供能啊哈后引导下一步：ATP合成酶放到碳源右上（触发邻接）
+        setTimeout(() => {
+          if (this.bldCount('energyStation') === 0) {
+            this.selectBuilding('energyStation');
+            this._showGuideBubble(
+              '🔋 它需要动力。把ATP合成酶放在旁边 — 相邻建筑会共生加速！',
+              { dx: 1, dy: -1 },
+              { highlightCell: true }
+            );
+          }
+        }, 5000);
+      }, 600);
+    }
+
+    // ★ C1b: 邻接惊喜啊哈 — 第2个建筑与已有建筑相邻
+    if (this.stats.totalBuilt === 2 && !this._ahaAdjacencyShown) {
+      const neighbors = this.getNeighbors(idx);
+      const hasAdjacentBuilding = neighbors.some(nIdx => this.grid[nIdx] && !this.isCoreCell(nIdx));
+      if (hasAdjacentBuilding) {
+        this._ahaAdjacencyShown = true;
+        setTimeout(() => {
+          // 在有邻接的建筑之间闪烁连接效果
+          this._showAdjacencyAhaEffect(idx, neighbors);
+          this._showGuideBubble(
+            '🧬 共生！相邻建筑效率+15%',
+            idx,
+            { duration: 5000, highlightCell: false }
+          );
+          SFX.reward();
+        }, 1200); // 在供能啊哈之后
+      }
     }
     this.buildBurst(idx);
     this.addCombo();
@@ -9071,7 +9800,7 @@ const G = {
   },
 
   totalBuildings() {
-    return this.grid.filter(g => g !== null).length;
+    return this.grid.filter(g => g !== null && g.type !== '_coreColony').length;
   },
 
   // 种群上限：基于建筑数量和阶段（+科技加成）
@@ -9346,6 +10075,8 @@ const G = {
     this._coreSupplyUsed = collectorIndices.length;
     this._coreSupplyMax = maxCollectors;
     this._coreSupplyActive = activeCollectors;
+    // ★ J2: 保存被供能的碳源索引列表（供SVG链接渲染用）
+    this._coreSuppliedIndices = collectorIndices.slice(0, maxCollectors);
 
     // ★ 维护费后处理 — 需要 totalConsReduce 完成后才能算
     if (phaseGe2) {
@@ -10825,6 +11556,35 @@ const G = {
   // 实际执行阶段升级（原manualCoreUpgrade核心逻辑）
   // ★ Phase D 视觉叙事：阶段升级仪式序列（~3秒）
   _doPhaseUpgrade() {
+    // ★ v3.1 C1: P1→P2时记录已有建筑位置，作为"旧建筑"基准
+    if (this.phase === 1) {
+      this._p2BaseBldSet = new Set();
+      for (let i = 0; i < this.grid.length; i++) {
+        if (this.grid[i]) this._p2BaseBldSet.add(i);
+      }
+      // _p2ManualBldSet 记录P2期间新放的建筑（不享受自动管线）
+      this._p2ManualBldSet = new Set();
+    }
+
+    // ★ v3.1 C2: P2→P3时创建遗留管线快照
+    if (this.phase === 2 && this._computeBelts) {
+      const { belts } = this._computeBelts();
+      // 过滤出非手动的自动管线，按资源流数量排序
+      const autoBelts = belts
+        .filter(b => !b.isManual && (b.flows || []).length > 0)
+        .sort((a, b) => (b.flows || []).length - (a.flows || []).length);
+      this._p3LegacyBelts = {};
+      for (let i = 0; i < Math.min(3, autoBelts.length); i++) {
+        const belt = autoBelts[i];
+        const key = Math.min(belt.fi, belt.ti) + '-' + Math.max(belt.fi, belt.ti);
+        this._p3LegacyBelts[key] = {
+          fi: belt.fi, ti: belt.ti,
+          colors: belt.colors || [], icons: belt.icons || [], labels: belt.labels || [],
+          decayTimer: 0,
+        };
+      }
+    }
+
     // 阶段1→2时: 将自动传送带转化为手动传送带（保留已有连接）
     if (this.phase === 1 && this._computeBelts) {
       const { belts } = this._computeBelts();
@@ -10860,11 +11620,20 @@ const G = {
       setTimeout(() => {
         this._competitionEnabled = true;
       }, 180000);
+
+      // ★ v3.1 C2: 遗留管线退化序列 — 30s后开始，每15s断一条
+      if (this._p3LegacyBelts && Object.keys(this._p3LegacyBelts).length > 0) {
+        this.log('🔗 旧管线暂时保留，30秒后开始退化...', 'w');
+        this._p3LegacyDecayTimer = setTimeout(() => {
+          this._startLegacyDecay();
+        }, 30000);
+      }
     }
     const p = PHASES[this.phase - 1];
     const cc = CORE_COLONY[this.phase];
+    const narr = PHASE_NARRATIVES[this.phase]; // ★ E: 叙事文案
 
-    // ===== Phase D 仪式序列 =====
+    // ===== ★ E: 阶段转换叙事仪式（重构） =====
     const overlay = document.getElementById('phaseCeremony');
     const titleEl = document.getElementById('ceremonTitle');
     const descEl = document.getElementById('ceremonDesc');
@@ -10875,17 +11644,35 @@ const G = {
     SFX.phaseUp();
     overlay.classList.add('active');
 
-    // 0.5s — 核心菌落开始进化动画
+    // ★ E: 0.5s — 叙事文字渐入（story）
     setTimeout(() => {
+      if (narr) {
+        titleEl.textContent = narr.title;
+        descEl.innerHTML = narr.story.replace(/\n/g, '<br>');
+        overlay.classList.add('title-in');
+      }
+    }, 500);
+
+    // ★ E: 2.0s — 核心升级演出
+    setTimeout(() => {
+      // 核心进化动画
       const coreIcon = document.querySelector('.core-colony-icon');
       if (coreIcon) coreIcon.classList.add('core-evolving');
       SFX.updateBGMPhase(this.phase);
-    }, 500);
 
-    // 1.0s — 色彩切换（Phase A）+ 光粒子爆发
+      // 替换叙事文字为核心变化描述
+      if (narr) {
+        descEl.innerHTML = narr.coreChange;
+        descEl.classList.add('core-change-pulse');
+      }
+    }, 2000);
+
+    // ★ E: 2.8s — 色彩切换 + 光粒子爆发
     setTimeout(() => {
       setPhaseColors(this.phase);
-      // 光粒子爆发
+      // 进化符号集
+      const evoSymbols = { 2:'🧬🔬🌿', 3:'🔗⚙️🏗', 4:'⭐🌟💫', 5:'🧠🌌👁' };
+      const symbols = (evoSymbols[this.phase] || '✨🔮💠').split('');
       const cx = window.innerWidth / 2, cy = window.innerHeight / 2;
       for (let i = 0; i < 24; i++) {
         const angle = (i / 24) * Math.PI * 2 + (Math.random() - 0.5) * 0.3;
@@ -10897,71 +11684,222 @@ const G = {
         pt.style.setProperty('--dx', Math.cos(angle) * dist + 'px');
         pt.style.setProperty('--dy', Math.sin(angle) * dist + 'px');
         pt.style.setProperty('--dur', (1.0 + Math.random() * 0.8) + 's');
+        if (i % 4 === 0) {
+          pt.textContent = symbols[Math.floor(Math.random() * symbols.length)];
+          pt.style.fontSize = '1.2em';
+          pt.style.background = 'none';
+          pt.style.width = 'auto';
+          pt.style.height = 'auto';
+        }
         document.body.appendChild(pt);
         setTimeout(() => pt.remove(), 2000);
       }
-    }, 1000);
 
-    // 1.5s — 屏震 + 核心进化音效
+      // 供能链接全部闪亮一次
+      const svgLinks = document.querySelectorAll('.supply-link-line');
+      svgLinks.forEach(l => {
+        l.style.transition = 'stroke-opacity 0.3s';
+        l.style.strokeOpacity = '1';
+        setTimeout(() => { l.style.strokeOpacity = ''; l.style.transition = ''; }, 800);
+      });
+    }, 2800);
+
+    // ★ E: 3.3s — 屏震 + 核心进化音效
     setTimeout(() => {
       this.screenShake(8);
       if (cc) setTimeout(() => SFX.coreUpgrade(), 200);
-    }, 1500);
+    }, 3300);
 
-    // 1.8s — 阶段名称+描述显示
-    setTimeout(() => {
-      titleEl.textContent = p.icon + ' ' + p.name + '纪元';
-      descEl.textContent = p.desc;
-      overlay.classList.add('title-in');
-    }, 1800);
-
-    // 2.5s — 全屏色调闪烁
+    // ★ E: 3.8s — 全屏色调闪烁
     setTimeout(() => {
       const flash = document.createElement('div');
       flash.className = 'ceremony-flash';
       document.body.appendChild(flash);
       setTimeout(() => flash.remove(), 400);
-    }, 2500);
+    }, 3800);
 
-    // 3.0s — 仪式结束：清理遮罩，恢复游戏，执行所有后续逻辑
+    // ★ E: 4.2s — 显示阶段名称 + 膜扩张提示
     setTimeout(() => {
-      overlay.classList.remove('active', 'title-in');
-      titleEl.textContent = '';
-      descEl.textContent = '';
+      titleEl.textContent = p.icon + ' ' + p.name + '纪元';
+      if (narr) {
+        descEl.innerHTML = narr.expand;
+        descEl.classList.remove('core-change-pulse');
+      } else {
+        descEl.textContent = p.desc;
+      }
+    }, 4200);
+
+    // ★ E: 5.0s — 执行网格扩张 + 后续逻辑（第一批）
+    setTimeout(() => {
       // 移除核心进化动画
       const coreIcon = document.querySelector('.core-colony-icon');
       if (coreIcon) coreIcon.classList.remove('core-evolving');
-      // 恢复游戏
-      if (!wasPaused && this.paused) this.togglePause();
 
       // ===== 原有后续逻辑 =====
-      // 进入阶段3时停止帮助按钮脉冲
       if (this.phase >= 3) this._stopHelpPulse();
-      this.showMilestone(p.icon, '菌主大人，帝国迈入阶段 ' + p.id + ': ' + p.name + '！');
       this.log('◆ 进入阶段 ' + p.id + ': ' + p.name + ' — ' + p.desc, 's');
-      // J3: 微叙事 — 阶段升级
-      this.log('🌅 菌主大人，一个新时代降临...帝国更加强大了。', 's');
-      // 核心菌落升级提示
+      if (narr) this.log('🌅 ' + narr.flavor, 's');
+      else this.log('🌅 菌主大人，一个新时代降临...帝国更加强大了。', 's');
       if (cc) {
         this.log(`◆ 核心菌落进化: ${cc.name} ${cc.emoji}`, 's');
-        this.showEvent('核心进化: ' + cc.name, cc.desc + '\n\n菌主大人，帝国中枢变得更加强大了！', cc.color);
       }
       this.updatePhase();
       this.renderResources();
       this.renderBuildings();
       this.renderTechs();
-      // 阶段升级后更新小手引导（阶段2+自动隐藏）
       this._updateGuideHand();
       this.renderGrid();
       this.renderCoreColony(true);
       this.updateCoreUpgradeUI();
-      // 进入阶段3: 首次触发存档保存 + 提示玩家
+
+      // ★ G3: 执行网格扩张
+      this._expandGridForPhase(this.phase);
+
       if (this.phase === 3) {
         this.save(true);
         this.log('💾 进度已开始自动保存！', 's');
         this._updateSaveHint();
       }
-    }, 3000);
+    }, 5000);
+
+    // ★ E: 6.0s — flavor小字 + 点击任意处关闭
+    setTimeout(() => {
+      if (narr) {
+        descEl.innerHTML = '<span style="opacity:0.7;font-style:italic">' + narr.flavor + '</span><br><span style="opacity:0.4;font-size:0.8em;margin-top:8px;display:inline-block">点击任意处继续</span>';
+      }
+
+      this.showMilestone(p.icon, '菌主大人，帝国迈入阶段 ' + p.id + ': ' + p.name + '！');
+      if (cc) {
+        this.showEvent('核心进化: ' + cc.name, cc.desc + '\n\n菌主大人，帝国中枢变得更加强大了！', cc.color);
+      }
+
+      // 点击或3秒后自动关闭仪式遮罩
+      const closeCeremony = () => {
+        overlay.classList.remove('active', 'title-in');
+        titleEl.textContent = '';
+        descEl.textContent = '';
+        descEl.classList.remove('core-change-pulse');
+        if (!wasPaused && this.paused) this.togglePause();
+        overlay.removeEventListener('click', closeCeremony);
+        // ★ v3.1 C2: P3仪式关闭后启动保底教程定时器
+        if (this.phase === 3) this._startP3SafetyNet();
+      };
+      overlay.addEventListener('click', closeCeremony);
+      // 自动关闭计时器
+      setTimeout(closeCeremony, 3000);
+    }, 6000);
+  },
+
+  // ★ 动机引擎 G3: 阶段→网格扩张映射表
+  _GRID_EXPANSION: {
+    2: { cols: 5, rows: 5 },   // P1→P2: 3×3 → 5×5
+    3: { cols: 7, rows: 7 },   // P2→P3: 5×5 → 7×7 (或P2中期扩)
+    4: { cols: 9, rows: 9 },   // P3→P4
+    5: { cols: 11, rows: 11 }, // P4→P5
+  },
+
+  /** ★ G3: 扩张网格到指定阶段的目标尺寸 */
+  _expandGridForPhase(phase) {
+    const target = this._GRID_EXPANSION[phase];
+    if (!target) return;
+    // 如果当前网格已经 >= 目标尺寸，不再扩张
+    if (this.gridCols >= target.cols && this.gridRows >= target.rows) return;
+
+    const oldCols = this.gridCols;
+    const oldRows = this.gridRows;
+    const gridEl = document.getElementById('grid');
+
+    // ★ H2: 膜扩张动画序列 — 颤抖→起泡→破裂→涌出→重组
+    if (gridEl) {
+      // Phase 1 (0ms): 膜剧烈颤抖
+      gridEl.classList.add('membrane-expanding');
+
+      // Phase 2 (400ms): 膜起泡+变形
+      setTimeout(() => gridEl.classList.add('membrane-bursting'), 400);
+
+      // Phase 3 (800ms): 膜破裂闪光
+      setTimeout(() => {
+        gridEl.classList.add('membrane-burst');
+        // 破裂粒子
+        const rect = gridEl.getBoundingClientRect();
+        const cx = rect.left + rect.width / 2;
+        const cy = rect.top + rect.height / 2;
+        for (let i = 0; i < 12; i++) {
+          const angle = (i / 12) * Math.PI * 2;
+          const dist = Math.max(rect.width, rect.height) * 0.6;
+          const pt = document.createElement('div');
+          pt.className = 'membrane-burst-particle';
+          pt.style.left = cx + 'px';
+          pt.style.top = cy + 'px';
+          pt.style.setProperty('--bx', Math.cos(angle) * dist + 'px');
+          pt.style.setProperty('--by', Math.sin(angle) * dist + 'px');
+          document.body.appendChild(pt);
+          setTimeout(() => pt.remove(), 1200);
+        }
+      }, 800);
+
+      // Phase 4 (1200ms): 执行实际扩张 + 膜重组
+      setTimeout(() => {
+        gridEl.classList.remove('membrane-expanding', 'membrane-bursting', 'membrane-burst');
+        this._doGridExpansion(phase, target, oldCols, oldRows);
+        // 重组动画
+        requestAnimationFrame(() => {
+          const newGridEl = document.getElementById('grid');
+          if (newGridEl) {
+            newGridEl.classList.add('membrane-reforming');
+            setTimeout(() => newGridEl.classList.remove('membrane-reforming'), 800);
+          }
+        });
+      }, 1200);
+    } else {
+      // 无 DOM fallback：直接扩张
+      this._doGridExpansion(phase, target, oldCols, oldRows);
+    }
+  },
+
+  /** H2 辅助：实际执行网格扩张（从膜动画中分离出来） */
+  _doGridExpansion(phase, target, oldCols, oldRows) {
+    this._resizeGrid(target.cols, target.rows);
+    // 确保核心在新网格中心
+    this.placeCoreInGrid();
+
+    // 记录扩张历史
+    this._gridExpansionHistory.push({
+      phase: phase,
+      from: `${oldCols}×${oldRows}`,
+      to: `${target.cols}×${target.rows}`,
+      time: Date.now()
+    });
+
+    this.log(`🧬 培养皿扩张！ ${oldCols}×${oldRows} → ${target.cols}×${target.rows}`, 's');
+    this.showMilestone('🧬', `领地扩张！ ${target.cols}×${target.rows}`);
+
+    // 重新渲染网格（DOM需要重建）
+    this._gridInitialized = false;
+    this.renderGrid();
+
+    // 新格子入场动画
+    setTimeout(() => {
+      const gridEl = document.getElementById('grid');
+      if (!gridEl) return;
+      for (let i = 0; i < this.grid.length; i++) {
+        const cell = gridEl.children[i];
+        if (!cell) continue;
+        // 判断是否是新格子：在旧网格范围外的
+        const r = Math.floor(i / this.gridCols);
+        const c = i % this.gridCols;
+        const offsetR = Math.floor((this.gridRows - oldRows) / 2);
+        const offsetC = Math.floor((this.gridCols - oldCols) / 2);
+        const wasInOld = r >= offsetR && r < offsetR + oldRows && c >= offsetC && c < offsetC + oldCols;
+        if (!wasInOld) {
+          cell.classList.add('cell-newborn');
+          cell.style.animationDelay = (Math.abs(r - Math.floor(this.gridRows/2)) + Math.abs(c - Math.floor(this.gridCols/2))) * 0.05 + 's';
+          cell.addEventListener('animationend', () => cell.classList.remove('cell-newborn'), { once: true });
+        }
+      }
+    }, 100);
+
+    SFX.build(); // 暂时复用建造音效
   },
 
   // 旧的自动检查（现在仅用于内部条件判断，不再自动升级）
@@ -11047,6 +11985,35 @@ const G = {
       btn.className = 'core-upgrade-btn locked';
       btn.disabled = true;
     }
+
+    // ★ 核心格"可升级"提示 + 首次引导
+    const canUp = (this._evoTask ? this._evoTask.check(this) : allMet) && this.phase < 5;
+    const hintEl = document.getElementById('coreUpgradeHint');
+    if (hintEl) hintEl.style.display = canUp ? 'block' : 'none';
+
+    // 首次核心可升级 → 引导气泡 + 自动展开帝国总览
+    if (canUp && !this._coreUpgradeNotified) {
+      this._coreUpgradeNotified = true;
+      // 自动展开帝国总览让玩家看到升级按钮
+      const empire = document.getElementById('empireOverview');
+      if (empire && empire.classList.contains('collapsed')) {
+        empire.classList.remove('collapsed');
+        this._empireAutoCollapsed = false;
+      }
+      // 核心格引导气泡
+      const coreIdx = this.getCoreIdx();
+      if (coreIdx >= 0 && typeof this._showGuideBubble === 'function') {
+        setTimeout(() => {
+          this._showGuideBubble(
+            `🧬 核心可以升级了！展开上方「帝国总览」点击升级按钮`,
+            coreIdx,
+            { dir: 'top', duration: 6000 }
+          );
+        }, 800);
+      }
+    }
+    // 升级完成后重置，以便下一阶段再次触发
+    if (!canUp) this._coreUpgradeNotified = false;
   },
 
   // v3.0 §2: 渲染探索度详细面板（嵌入核心升级面板底部）
@@ -11190,18 +12157,23 @@ const G = {
   },
 
   // ===== GUIDE =====
+  _onceGuideHold: null, // {text, icon, until} — once教学最短停留
   updateGuide() {
     const steps = GUIDE[this.phase] || [];
     let currentIdx = -1;
     let guideText = '';
     let guideIcon = '🎯';
 
+    // ★ once教学最短停留：如果仍在hold期间且没有更高优先级步骤，保持显示
+    const now = Date.now();
+    const hold = this._onceGuideHold;
+
     for (let i = 0; i < steps.length; i++) {
       if (steps[i].check(this)) {
         currentIdx = i;
         guideText = steps[i].text;
         guideIcon = steps[i].icon;
-        // v2.0: once教学 — 显示后自动关闭pending flag
+        // v2.0: once教学 — 显示后自动关闭pending flag + 设置停留期
         if (steps[i].once) {
           const key = steps[i].once;
           if (key === 'p2PortTutorial') this._p2PortTutorialPending = false;
@@ -11209,9 +12181,20 @@ const G = {
           if (key === 'adjPreviewHint') this._adjPreviewShown = true;
           if (key === 'boxSelectHint') this._boxSelectHintShown = true;
           if (key === 'competitionTutorial') this._competitionTutorialShown = true;
+          // 设置8秒停留期
+          this._onceGuideHold = { text: guideText, icon: guideIcon, until: now + 8000 };
         }
         break;
       }
+    }
+
+    // 如果没找到当前步骤，但hold期未过，继续显示hold中的教学
+    if (currentIdx === -1 && hold && now < hold.until) {
+      guideText = hold.text;
+      guideIcon = hold.icon;
+    } else if (currentIdx !== -1 || !hold || now >= hold.until) {
+      // 找到了新步骤，或hold已过期，清除hold
+      if (hold && now >= hold.until) this._onceGuideHold = null;
     }
 
     if (!guideText) {
@@ -11237,7 +12220,7 @@ const G = {
       const sectionMap = [
         { match: () => txt.includes('研究') && txt.includes('「'), secId: 'techSection', name: '科技树' },
         { match: () => txt.match(/建造「/), secId: 'secBuild', name: '建造面板' },
-        { match: () => txt.includes('进化') && (txt.includes('按钮') || txt.includes('Lv')), secId: 'evoSection', name: '进化面板' },
+        { match: () => txt.includes('进化') && (txt.includes('按钮') || txt.includes('Lv') || txt.includes('「进化」') || txt.includes('蜕变')), secId: 'evoSection', name: '进化面板' },
         { match: () => txt.includes('变异实验室'), secId: 'mutLabSection', name: '变异面板' },
       ];
       for (const m of sectionMap) {
@@ -11534,6 +12517,9 @@ const G = {
             if (penalty[k] >= 0.95) this._competitionWarningShown[k] = false;
           }
         }
+
+        // ★ C2: 格子占用率检测 — 膜颤抖 + 核心增强
+        this._tickOccupancy();
 
         // ★ 菌主顾问系统 — 每45秒根据当前情境给出上下文提示
         this._advisorTimer++;
@@ -12269,9 +13255,9 @@ const G = {
       const pairMap = {}; // "min-max" -> { fi, ti, flows:[], colors:[], icons:[], labels:[] }
       const usedEdges = new Set(); // 已占用的通道，"min-max" 形式
 
-      // v2.0 §8.4: P1自动, P2 hybrid(自动+可选手动), P3+纯手动
-      const beltMode = BELT_MODE[Math.min(this.phase, 3)] || 'manual';
-      if (beltMode === 'auto' || beltMode === 'hybrid') {
+      // v3.1: 动态belt模式 + P2渐退
+      const beltMode = getBeltMode();
+      if (beltMode === 'auto' || beltMode === 'hybrid' || beltMode === 'degraded' || beltMode === 'softLanding') {
         // Step 1: 为每个 flow，每个 from 实例找最近的 to 实例
         // ★ 使用全局最优匹配（抢占式），避免老建筑"占住"最近位
         const rawLinks = []; // { fi, ti, flow }
@@ -12352,6 +13338,15 @@ const G = {
           const key = Math.min(link.fi, link.ti) + '-' + Math.max(link.fi, link.ti);
           if (this.removedBelts[key]) continue;
 
+          // ★ v3.1 C1: P2渐退 — hybrid/degraded模式下新建筑不自动连
+          if ((beltMode === 'hybrid' || beltMode === 'degraded') && this._p2ManualBldSet) {
+            if (this._p2ManualBldSet.has(link.fi) || this._p2ManualBldSet.has(link.ti)) continue;
+          }
+          // ★ v3.1 C2: P3软着陆 — 只保留遗留管线
+          if (beltMode === 'softLanding') {
+            if (!this._p3LegacyBelts || !this._p3LegacyBelts[key]) continue;
+          }
+
           // v2.0: 端口约束检查 — 自动连接也遵守端口限制
           const fromType = this.grid[link.fi]?.type;
           const toType = this.grid[link.ti]?.type;
@@ -12385,7 +13380,11 @@ const G = {
           }
 
           if (!pairMap[key]) {
-            pairMap[key] = { fi: link.fi, ti: link.ti, flows: [], colors: [], icons: [], labels: [], isManual: false };
+            pairMap[key] = {
+              fi: link.fi, ti: link.ti, flows: [], colors: [], icons: [], labels: [], isManual: false,
+              isDegraded: beltMode === 'degraded',      // ★ C1第三拍衰减标记
+              isLegacy: beltMode === 'softLanding',     // ★ C2遗留管线标记
+            };
             usedEdges.add(key);
             // v2.0: 更新端口使用计数
             getPortUsage(link.fi).out++;
@@ -12617,6 +13616,53 @@ const G = {
           ctx.globalAlpha = 1;
 
           // 悬停高亮（即使无效也可以点击操作）
+          if (this._hoverBeltKey === beltKey) {
+            ctx.save();
+            ctx.lineWidth = 8;
+            ctx.strokeStyle = 'rgba(249,115,22,0.25)';
+            ctx.setLineDash([]);
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            drawLPath(); ctx.stroke();
+            ctx.restore();
+          }
+          continue; // 跳过正常渲染
+        }
+
+        // ★ v3.1 C1/C2: degraded或legacy管线 → 橙色虚线 + 闪烁
+        if (belt.isDegraded || belt.isLegacy) {
+          const pulse = 0.35 + Math.sin(Date.now() / 500) * 0.15;
+          const color = belt.isLegacy ? 'rgba(249,115,22,' : 'rgba(251,191,36,';
+          // 橙色虚线底色
+          ctx.lineWidth = 5;
+          ctx.strokeStyle = color + pulse + ')';
+          ctx.setLineDash([6, 4]);
+          ctx.lineDashOffset = -(Date.now() / 250) % 10;
+          ctx.lineCap = 'butt';
+          ctx.lineJoin = 'miter';
+          drawLPath(); ctx.stroke();
+          // 内线
+          ctx.lineWidth = 2.5;
+          ctx.strokeStyle = color + (pulse + 0.1) + ')';
+          ctx.setLineDash([4, 3]);
+          drawLPath(); ctx.stroke();
+          ctx.setLineDash([]);
+          // 中间标记
+          const midXD = isOrthogonal ? (sx+ex)/2 : mx;
+          const midYD = isOrthogonal ? (sy+ey)/2 : my;
+          ctx.globalAlpha = 0.7;
+          ctx.font = 'bold 7px sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillStyle = belt.isLegacy ? '#f97316' : '#fbbf24';
+          ctx.fillText(belt.isLegacy ? '⏳' : '-50%', midXD, midYD);
+          ctx.globalAlpha = 1;
+          // 两端标记
+          const tSzD = 2.5;
+          ctx.fillStyle = color + '0.4)';
+          ctx.fillRect(sx - tSzD, sy - tSzD, tSzD*2, tSzD*2);
+          ctx.fillRect(ex - tSzD, ey - tSzD, tSzD*2, tSzD*2);
+          // 悬停
           if (this._hoverBeltKey === beltKey) {
             ctx.save();
             ctx.lineWidth = 8;
@@ -13821,6 +14867,20 @@ const G = {
           rateEl.className = 'res-rate';
         }
       }
+
+      // ★ C3: 溢出提示 — 产量远超消耗时资源卡片脉冲（效率焦虑驱动）
+      if (card) {
+        const bd = this._rateBreakdown?.[k];
+        if (bd) {
+          const prod = bd.prod || 0;
+          const cons = Math.abs(bd.bldCons || 0) + Math.abs(bd.maint || 0) + Math.abs(bd.popFood || 0);
+          // 当产量 > 消耗×3 且有明显产量时标记溢出
+          const isOverflow = prod > 0.5 && cons > 0.01 && prod > cons * 3;
+          card.classList.toggle('res-overflow', isOverflow);
+        } else {
+          card.classList.remove('res-overflow');
+        }
+      }
     }
 
     document.getElementById('statPop').textContent = formatNum(Math.floor(this.pop)) + '/' + formatNum(this._popCap());
@@ -14142,6 +15202,26 @@ const G = {
       });
     }
 
+    // ── 2b. 闲置碳源检测 ──
+    const coreConfig = CORE_COLONY[this.phase] || CORE_COLONY[1];
+    const maxCollectors = (coreConfig.maxCollectors || 2) + (this._coreBonus || 0);
+    const totalCollectors = this.grid.filter(g => g && BLDS[g.type]?.corePowered).length;
+    if (totalCollectors > maxCollectors) {
+      const idleCount = totalCollectors - maxCollectors;
+      alerts.push({
+        icon: '⚡', severity: 'info',
+        text: `${idleCount}座碳源闲置(上限${maxCollectors})`
+      });
+    }
+
+    // ── 2c. 核心可升级提醒 ──
+    if (this.phase < 5 && this.canPhaseUp()) {
+      alerts.push({
+        icon: '⬆', severity: 'info',
+        text: '核心可升级!'
+      });
+    }
+
     // ── 3. 无告警 → 隐藏 ──
     if (alerts.length === 0) {
       bar.classList.remove('show', 'level-info', 'level-warn', 'level-danger');
@@ -14213,6 +15293,13 @@ const G = {
     const rank = this._scoreRank ? this._scoreRank(score).rank : '';
     const eff = Math.round((this.gEff || 1) * 100);
     el.textContent = `P${this.phase} ${phaseName}  ⚡${eff}%  🏆${formatNum(score)} [${rank}]`;
+    // ★ 折叠状态下追加核心可升级提示
+    if (this.phase < 5 && this.canPhaseUp()) {
+      el.textContent += '  ⬆可升级!';
+      el.style.color = '#06d6a0';
+    } else {
+      el.style.color = '';
+    }
   },
 
   // ===== J1: 菌主形象常驻 =====
@@ -14337,7 +15424,7 @@ const G = {
         return;
       }
       // 进化类引导
-      if (text.includes('进化') && (text.includes('按钮') || text.includes('Lv'))) {
+      if (text.includes('进化') && (text.includes('按钮') || text.includes('Lv') || text.includes('「进化」') || text.includes('蜕变'))) {
         this._ensureSectionExpanded('evoSection');
         return;
       }
@@ -14557,6 +15644,235 @@ const G = {
     setTimeout(() => el.remove(), 2200);
   },
 
+  // ===== ★ I1-I4: 引导气泡系统 =====
+  _guideBubbleVisible: false,
+  _guideBubbleTargetIdx: -1,
+  _guideBubbleTimer: null,
+
+  /**
+   * ★ I1: 显示引导气泡 — 浮动在目标格子旁
+   * @param {string} text - 气泡文案
+   * @param {number|{dx:number,dy:number}} target - 格子索引 或 核心偏移量
+   * @param {object} [opts] - 选项 { duration, highlightCell }
+   */
+  _showGuideBubble(text, target, opts = {}) {
+    const bubble = document.getElementById('guideBubble');
+    const textEl = document.getElementById('guideBubbleText');
+    if (!bubble || !textEl) return;
+
+    // ★ I3: 核心偏移量系统 — 将 coreOffset 转换为实际格子索引
+    let targetIdx;
+    if (typeof target === 'object' && target.dx !== undefined) {
+      targetIdx = this.coreOffsetToIdx(target.dx, target.dy);
+    } else {
+      targetIdx = target;
+    }
+    if (targetIdx < 0 || targetIdx >= this.grid.length) return;
+
+    // 清除上一个气泡的定时器
+    if (this._guideBubbleTimer) {
+      clearTimeout(this._guideBubbleTimer);
+      this._guideBubbleTimer = null;
+    }
+
+    // 清除上一个推荐格子高亮
+    if (this._guideBubbleTargetIdx >= 0) {
+      const prevCell = document.getElementById('grid')?.children[this._guideBubbleTargetIdx];
+      if (prevCell) prevCell.classList.remove('guide-target');
+    }
+
+    textEl.textContent = text;
+    this._guideBubbleTargetIdx = targetIdx;
+    this._guideBubbleVisible = true;
+
+    // ★ I4: 气泡位置算法 — 优先右侧，不够则左侧，再不够则下方/上方
+    const gridEl = document.getElementById('grid');
+    const cell = gridEl?.children[targetIdx];
+    if (!cell) return;
+
+    // 高亮推荐格子
+    if (opts.highlightCell !== false) {
+      cell.classList.add('guide-target');
+    }
+
+    const rect = cell.getBoundingClientRect();
+    const bw = 220; // bubble max-width
+    const bh = 80;  // estimate bubble height
+    const gap = 10;
+
+    const spaceRight = window.innerWidth - rect.right;
+    const spaceLeft = rect.left;
+    const spaceBelow = window.innerHeight - rect.bottom;
+
+    let dir, bx, by;
+
+    if (spaceRight > bw + gap + 20) {
+      dir = 'right';
+      bx = rect.right + gap;
+      by = rect.top + rect.height / 2 - bh / 2;
+    } else if (spaceLeft > bw + gap + 20) {
+      dir = 'left';
+      bx = rect.left - bw - gap;
+      by = rect.top + rect.height / 2 - bh / 2;
+    } else if (spaceBelow > bh + gap + 20) {
+      dir = 'bottom';
+      bx = rect.left + rect.width / 2 - bw / 2;
+      by = rect.bottom + gap;
+    } else {
+      dir = 'top';
+      bx = rect.left + rect.width / 2 - bw / 2;
+      by = rect.top - bh - gap;
+    }
+
+    // 确保不超出屏幕
+    bx = Math.max(8, Math.min(bx, window.innerWidth - bw - 8));
+    by = Math.max(8, Math.min(by, window.innerHeight - bh - 8));
+
+    bubble.style.left = bx + 'px';
+    bubble.style.top = by + 'px';
+    bubble.setAttribute('data-dir', dir);
+    bubble.classList.add('active');
+    bubble.setAttribute('aria-hidden', 'false');
+
+    // 自动隐藏（可选）
+    if (opts.duration) {
+      this._guideBubbleTimer = setTimeout(() => this._hideGuideBubble(), opts.duration);
+    }
+  },
+
+  /** ★ I1: 隐藏引导气泡 */
+  _hideGuideBubble() {
+    const bubble = document.getElementById('guideBubble');
+    if (bubble) {
+      bubble.classList.remove('active');
+      bubble.setAttribute('aria-hidden', 'true');
+    }
+    // 清除推荐格子高亮
+    if (this._guideBubbleTargetIdx >= 0) {
+      const gridEl = document.getElementById('grid');
+      const cell = gridEl?.children[this._guideBubbleTargetIdx];
+      if (cell) cell.classList.remove('guide-target');
+      this._guideBubbleTargetIdx = -1;
+    }
+    this._guideBubbleVisible = false;
+    if (this._guideBubbleTimer) {
+      clearTimeout(this._guideBubbleTimer);
+      this._guideBubbleTimer = null;
+    }
+  },
+
+  /** ★ C1b: 邻接啊哈效果 — 在两个相邻建筑之间显示菌丝连接动画 */
+  _showAdjacencyAhaEffect(newIdx, neighborIndices) {
+    const gridEl = document.getElementById('grid');
+    if (!gridEl) return;
+
+    // 找到有建筑的相邻格子
+    const adjBuildingIdx = neighborIndices.find(nIdx => this.grid[nIdx] && !this.isCoreCell(nIdx));
+    if (adjBuildingIdx === undefined) return;
+
+    const newCell = gridEl.children[newIdx];
+    const adjCell = gridEl.children[adjBuildingIdx];
+    if (!newCell || !adjCell) return;
+
+    // 给两个格子加上菌丝连接脉冲效果
+    newCell.classList.add('aha-adjacency');
+    adjCell.classList.add('aha-adjacency');
+
+    // 3秒后移除效果
+    setTimeout(() => {
+      newCell.classList.remove('aha-adjacency');
+      adjCell.classList.remove('aha-adjacency');
+    }, 3000);
+  },
+
+  // ===== ★ F1: 建筑放置波纹扩散 =====
+  /** F1: 放置建筑后从中心向外扩散涟漪，邻居闪亮 */
+  _spawnPlaceRipple(idx, cellEl) {
+    if (!cellEl) return;
+    // 1. 在格子上方叠加涟漪圆环
+    const ripple = document.createElement('div');
+    ripple.className = 'place-ripple';
+    cellEl.appendChild(ripple);
+    ripple.addEventListener('animationend', () => ripple.remove(), { once: true });
+
+    // 2. 邻居闪亮：200ms延迟后，已占用的邻居格子闪一下
+    const r = Math.floor(idx / this.gridCols);
+    const c = idx % this.gridCols;
+    const dirs = [[-1,0],[1,0],[0,-1],[0,1],[-1,-1],[-1,1],[1,-1],[1,1]];
+    const gridEl = document.getElementById('grid');
+    if (!gridEl) return;
+
+    setTimeout(() => {
+      dirs.forEach(([dr, dc], di) => {
+        const nr = r + dr, nc = c + dc;
+        if (nr < 0 || nr >= this.gridRows || nc < 0 || nc >= this.gridCols) return;
+        const ni = nr * this.gridCols + nc;
+        if (!this.grid[ni]) return; // 只有占用格闪亮
+        const neighCell = gridEl.children[ni];
+        if (!neighCell) return;
+        // 距离越远延迟越大
+        const delay = di < 4 ? 0 : 80; // 对角线多延迟80ms
+        setTimeout(() => {
+          neighCell.classList.add('place-ripple-hit');
+          setTimeout(() => neighCell.classList.remove('place-ripple-hit'), 600);
+        }, delay);
+      });
+    }, 200);
+  },
+
+  // ===== ★ C2: 格子占用率 + 膜颤抖系统 =====
+  _lastOccupancyLevel: 0, // 0=低 1=中 2=高(≥70%) 3=满(≥90%)
+  _occupancyWarningShown: false,
+
+  /** ★ C2: 获取格子占用率（排除核心格） */
+  _getOccupancyRate() {
+    const total = this.grid.length;
+    const coreIdx = this.getCoreIdx();
+    const available = coreIdx >= 0 ? total - 1 : total; // 核心格不计入可用格子
+    if (available <= 0) return 0;
+    const filled = this.totalBuildings();
+    return filled / available;
+  },
+
+  /** ★ C2: 每 tick 检测占用率 — 控制膜颤抖 + 核心光效强度 */
+  _tickOccupancy() {
+    const rate = this._getOccupancyRate();
+    const gridEl = document.getElementById('grid');
+    if (!gridEl) return;
+
+    // 四档映射
+    let level;
+    if (rate >= 0.9) level = 3;       // 满溢
+    else if (rate >= 0.7) level = 2;  // 高（颤抖开始）
+    else if (rate >= 0.4) level = 1;  // 中
+    else level = 0;                   // 低
+
+    // 设置 CSS 变量供膜和核心使用
+    gridEl.style.setProperty('--occupancy-rate', rate.toFixed(2));
+    gridEl.dataset.occupancy = level;
+
+    // 只在档位变化时执行
+    if (level !== this._lastOccupancyLevel) {
+      this._lastOccupancyLevel = level;
+
+      // ★ 膜颤抖提示 — 首次达到70%时提示
+      if (level >= 2 && !this._occupancyWarningShown) {
+        this._occupancyWarningShown = true;
+        this.log('🔬 培养皿快要装不下了…继续成长将突破边界。', 'ev');
+        this._showGuideBubble(
+          '🔬 培养皿快满了…继续成长，膜将破裂扩张！',
+          this.getCoreIdx(),
+          { duration: 6000, highlightCell: false }
+        );
+      }
+
+      // 扩张后重置警告
+      if (level < 2) {
+        this._occupancyWarningShown = false;
+      }
+    }
+  },
+
   // ===== GUIDE ENHANCEMENT (强引导) =====
   _prevGuideKey: null,  // 追踪上一次的引导建筑 key
 
@@ -14724,7 +16040,7 @@ const G = {
       }
 
       // 进化类引导
-      if (text.includes('进化') && (text.includes('按钮') || text.includes('Lv'))) {
+      if (text.includes('进化') && (text.includes('按钮') || text.includes('Lv') || text.includes('「进化」') || text.includes('蜕变'))) {
         if (this.canEvolve()) {
           return { type: 'evolve', text: '点击「进化」按钮！', icon: steps[i].icon };
         }
@@ -14964,19 +16280,19 @@ const G = {
       // 保持 Top5 折叠状态
       const wasTop5Hidden = list.parentElement?.querySelector('.adj-top5-list.adj-hidden') !== null;
       adjEl.innerHTML = `<div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">
-          <span style="color:#06d6a0;font-size:0.85em;white-space:nowrap">🔗 ×${adjStats.adjCount}</span>
+          <span style="color:#06d6a0;font-size:0.92em;white-space:nowrap">🔗 ×${adjStats.adjCount}</span>
           <div style="flex:1;height:6px;background:rgba(255,255,255,0.06);border-radius:3px;overflow:hidden">
             <div style="width:${barPct}%;height:100%;background:${barColor};border-radius:3px;transition:width 0.4s"></div>
           </div>
-          <span style="color:${barColor};font-size:0.8em;font-weight:700;font-family:'Orbitron',monospace;white-space:nowrap">+${totalPct}%</span>
+          <span style="color:${barColor};font-size:0.88em;font-weight:700;font-family:'Orbitron',monospace;white-space:nowrap">+${totalPct}%</span>
         </div>` + (adjStats.top5.length > 0 ? `<div style="display:flex;align-items:center;gap:4px;cursor:pointer" onclick="this.nextElementSibling.classList.toggle('adj-hidden')">
-          <span style="font-size:0.7em;color:var(--dim)">▾ Top ${adjStats.top5.length}</span>
+          <span style="font-size:0.78em;color:var(--dim)">▾ Top ${adjStats.top5.length}</span>
           ${adjStats.top5.slice(0, 3).map(item => {
             const bld = BLDS[item.type];
-            return `<span style="font-size:0.75em" title="${bld?.n||'?'} +${Math.round(item.bonus*100)}%">${bld?.emoji||'?'}</span>`;
+            return `<span style="font-size:0.85em" title="${bld?.n||'?'} +${Math.round(item.bonus*100)}%">${bld?.emoji||'?'}</span>`;
           }).join('')}
         </div>
-        <div class="adj-top5-list${wasTop5Hidden !== false ? ' adj-hidden' : ''}" style="padding:2px 0 0 4px;font-size:0.72em;line-height:1.5">${adjStats.top5.map((item, i) => {
+        <div class="adj-top5-list${wasTop5Hidden !== false ? ' adj-hidden' : ''}" style="padding:2px 0 0 4px;font-size:0.82em;line-height:1.5">${adjStats.top5.map((item, i) => {
           const bld = BLDS[item.type];
           const name = (bld?.emoji||'')+(bld?.n||'?');
           const pct = Math.round(item.bonus*100);
@@ -14992,8 +16308,8 @@ const G = {
       hasActive = true;
       const chainEl = document.createElement('div');
       chainEl.style.cssText = 'padding:3px 0 4px;border-bottom:1px solid rgba(255,255,255,0.04);display:flex;flex-wrap:wrap;gap:3px 2px;align-items:center';
-      const pillStyle = 'display:inline-flex;align-items:center;gap:2px;padding:1px 5px;border-radius:8px;font-size:0.72em;font-weight:600;white-space:nowrap';
-      const arrowStyle = 'color:var(--dim);font-size:0.7em;margin:0 1px';
+      const pillStyle = 'display:inline-flex;align-items:center;gap:2px;padding:1px 5px;border-radius:8px;font-size:0.82em;font-weight:600;white-space:nowrap';
+      const arrowStyle = 'color:var(--dim);font-size:0.8em;margin:0 1px';
       chainEl.innerHTML = activeChains.map(ch => {
         // steps: ['输入', '→', '输出']
         const input = ch.steps[0];
@@ -15020,8 +16336,8 @@ const G = {
 
       const header = document.createElement('div');
       header.style.cssText = 'padding:5px 0;margin-top:4px;border-top:1px solid rgba(6,214,160,0.1);display:flex;justify-content:space-between;align-items:center';
-      header.innerHTML = `<span style="color:var(--color-muted-dark);font-size:0.95em">🏭 传送带 ×<span style="color:var(--cyan);font-weight:700">${beltCount}</span></span>`
-        + `<span style="font-size:0.85em;color:${avgColor}">平均效率 ${avgEff}%</span>`;
+      header.innerHTML = `<span style="color:var(--color-muted-dark);font-size:1em">🏭 传送带 ×<span style="color:var(--cyan);font-weight:700">${beltCount}</span></span>`
+        + `<span style="font-size:0.92em;color:${avgColor}">均效 ${avgEff}%</span>`;
       list.appendChild(header);
 
       // --- 按同类型分组传送带 ---
@@ -15053,29 +16369,24 @@ const G = {
         const avgEff2 = count > 0 ? grp.keys.reduce((s, k) => s + this.getBeltEfficiency(k), 0) / count : 0;
         const effPct = Math.round(avgEff2 * 100);
         const allMax = minLv >= 5;
-        const resIcons = grp.icons.join('');
 
         const lvColor = minLv >= 5 ? 'var(--purple)' : minLv >= 3 ? 'var(--cyan)' : minLv >= 2 ? 'var(--yellow)' : 'var(--orange)';
         const effColor = effPct >= 100 ? 'var(--cyan)' : effPct >= 70 ? 'var(--yellow)' : 'var(--orange)';
-        const lvBar = '█'.repeat(minLv) + '░'.repeat(5 - minLv);
-        const maxTag = allMax ? '<span style="color:var(--purple);font-size:0.85em"> ★MAX</span>' : '';
-        const countTag = count > 1 ? `<span style="color:var(--color-muted);font-size:0.75em"> ×${count}</span>` : '';
+        const maxTag = allMax ? ' ★' : '';
+        const countTag = count > 1 ? ` ×${count}` : '';
+        // 简化建筑名：只取emoji+短名(前2字)
+        const fromEmoji = BLDS[grp.fromType]?.emoji || '';
+        const toEmoji = BLDS[grp.toType]?.emoji || '';
+        const fromShort = (BLDS[grp.fromType]?.n || '?').slice(0, 3);
+        const toShort = (BLDS[grp.toType]?.n || '?').slice(0, 3);
 
         const row = document.createElement('div');
-        row.style.cssText = `padding:4px 6px;margin:2px 0;border-radius:3px;
+        row.style.cssText = `display:flex;align-items:center;gap:6px;padding:5px 6px;margin:2px 0;border-radius:4px;
           background:var(--color-panel-bg);border:1px solid ${minLv >= 5 ? 'rgba(74,26,106,0.25)' : minLv >= 3 ? 'rgba(26,58,58,0.25)' : 'rgba(58,42,26,0.25)'};
-          cursor:pointer;transition:all 0.15s`;
-        const avgCap = count > 0 ? grp.keys.reduce((s, k) => s + this.getBeltCapacity(k), 0) / count : 0;
-        const capStr = formatNum(avgCap, 1);
-        row.innerHTML = `
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px">
-            <span style="font-size:0.95em;color:var(--color-info)">${resIcons} ${grp.fromName} → ${grp.toName}${countTag}</span>
-            <span style="font-size:0.85em;color:${lvColor};font-family:'Orbitron',monospace;font-weight:700">Lv.${minLv}${maxTag}</span>
-          </div>
-          <div style="display:flex;justify-content:space-between;align-items:center">
-            <span style="font-size:0.75em;color:var(--color-muted-dark);font-family:'Share Tech Mono',monospace;letter-spacing:1px">${lvBar}</span>
-            <span style="font-size:0.85em"><span style="color:${effColor};font-weight:600">${effPct}%</span> <span style="color:var(--color-muted);font-size:0.85em">|📦${capStr}/s</span></span>
-          </div>`;
+          cursor:pointer;transition:all 0.15s;font-size:0.92em`;
+        row.innerHTML = `<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--color-info)">${fromEmoji}${fromShort} → ${toEmoji}${toShort}<span style="color:var(--color-muted)">${countTag}</span></span>`
+          + `<span style="color:${lvColor};font-family:'Orbitron',monospace;font-weight:700;white-space:nowrap">Lv${minLv}${maxTag}</span>`
+          + `<span style="color:${effColor};font-weight:600;white-space:nowrap">${effPct}%</span>`;
         // 点击批量升级同类传送带
         row.addEventListener('click', () => {
           this.showBeltGroupUpgradePopup(grp.keys, grp.fromName, grp.toName);
@@ -15372,6 +16683,7 @@ const G = {
     try {
       const s = {
         res: this.res, grid: this.grid, gridSize: this.gridSize, gridCols: this.gridCols, gridRows: this.gridRows, techs: this.techs,
+        _gridExpansionHistory: this._gridExpansionHistory || [],
         pop: this.pop, gEff: this.gEff, eL: this.eL, eP: this.eP,
         phase: this.phase, rt: this.rt, rTech: this.rTech, rProg: this.rProg,
         wBuild: this.wBuild, wProg: this.wProg, wonderComplete: this.wonderComplete,
@@ -15399,6 +16711,15 @@ const G = {
         _competitionEnabled: this._competitionEnabled,
         _competitionTutorialShown: this._competitionTutorialShown,
         _portFullShown: this._portFullShown,
+        // v3.1: 管线过渡系统状态
+        _p2BaseBldSet: this._p2BaseBldSet ? [...this._p2BaseBldSet] : null,
+        _p2ManualBldSet: this._p2ManualBldSet ? [...this._p2ManualBldSet] : null,
+        _p2BeltNudgeShown: this._p2BeltNudgeShown || false,
+        _p2DegradedShown: this._p2DegradedShown || false,
+        _p3LegacyBelts: this._p3LegacyBelts || null,
+        _ahaManualBeltShown: this._ahaManualBeltShown || false,
+        _ahaP3ManualShown: this._ahaP3ManualShown || false,
+        _p3PortActivationShown: this._p3PortActivationShown || false,
         // v3.0 §4: 远距首次弹窗标志
         _firstDist2Shown: this._firstDist2Shown,
         _firstDist3Shown: this._firstDist3Shown,
@@ -15510,12 +16831,15 @@ const G = {
         }
         if (Object.keys(newLevels).length > 0) s.buildingLevels = newLevels;
       }
-      // 清理无效格子数据（包括旧存档中残留的核心菌落）
+      // 清理无效格子数据（不清除 _coreColony — 核心入格系统）
       for (let i = 0; i < this.grid.length; i++) {
-        if (this.grid[i] && (this.grid[i].type === '_coreColony' || !this.grid[i].type || !BLDS[this.grid[i].type])) {
+        if (this.grid[i] && this.grid[i].type !== '_coreColony' && (!this.grid[i].type || !BLDS[this.grid[i].type])) {
           this.grid[i] = null;
         }
       }
+      // ★ J1: 确保核心入格 — 旧存档可能没有核心
+      this.placeCoreInGrid();
+      this._gridExpansionHistory = s._gridExpansionHistory || [];
       this.techs = s.techs || this.techs;
       this.pop = s.pop ?? 0;
       this.gEff = s.gEff ?? 1;
@@ -15554,6 +16878,15 @@ const G = {
       if ('_competitionEnabled' in s) this._competitionEnabled = s._competitionEnabled;
       if ('_competitionTutorialShown' in s) this._competitionTutorialShown = s._competitionTutorialShown;
       if ('_portFullShown' in s) this._portFullShown = s._portFullShown;
+      // v3.1: 恢复管线过渡系统状态
+      if (s._p2BaseBldSet) this._p2BaseBldSet = new Set(s._p2BaseBldSet);
+      if (s._p2ManualBldSet) this._p2ManualBldSet = new Set(s._p2ManualBldSet);
+      if ('_p2BeltNudgeShown' in s) this._p2BeltNudgeShown = s._p2BeltNudgeShown;
+      if ('_p2DegradedShown' in s) this._p2DegradedShown = s._p2DegradedShown;
+      if (s._p3LegacyBelts) this._p3LegacyBelts = s._p3LegacyBelts;
+      if ('_ahaManualBeltShown' in s) this._ahaManualBeltShown = s._ahaManualBeltShown;
+      if ('_ahaP3ManualShown' in s) this._ahaP3ManualShown = s._ahaP3ManualShown;
+      if ('_p3PortActivationShown' in s) this._p3PortActivationShown = s._p3PortActivationShown;
       // v3.0 §4: 远距首次弹窗标志
       if ('_firstDist2Shown' in s) this._firstDist2Shown = s._firstDist2Shown;
       if ('_firstDist3Shown' in s) this._firstDist3Shown = s._firstDist3Shown;
@@ -15664,6 +16997,10 @@ const G = {
       this.updateRates();
       this.updateUI();
       if (this.rt > 0) this.log('▸ 存档已加载', 's');
+      // ★ v3.1: 恢复P3遗留管线退化（如果还有未退完的）
+      if (this.phase === 3 && this._p3LegacyBelts && Object.keys(this._p3LegacyBelts).length > 0) {
+        setTimeout(() => this._startLegacyDecay(), 5000); // 5秒后继续退化
+      }
 
       if (this.wBuild) {
         const bd = BLDS[this.wBuild];
@@ -16058,7 +17395,20 @@ const G = {
     const specEffBonus = 1 + (this._specCache?.beltEffBonus || 0);
     // v3.0 §8.3: 物流催化剂加成
     const catalystBeltBonus = 1 + this._getCatalystValue('beltEff');
-    return baseEff * distFactor * relayPenalty * specEffBonus * catalystBeltBonus;
+    // ★ v3.1 C3: 手动管线效率加成 +10%
+    const manualBonus = this.manualBelts[beltKey] ? 1.10 : 1.0;
+    // ★ v3.1 C1: degraded模式自动管线效率衰减 -50%
+    let degradedPenalty = 1.0;
+    if (!this.manualBelts[beltKey]) {
+      const belt = (this._activeBelts || []).find(b => {
+        const k = Math.min(b.fi, b.ti) + '-' + Math.max(b.fi, b.ti);
+        return k === beltKey;
+      });
+      if (belt && (belt.isDegraded || belt.isLegacy)) {
+        degradedPenalty = 0.5; // -50%效率
+      }
+    }
+    return baseEff * distFactor * relayPenalty * specEffBonus * catalystBeltBonus * manualBonus * degradedPenalty;
   },
 
   // v3.0 §5: 检查传送带是否涉及中继站
@@ -16107,6 +17457,85 @@ const G = {
       this._beltEdges = usedEdges;
     }
     this._chainsDirty = true;
+  },
+
+  // ★ v3.1 C1: P2新建筑追踪 — 在cellClick建造成功后调用
+  _trackP2NewBuilding(idx) {
+    if (this.phase !== 2) return;
+    // 如果还没初始化（旧存档直接加载到P2），就在首次调用时初始化
+    if (!this._p2ManualBldSet) this._p2ManualBldSet = new Set();
+    if (!this._p2BaseBldSet) {
+      this._p2BaseBldSet = new Set();
+      for (let i = 0; i < this.grid.length; i++) {
+        if (this.grid[i] && i !== idx) this._p2BaseBldSet.add(i);
+      }
+    }
+    // P2 bld<4时不标记（第一拍仍然全自动）
+    if (this.totalBuildings() < 4) return;
+    // 如果这个位置不在旧建筑集合中，标记为新建筑
+    if (!this._p2BaseBldSet.has(idx)) {
+      this._p2ManualBldSet.add(idx);
+    }
+  },
+
+  // ★ v3.1 C2: 遗留管线退化序列
+  _startLegacyDecay() {
+    if (!this._p3LegacyBelts) return;
+    const keys = Object.keys(this._p3LegacyBelts);
+    if (keys.length === 0) return;
+
+    const decayOne = () => {
+      const remaining = Object.keys(this._p3LegacyBelts);
+      if (remaining.length === 0) {
+        this.log('🔗 所有旧管线已退化。你的管线网络完全由你掌控了！', 's');
+        return;
+      }
+      const key = remaining[0];
+      const legacy = this._p3LegacyBelts[key];
+      // 弹引导气泡指向断裂位置
+      const targetIdx = legacy.fi;
+      if (this.grid[targetIdx]) {
+        this._showGuideBubble(
+          `⚠️ 旧管线断裂！快手动补上这条连接`,
+          targetIdx,
+          { duration: 5000, highlightCell: true }
+        );
+      }
+      // 移除遗留管线
+      delete this._p3LegacyBelts[key];
+      this.refreshBelts();
+      this.updateRates();
+      this.updateUI();
+      SFX.buildFail();
+      this.log(`🔗 旧管线退化断裂 (剩余${Object.keys(this._p3LegacyBelts).length}条)`, 'w');
+
+      // 15秒后断下一条
+      if (Object.keys(this._p3LegacyBelts).length > 0) {
+        this._p3LegacyDecayTimer = setTimeout(decayOne, 15000);
+      }
+    };
+    decayOne();
+  },
+
+  // ★ v3.1 C2: P3保底教程 — 60秒无手动管线操作时弹出
+  _startP3SafetyNet() {
+    if (this._p3SafetyTimer) clearTimeout(this._p3SafetyTimer);
+    this._p3SafetyTimer = setTimeout(() => {
+      // 检查是否已有手动管线
+      const manualCount = Object.keys(this.manualBelts).length;
+      if (manualCount === 0 && this.phase === 3) {
+        this.showEvent(
+          '🔗 管线教学',
+          '现在需要手动连接管线了！\n\n' +
+          '1️⃣ 点击底部「连接管线」按钮\n' +
+          '2️⃣ 选择一个产出资源的建筑（起点）\n' +
+          '3️⃣ 选择一个消耗该资源的建筑（终点）\n' +
+          '4️⃣ 管线就会自动建立！\n\n' +
+          '💡 手动管线比旧自动管线效率高10%',
+          '#06d6a0'
+        );
+      }
+    }, 60000);
   },
 
   // 计算建筑的传送带加成（方向性 + 容量限制）
@@ -16673,6 +18102,49 @@ const G = {
         colors, icons, labels,
         invalid: !hasValidFlow, // 标记无效传送带
       };
+
+      // ★ v3.1 C3: 手动管线啊哈奖励
+      if (hasValidFlow && !this._ahaManualBeltShown) {
+        this._ahaManualBeltShown = true;
+        const totalManual = Object.keys(this.manualBelts).length;
+        if (totalManual === 1 || (this.phase >= 3 && !this._ahaP3ManualShown)) {
+          this._ahaP3ManualShown = true;
+          setTimeout(() => {
+            this._showGuideBubble(
+              '🎉 完美连接！手动管线比自动管线效率高10%',
+              idx,
+              { duration: 4000, highlightCell: false }
+            );
+            SFX.milestone();
+            this.showMilestone('🔗', '手动管线大师！效率+10%');
+          }, 600);
+        }
+      }
+      // P3保底教程定时器重置（有操作就取消保底）
+      if (this._p3SafetyTimer) {
+        clearTimeout(this._p3SafetyTimer);
+        this._p3SafetyTimer = null;
+      }
+
+      // ★ v3.1 C4: 手动管线达到5条时激活端口系统引导
+      if (hasValidFlow && this.phase === 3 && !this._p3PortActivationShown) {
+        const totalManualNow = Object.keys(this.manualBelts).length;
+        if (totalManualNow >= 5) {
+          this._p3PortActivationShown = true;
+          setTimeout(() => {
+            this.showEvent(
+              '🔌 端口系统激活',
+              '你的管线网络已经初具规模！\n\n' +
+              '从现在开始，每个建筑的连接数有上限：\n' +
+              '📥 输入端口: 接收资源的管线数\n' +
+              '📤 输出端口: 输出资源的管线数\n\n' +
+              '💡 合理规划管线路径，让每个端口都物尽其用！\n' +
+              '📡 信号中继站可以扩展连接范围',
+              '#14b8a6'
+            );
+          }, 1200);
+        }
+      }
 
       if (!hasValidFlow) {
         // 无效连接：弹橙色警告但仍然创建
