@@ -273,6 +273,35 @@ hermanlei 当前的主要工作方向：
 - 上下文已经很明确（比如正在连续讨论同一个项目的代码）
 - 用户的描述能精确匹配到索引表中的某一行
 
+#### Skill 自动路由规则
+
+> AI 根据用户需求的领域关键词，**自动加载**对应 Skill，无需用户手动指定。
+> 多个 Skill 匹配时，按优先级加载（最多同时 2 个）。
+> 用户也可以直接说"用 XXX Skill"强制指定。
+> **路由表中没有覆盖的领域**：先用当前角色知识回答，深度不够时当场用 `find-skills` 搜索合适的 Skill 并建议安装。
+
+| 需求领域 | 触发关键词 | 推荐 Skill | 备注 |
+|----------|-----------|-----------|------|
+| Unity 编辑器工具 IMGUI | EditorWindow, Inspector, IMGUI, 编辑器工具, 自定义面板 | `unity-editor-imgui-design` | 可叠加 `unity-workflows` |
+| Unity 编辑器自动化 | 自动化, 批量操作, 菜单脚本 | `unity-workflows` | |
+| Unity UI 系统选型 | UI 选型, UGUI 还是 Toolkit, 该用哪个 UI | `unity-ui-selector` | 选完后按结果加载对应 Skill |
+| Unity UI Toolkit | UI Toolkit, USS, UXML, VisualElement | `unity-uitoolkit` | |
+| Unity 代码架构 / SO | ScriptableObject, 解耦, 事件通道, 架构设计 | _(当前会话已有 Unity架构师角色)_ | 角色自带，无需额外 Skill |
+| Unity 场景性能优化 | 性能, draw call, 帧率, 卡顿, batching | `unity-scene-optimizer` | |
+| Unity 代码质量 | 代码审查, review, 规范检查, 最佳实践 | `unity-script-validator` | |
+| Unity 编译错误修复 | 编译报错, CS0xxx, 红色错误, 编译不过 | `unity-compile-fixer` | |
+| Unity 新脚本模板 | 新建脚本, 生成模板, MonoBehaviour 模板 | `unity-template-generator` | |
+| Unity 测试 | 单元测试, PlayMode, EditMode, Test Runner | `unity-test-runner` | |
+| Unity 关卡/场景设计 | 关卡设计, 地图布局, 场景搭建, 原型 | `level-design-patterns` | 可叠加 `unity-level-design` |
+| 游戏设计 / 策划 | 玩法, 机制, 数值, 策划, 系统设计 | `game-developer-skill` | |
+| Shader / 渲染 | Shader, 材质, 渲染管线, URP, HDRP | _(待补充，遇到时用 find-skills 搜索)_ | shadergraph-editor 仅限 visionOS |
+| 2D / 3D 美术表现 | 美术风格, 动画, 粒子, VFX, 2D 美术 | _(待补充，遇到时用 find-skills 搜索)_ | |
+| 后端开发 | 服务器, API, 数据库, 网络, 后端 | _(待补充，遇到时用 find-skills 搜索)_ | |
+| Git / GitHub | PR, issue, CI, Actions, GitHub | `github` | |
+| 图片生成 | 生成图片, 画一张, 概念图 | `nano-banana-pro` 或 `openai-image-gen` | |
+
+> **维护说明**：安装新 Skill 后，在此表追加对应行。标记「待补充」的行表示该领域尚无专用 Skill，AI 应在用户首次触发时主动搜索推荐。
+
 ---
 
 ### SceneCraft（场景工坊）
