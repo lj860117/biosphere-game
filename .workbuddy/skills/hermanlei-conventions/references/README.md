@@ -86,8 +86,12 @@ references 目录下的文档分为四种类型，每种有不同的管理规则
 |------|------|----------|------|
 | `rendering-knowledge-index.md` | 📖 知识索引 | 每月 | Unity 渲染管线战略 + 全球渲染前沿技术图谱 |
 | `gamedev-knowledge-index.md` | 📖 知识索引 | 每月 | 游戏架构参考模式 + 移动端性能知识 + 竞品研究方向 |
+| `material-stylization-knowledge-index.md` | 📖 知识索引 | 每月 | SD 材质风格化工作流 + AI 材质生成 + 风格化 PBR 技术 |
+| `terrain-pcg-knowledge-index.md` | 📖 知识索引 | 每月 | Unity 地形编辑 + 大世界方案 + PCG 程序化生成技术 |
 | `scenecraft-architecture.md` | 🏗️ 架构速查 | 架构变更时 | SceneCraft 28 个文件的完整架构文档 |
 | `scenecraft-known-issues.md` | 🐛 问题台账 | 实时 | SceneCraft 代码预审发现的问题跟踪 |
+| `scenecraft-dev-rules.md` | 📋 开发细则 | 项目活跃时 | SceneCraft 体量限制、预审工作流、新功能 Checklist、踩坑记录 |
+| `editor-ui-detailed-rules.md` | 📋 开发细则 | 项目活跃时 | 编辑器 UI 排版/颜色/交互模式详细规则 + 闭环流程各步骤展开 |
 | `project-context.md` | 📋 项目上下文 | 项目变化时 | 项目路径、版本历史、技术栈 |
 | `README.md`（本文件） | 📋 目录规范 | 规则变化时 | references 目录本身的管理规范 |
 

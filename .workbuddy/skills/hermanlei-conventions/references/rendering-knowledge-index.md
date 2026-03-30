@@ -2,6 +2,7 @@
 
 > **用途**：AI 在接到渲染相关任务时，先读此文档定位方向，再去搜索最新资料。
 > **维护规则**：每次调研渲染话题后更新此文档。每月巡检时检查链接有效性。
+> **保鲜周期**：每月
 > **最后更新**：2026-03-30
 
 ---
@@ -41,18 +42,54 @@
 | **DLSS 5 / 神经渲染** | AI 模型直接生成像素级光照和材质 | 2026 秋发布 | `DLSS 5 neural rendering` |
 | **DLSS 4.5** | 第二代 Transformer 超分 + 多帧生成 | 2026.3 可用 | `DLSS 4.5 Transformer` |
 | **AMD FSR Redstone** | 神经网络超分 + ML 帧生成 + Radiance Caching | 2026 | `FSR Redstone neural` |
-| **RTX Mega Geometry** | 几何体压缩+簇复用，密集场景路径追踪提速100x | GDC 2026 | `RTX Mega Geometry` |
-| **Cooperative Vector (DX)** | DirectX API 标准化 Tensor Core 加速 | 2025.3 发布 | `Cooperative Vector DirectX` |
-| **Neural Texture Compression** | 神经网络驱动的纹理压缩 | 实验中 | `neural texture compression` |
+| **RTX Mega Geometry** | 几何体压缩+簇复用，密集场景路径追踪提速100x | GDC 2026 演示 | `RTX Mega Geometry cluster` |
+| **RTX Neural Shaders** | Tensor Core 运行小型神经网络着色器，替代传统 BRDF 着色 | RTX 50 系列可用 | `RTX Neural Shaders cooperative vector` |
+| **Neural Texture Compression (NTC)** | 神经网络纹理压缩，16:1 压缩比保持高保真，VRAM 减少 6x | SDK 公开 | `neural texture compression NVIDIA` |
+| **Cooperative Vector (DX)** | DirectX API 标准化 Tensor Core 加速，让所有引擎接入神经渲染 | 2025.3 发布 | `Cooperative Vector DirectX` |
+| **腾讯 MagicDawn** | AI 驱动全局光照，用 Neural Radiance Caching 替代传统光线追踪弹射 | GDC 2026 发布 | `Tencent MagicDawn AI GI` |
 | **Stochastic Tile-Based Lighting** | 跨平台（移动→PC）随机瓦片光照 | SIGGRAPH 2025 | `stochastic tile lighting HypeHype` |
 
 ### 第三梯队：学术/实验阶段
 
 | 技术 | 是什么 | 查找关键词 |
 |------|--------|-----------|
-| **3D Gaussian Splatting** | 实时神经辐射场渲染 | `3DGS real-time rendering` |
-| **Neural Radiance Caching** | 用神经网络缓存全局光照 | `neural radiance cache GI` |
+| **3D Gaussian Splatting** | 实时神经辐射场渲染，快速场景重建 | `3DGS real-time rendering` |
+| **Neural Radiance Caching** | 用神经网络缓存全局光照（MagicDawn 已有生产级实现） | `neural radiance cache GI` |
 | **GPU-Driven Voxel Rendering** | GPU 驱动的大规模体素场景 | `GPU voxel Aokana` |
+| **AI Material Generation** | 用扩散模型生成 PBR 材质贴图（Adobe/NVIDIA 研究中） | `AI material generation diffusion PBR` |
+| **Neural Style Transfer for Textures** | 将参考图风格迁移到 PBR 材质，SD 插件方向 | `neural style transfer texture material` |
+
+---
+
+## 二-B、GDC 2026 渲染技术要点（2026-03 调研）
+
+> 本节记录 GDC 2026 期间发布的渲染技术亮点，供后续追踪。
+
+### NVIDIA RTX Neural Rendering 全景
+
+NVIDIA 在 GDC 2026 提出"神经渲染时代"概念，核心三件套：
+
+1. **RTX Neural Shaders**：在着色器代码中嵌入小型神经网络，用 Tensor Core 实时推理。支持 AI 学习的 BRDF/材质响应，比手写近似更准确。通过 Cooperative Vector API 接入 DirectX/Vulkan，任何引擎均可使用
+2. **Neural Texture Compression (NTC)**：用神经网络编解码纹理数据。相比 BC7，在同等质量下 VRAM 占用减少 ~6x。对高分辨率 4K 贴图和虚拟纹理管线意义重大
+3. **RTX Mega Geometry**：面向密集路径追踪场景的几何体处理优化。通过 cluster 复用和压缩，密集场景性能提升可达 100x
+
+> **与我们的关联**：Neural Texture Compression 对大世界项目有直接价值（VRAM 是瓶颈）。Neural Shaders 属于下一代技术储备，短期不急但要跟踪。EcoEngine 自研管线可以较早尝试 Cooperative Vector API 集成。
+
+### 腾讯 MagicDawn
+
+腾讯天美 J3 在 GDC 2026 展示的 AI 驱动实时全局光照系统：
+- 用 Neural Radiance Caching 替代传统光线追踪的多次弹射
+- 降低了对光线弹射次数的依赖，低端硬件也能获得近似全局光照效果
+- 适用于开放世界、室内外混合照明场景
+
+> **与我们的关联**：作为腾讯内部技术，值得持续关注落地进展和可能的引擎集成。
+
+### Unity 2026 渲染管线战略更新
+
+- **URP 全面加强**：实时 GI Probe（预计 Unity 6.5+）、增强 SSR、Physical Light Units 标准化
+- **GPU Resident Drawer 2.0**：BatchRendererGroup 升级，支持更多绘制类型，减少 CPU 开销
+- **SpeedTree 10 原生集成**：新的植被渲染管线，自动 LOD + wind animation
+- **HDRP 不再加新功能**：只修 bug + 支持 Switch 2 硬件适配（Unity 6.5）
 
 ---
 
