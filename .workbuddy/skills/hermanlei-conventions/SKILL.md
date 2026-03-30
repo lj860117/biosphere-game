@@ -787,12 +787,18 @@ AI 在台账里给新问题定级时，按以下顺序判断：
 
 > 用户提到某个功能/bug 时，AI 根据下表的「别名/口语」列匹配项目。**匹配不到任何一行时必须询问用户**，不得猜测。
 
-| 项目 | 别名 / 口语关键词 | 命名空间 | 文件路径特征 | 技术栈 | 适用规范章节 |
-|------|-------------------|---------|-------------|--------|-------------|
-| SceneCraft | 场景工坊、工具、编辑器工具、SceneCraft | `SceneCraftKit` | `SceneCraft\Editor\` | Unity IMGUI 编辑器扩展 | 七 + 八 |
-| biosphere-game | 游戏、小游戏、biosphere | — | `biosphere-game\` | Unity C# 游戏逻辑 | 七 |
-| hermanlei-conventions | Skill、规范、约定 | — | `.workbuddy\skills\hermanlei-conventions\` | Markdown 文档 | 四 |
+| 项目 | 别名 / 口语关键词 | 命名空间 | 文件路径特征 | 技术栈 | 参与模式 | 适用规范章节 |
+|------|-------------------|---------|-------------|--------|---------|-------------|
+| SceneCraft | 场景工坊、工具、编辑器工具、SceneCraft | `SceneCraftKit` | `SceneCraft\Editor\` | Unity IMGUI 编辑器扩展 | 🔑 主导 | 七 + 八 |
+| biosphere-game | 游戏、小游戏、biosphere | — | `biosphere-game\` | HTML/CSS/JS 网页游戏 | 🔑 主导 | 七 |
+| hermanlei-conventions | Skill、规范、约定 | — | `.workbuddy\skills\hermanlei-conventions\` | Markdown 文档 | 🔑 主导 | 四 |
+| 公司 Unity 项目 | 项目、15hb、unity 项目 | — | `G:\Project_15hb\` | Unity + EcoEngine | 🤝 协作 | 铁律 only |
 
+> **参与模式说明**：
+> - 🔑 **主导**：用户定规范、做架构决策 → 全套铁律+规范+闭环流程适用
+> - 🤝 **协作**：别人的规范，用户参与开发 → 只遵守铁律（安全底线），不主动推架构偏好
+> - SceneCraft 内有 cat1986 维护的子模块（Hierarchy 文件夹、模型导出 & 检查），这些子模块按🤝协作模式对待，详见 scenecraft-architecture.md 第七章
+>
 > **以后新增项目时，在此表追加一行即可。**
 
 #### 消歧义交互规则
@@ -1060,6 +1066,7 @@ hermanlei-rendering          ← 渲染专属：配合 rendering-knowledge-index
 
 ### biosphere-game
 
+- **技术栈**：HTML / CSS / JavaScript 纯前端网页游戏（非 Unity 项目），后端 Supabase
 - 使用上述 Git commit 规范（[office]/[home] 前缀）
 - 当前最新 tag：`v1.3.0`（2026-03-22）
 - **远程仓库**：`https://github.com/lj860117/biosphere-game.git`（origin/main）
