@@ -258,6 +258,28 @@ hermanlei 当前的主要工作方向：
 
 - 使用上述 Git commit 规范（[office]/[home] 前缀）
 - 当前最新 tag：`v1.3.0`（2026-03-22）
+- **远程仓库**：`https://github.com/lj860117/biosphere-game.git`（origin/main）
+- **仓库内容**：游戏代码 + hermanlei-conventions Skill 副本（`.workbuddy/skills/hermanlei-conventions/`）
+
+#### 快捷指令："更新 git"
+
+> 当用户说 **"更新 git"** / **"同步到 git"** / **"把 Skill 更新到 git"** 时，执行以下流程：
+
+1. **同步 Skill 文件**：将 Skill 源目录（见下表）的所有文件（SKILL.md + references/）复制到 biosphere-game 仓库对应位置，覆盖旧文件
+2. **git add** `.workbuddy/skills/hermanlei-conventions/`
+3. **git diff --stat** 确认改动范围
+4. **git commit -F**（UTF-8 临时文件方式），commit 后删除临时文件
+5. 如果 `git push` 失败（远程有新提交），先 `git pull --rebase origin main` 再 push
+6. push 成功后报告 commit hash 和变更摘要
+
+**路径对照表**（按电脑选择）：
+
+| | Skill 源目录 | biosphere-game 本地仓库 |
+|---|---|---|
+| **公司电脑** (office) | `C:\Users\hermanlei\.workbuddy\skills\hermanlei-conventions\` | `C:\Users\hermanlei\WorkBuddy\20260317212750\biosphere-game\` |
+| **家里电脑** (home) | _(待补充，clone 后填入)_ | _(待补充，clone 后填入)_ |
+
+> **注意**：家里电脑第一次使用前，需要先 `git clone` biosphere-game 仓库，然后把路径填到上表中。
 
 ---
 
