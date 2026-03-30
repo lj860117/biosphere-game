@@ -85,6 +85,7 @@ references 目录下的文档分为四种类型，每种有不同的管理规则
 | 文档 | 类型 | 保鲜周期 | 说明 |
 |------|------|----------|------|
 | `rendering-knowledge-index.md` | 📖 知识索引 | 每月 | Unity 渲染管线战略 + 全球渲染前沿技术图谱 |
+| `gamedev-knowledge-index.md` | 📖 知识索引 | 每月 | 游戏架构参考模式 + 移动端性能知识 + 竞品研究方向 |
 | `scenecraft-architecture.md` | 🏗️ 架构速查 | 架构变更时 | SceneCraft 28 个文件的完整架构文档 |
 | `scenecraft-known-issues.md` | 🐛 问题台账 | 实时 | SceneCraft 代码预审发现的问题跟踪 |
 | `project-context.md` | 📋 项目上下文 | 项目变化时 | 项目路径、版本历史、技术栈 |
