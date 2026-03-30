@@ -246,6 +246,20 @@ hermanlei 当前的主要工作方向：
 
 ## 六、项目特定约定
 
+### 项目识别索引（AI 匹配规则）
+
+> 用户提到某个功能/bug 时，AI 根据下表的「别名/口语」列匹配项目。**匹配不到任何一行时必须询问用户**，不得猜测。
+
+| 项目 | 别名 / 口语关键词 | 命名空间 | 文件路径特征 | 技术栈 | 适用规范章节 |
+|------|-------------------|---------|-------------|--------|-------------|
+| SceneCraft | 场景工坊、工具、编辑器工具、SceneCraft | `SceneCraftKit` | `SceneCraft\Editor\` | Unity IMGUI 编辑器扩展 | 七 + 八 |
+| biosphere-game | 游戏、小游戏、biosphere | — | `biosphere-game\` | Unity C# 游戏逻辑 | 七 |
+| hermanlei-conventions | Skill、规范、约定 | — | `.workbuddy\skills\hermanlei-conventions\` | Markdown 文档 | 四 |
+
+> **以后新增项目时，在此表追加一行即可。**
+
+---
+
 ### SceneCraft（场景工坊）
 
 - **开发路径**：WorkBuddy workspace 中开发
