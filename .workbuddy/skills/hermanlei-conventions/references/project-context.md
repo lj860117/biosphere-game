@@ -57,3 +57,41 @@ Unity 编辑器工具套件，前身为 PrefabMaster / PrefabScaleTool。
 - commit 消息含特殊字符（如中文、括号）时，使用 `-F` 文件方式传递
 - 临时消息文件必须用 `write_to_file` 创建（确保 UTF-8），不用 `echo`
 - PowerShell 的 `echo` / `Out-File` 默认编码不是 UTF-8，会导致中文乱码
+
+## P4 集成 UI 决策参考
+
+| 决策项 | 最终方案 |
+|--------|----------|
+| p4.exe 存放 | `Editor/P4Bin/p4.exe`（不用 `Bin~`，因为 Unity 不生成 .meta 导致 P4 trigger 报错） |
+| 探测链 | 缓存 → EditorPrefs → 内嵌 → PATH → 同类进程探测 → 常见路径 |
+| 登录方式 | Unity 内密码输入框，`Process.StandardInput` 喂密码 |
+| Workspace 选择 | `p4 clients -u` 自动扫描 + Root 路径匹配 + 一键 ApplyWorkspace，绿色/灰色区分 |
+| 默认服务器 | `192.168.31.15:1667` |
+| 连接检测触发 | 手动按钮触发，绝不自动执行（`_p4LoginState` 初始 `-2`） |
+| Ticket 过期 | 自动弹 EditorInputDialog，回车确认，≥3 次重试 |
+| 预览过滤 | 自动过滤 `/SceneCraft/` 目录（工具自身文件不显示） |
+| 安全同步 | 「仅安全」一键排除冲突 + 需关 Unity 文件 |
+| 分支支持 | 状态行显示 `(用户名@workspace名)`，下拉切换分支 |
+| 图例条 | 固定顶部不滚动，■ 方块 + 实际颜色 + 文字 |
+| 需关 Unity 目录 | `Settings`、`scripts_dll` 等（可扩展列表） |
+
+## 颜色编码速查
+
+| 颜色 | RGB 参考 | 用途 |
+|------|----------|------|
+| 紫色 | `(0.7, 0.5, 1.0)` | 需关 Unity 才能同步的文件/文件夹 |
+| 绿色 | — | 其他美术资源 / Workspace 自动匹配项 |
+| 黄色 | — | 非场景目录含场景子文件的提示文字 |
+| 灰色 | — | 不匹配的 Workspace（可强制使用） |
+
+## "预览更新 0 文件" 五轮修复历史
+
+这是一个典型的"来回调整"案例，记录完整修复链路以供参考：
+
+1. **第一轮**：改用 `p4 -s sync -n`（tagged output）— 但根因不在这
+2. **第二轮**：加 `DiagnoseSyncOutput()` 诊断 — 发现 **P4CLIENT 环境变量是机器名默认值**，P4 服务器不认识
+3. **第三轮**：加 Step 3 Workspace 有效性检测（`p4 where ...`）+ 修复指引
+4. **第四轮**：P4CLIENT 一键自动修复（`ScanUserWorkspaces` + `ApplyWorkspace`）
+5. **第五轮**：完全零配置 + Unity 内登录（内嵌 p4.exe + 注册表读取 + 密码输入框）
+
+**教训**：表面问题（sync 解析）和根因（P4CLIENT 配置错误）可能相差很远，诊断工具比直接修代码更重要。
