@@ -7,4 +7,5 @@ Thumbs.db
 # WorkBuddy internal data (keep skills tracked)
 .workbuddy/*
 !.workbuddy/skills/
+.workbuddy/skills/**/.workbuddy/
 .codebuddy/
