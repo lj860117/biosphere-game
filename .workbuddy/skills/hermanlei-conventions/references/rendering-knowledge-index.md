@@ -3,7 +3,7 @@
 > **用途**：AI 在接到渲染相关任务时，先读此文档定位方向，再去搜索最新资料。
 > **维护规则**：每次调研渲染话题后更新此文档。每月巡检时检查链接有效性。
 > **保鲜周期**：每月
-> **最后更新**：2026-03-30
+> **最后更新**：2026-04-07
 
 ---
 
@@ -13,10 +13,10 @@
 |------|------|----------|----------|
 | **URP** | ✅ 主力发展 | 所有游戏类型、所有平台 | 持续加新功能：实时 GI、SSR、物理光源、天空管理器 |
 | **HDRP** | ⚠️ 维护模式 | 高端主机/PC 项目 | 不加新功能，只修 bug + 支持 Switch 2（Unity 6.5） |
-| **Built-in** | ❌ 将弃用 | 旧项目维护 | Unity 6.5 标记弃用，2028 年底前支持，之后移除 |
-| **Custom SRP** | 🛠️ 自行维护 | EcoEngine 等自研管线 | Unity SRP API 持续可用 |
+| **Built-in** | ❌ 6.5 正式标记弃用 | 旧项目维护 | 支持到 2028 年底（Enterprise/Industry 到 2029），之后移除。教育资源和 Asset Store 默认转 URP |
+| **Custom SRP** | 🛠️ 自行维护 | EcoEngine 等自研管线 | Unity SRP API 持续可用。注意 6.5 移除旧版 Render Graph 编译器 |
 
-> **关键结论**：新项目一律用 URP。现有 EcoEngine 项目走 Custom SRP。不要启动新的 HDRP 项目。
+> **关键结论**：新项目一律用 URP。现有 EcoEngine 项目走 Custom SRP（注意 Render Graph 编译器变更）。不要启动新的 HDRP 项目。BiRP 弃用时间线已确认——实时服务项目应开始评估迁移。
 
 ---
 
@@ -39,8 +39,8 @@
 
 | 技术 | 是什么 | 现状 | 查找关键词 |
 |------|--------|------|-----------|
-| **DLSS 5 / 神经渲染** | AI 模型直接生成像素级光照和材质 | 2026 秋发布 | `DLSS 5 neural rendering` |
-| **DLSS 4.5** | 第二代 Transformer 超分 + 多帧生成 | 2026.3 可用 | `DLSS 4.5 Transformer` |
+| **DLSS 5 / 神经渲染** | AI 模型实时生成光照、纹理、反射（不再只是超采样），黄仁勋称"图形界的 GPT 时刻" | 2026 下半年发布，GTC 2026 演示 | `DLSS 5 neural rendering GTC 2026` |
+| **DLSS 4.5（完整版 2026.3.31）** | 第二代 Transformer 超分 + **动态多帧生成**（自动变速箱式倍率调整）+ **6X 多帧生成**（RTX 50 系列，4K 光追再提升 35%）+ 增强型 UI 渲染模型 | ✅ 已发布 | `DLSS 4.5 Dynamic MFG 6X` |
 | **AMD FSR Redstone** | 神经网络超分 + ML 帧生成 + Radiance Caching | 2026 | `FSR Redstone neural` |
 | **RTX Mega Geometry** | 几何体压缩+簇复用，密集场景路径追踪提速100x | GDC 2026 演示 | `RTX Mega Geometry cluster` |
 | **RTX Neural Shaders** | Tensor Core 运行小型神经网络着色器，替代传统 BRDF 着色 | RTX 50 系列可用 | `RTX Neural Shaders cooperative vector` |
@@ -81,15 +81,21 @@ NVIDIA 在 GDC 2026 提出"神经渲染时代"概念，核心三件套：
 - 用 Neural Radiance Caching 替代传统光线追踪的多次弹射
 - 降低了对光线弹射次数的依赖，低端硬件也能获得近似全局光照效果
 - 适用于开放世界、室内外混合照明场景
+- **集成空间音频和高级遮挡剔除**（GDC 2026 新披露）
+- **官方确认兼容 Unreal Engine、Unity 和 Godot**（GDC 2026 新披露）
 
-> **与我们的关联**：作为腾讯内部技术，值得持续关注落地进展和可能的引擎集成。
+> **与我们的关联**：作为腾讯内部技术，且**已确认兼容 Unity**，这是最值得密切跟踪的技术之一。如果 EcoEngine/Unity 项目能试用，有望显著提升光照质量。
 
 ### Unity 2026 渲染管线战略更新
 
-- **URP 全面加强**：实时 GI Probe（预计 Unity 6.5+）、增强 SSR、Physical Light Units 标准化
+- **URP 全面加强**：实时 GI Probe（预计 Unity 6.5+）、增强 SSR、Physical Light Units 标准化、物理天空与动态天空管理器、预曝光与自动曝光、移动端片上后处理
 - **GPU Resident Drawer 2.0**：BatchRendererGroup 升级，支持更多绘制类型，减少 CPU 开销
 - **SpeedTree 10 原生集成**：新的植被渲染管线，自动 LOD + wind animation
-- **HDRP 不再加新功能**：只修 bug + 支持 Switch 2 硬件适配（Unity 6.5）
+- **HDRP 功能冻结**：只修 bug + 支持 Switch 2 硬件适配（Unity 6.5）
+- **Built-in (BiRP) 正式弃用**：Unity 6.5 标记弃用，6.7 LTS 仍包含，支持到 2028 年底
+- **Unity 6.5 破坏性变更**：移除旧版 Render Graph 编译器，仅保留新编译器
+- **DX12 成为 Windows 默认**：内存优化 + 平滑管线编译后默认启用
+- **着色器编译时间优化**：新构建设置可减少 URP 着色器编译时间最多 45%
 
 ---
 

@@ -128,11 +128,18 @@ hermanlei 当前的主要工作方向：
 > 不管是哪个 AI 在用这个 Skill，都必须遵守以下行为准则。
 
 1. **加载 Skill 后先报告**：告诉用户"已加载 hermanlei-conventions Skill"，不需要列出所有规则
-2. **铁律不可跳过**：🔴 铁律级别的规则，即使用户说"不用管那个"也要**提醒一次**（提醒后用户仍坚持则执行）
-3. **不确定时查文档**：碰到领域问题先查 references/，不要凭空回答
-4. **改 Skill 必须告知**：任何对 SKILL.md 或 references/ 的修改，都要列出改了什么并等用户确认
-5. **不要过度加载**：一次最多叠加 2 个 Skill（本 Skill + 1 个领域 Skill），多了 AI 上下文会爆
-6. **working memory 是桥梁**：对话中的临时发现写入 working memory → 确认有价值后再迁入 Skill
+2. **加载后执行过期检查**：读 MEMORY.md 中的 `last_weekly_check` 和 `last_monthly_research` 时间戳，超过 10 天 / 35 天 → 在回复开头一行提醒用户（详见成长引擎「Skill 加载时的过期触发检查」）
+3. **铁律不可跳过**：🔴 铁律级别的规则，即使用户说"不用管那个"也要**提醒一次**（提醒后用户仍坚持则执行）
+4. **不确定时查文档**：碰到领域问题先查 references/，不要凭空回答
+5. **改 Skill 必须告知**：任何对 SKILL.md 或 references/ 的修改，都要列出改了什么并等用户确认
+6. **不要过度加载**：一次最多叠加 2 个 Skill（本 Skill + 1 个领域 Skill），多了 AI 上下文会爆
+7. **working memory 是桥梁**：对话中的临时发现写入 working memory → 确认有价值后再迁入 Skill
+8. **中断任务必须记录**：当用户切任务/说暂停/会话即将结束时有未完成的工作 → **立刻**把未完成事项写入 MEMORY.md「待恢复任务」区块。批量工作（如分析多个文件）必须**做完一个写一个**，不要攒着最后一起写
+9. **诊断/审查 Skill 时的行为规范**：用户问"有什么缺陷/改进"时，必须按以下框架回答，**禁止上来就倒一堆改进清单**：
+   - **第一步：先说现有机制的价值**——"这些规则已经防住了什么、哪些设计是成熟的"
+   - **第二步：🔴 不做会出事的缺陷**——最多 3 条，每条说清楚"不修的后果是什么"
+   - **第三步：🟡🟢 锦上添花的建议**——压缩到 2-3 条，不展开细节，一句话带过
+   - **原因**：AI 天生倾向于"找问题"，不加约束会制造焦虑——把"理论上更好"和"不做会出事"混在一起报，让用户误以为 Skill 一身毛病
 
 ---
 
@@ -593,6 +600,7 @@ AI 在台账里给新问题定级时，按以下顺序判断：
 - P4V 的 workspace 配置和 `p4` 命令行用的 P4CLIENT 可能不一致
 - 通过 `p4 clients -u 用户名` 列出 workspace，按 Root 路径匹配工程
 - 密码登录通过 `Process.StandardInput.WriteLine(password)` 喂给 `p4 login`
+- **🔴 GUI 进程（Unity/WinForms 等）调 p4 必须包 chcp 65001** — Windows 默认 Console Code Page 是 936 (GBK)，p4.exe 在 GBK 下对含中文路径的文件 digest 计算错误，导致 reconcile 返回大量假阳性。统一用 `cmd /c "chcp 65001 >nul 2>&1 && p4 args..."` 包装，同时设 `StandardOutputEncoding = Encoding.UTF8`。详见 wiki pitfalls.md P4-2
 
 ---
 
@@ -640,8 +648,11 @@ AI 在台账里给新问题定级时，按以下顺序判断：
 
 | 需求领域 | 触发关键词 | 推荐 Skill | 备注 |
 |----------|-----------|-----------|------|
+| **SceneCraft 操作/检查** | 查场景, 查资产, 查P4, 同步工坊, SceneCraft, 场景检查, 资产检查, P4提交, 新规则 | `scenecraft-agent` | 🆕 2026-04-02 新增，可叠加 `hermanlei-conventions` |
 | Unity 编辑器工具 IMGUI | EditorWindow, Inspector, IMGUI, 编辑器工具, 自定义面板 | `unity-editor-imgui-design` | 可叠加 `unity-workflows` |
 | Unity 编辑器自动化 | 自动化, 批量操作, 菜单脚本 | `unity-workflows` | |
+| Unity 编辑器远程控制 | MCP, 远程控制, WebSocket, 编辑器自动化, 实时通信 | `unity-editor-toolkit` 或 `unity-mcp-orchestrator` | 🆕 2026-04-10 补入 |
+| Unity Editor Plugin 控制 | OpenClaw, Plugin, Unity Plugin, 编辑器插件 | `openclaw-unity-skill` | 🆕 2026-04-10 补入 |
 | Unity UI 系统选型 | UI 选型, UGUI 还是 Toolkit, 该用哪个 UI | `unity-ui-selector` | 选完后按结果加载对应 Skill |
 | Unity UI Toolkit | UI Toolkit, USS, UXML, VisualElement | `unity-uitoolkit` | |
 | Unity 代码架构 / SO | ScriptableObject, 解耦, 事件通道, 架构设计 | _(当前会话已有 Unity架构师角色)_ | 角色自带，无需额外 Skill |
@@ -727,6 +738,25 @@ AI 在台账里给新问题定级时，按以下顺序判断：
 | 错过了某周的巡检 | 下次打开时，AI 在首次对话开始前检查 MEMORY.md 中的 `last_weekly_check` 日期，超过 10 天自动触发补巡检 |
 | 错过了某月的前沿调研 | 下次打开时，AI 检查 `last_monthly_research` 日期，超过 35 天自动触发补调研 |
 | 长期不使用（>60 天） | AI 不要一口气补所有错过的，只做一次"回归巡检"：检查 Skill 中所有路径是否有效 + 做一次前沿调研 |
+
+**Skill 加载时的过期触发检查**（方案 B — 自动化任务的兜底）：
+> 自动化任务是主力，但如果 WorkBuddy 那天没运行，自动化就不会执行。
+> 以下规则让 **每次加载 hermanlei-conventions Skill** 时都做一次快速过期检查，确保不会长期错过。
+
+**AI 每次加载本 Skill 后，在开始正式工作前，花 3 秒执行以下检查**：
+1. 读取当前 workspace 的 `MEMORY.md`（或 hermanlei-conventions Skill 目录下的 `.workbuddy/memory/MEMORY.md`）
+2. 检查 `last_weekly_check` 距今是否 > 10 天
+3. 检查 `last_monthly_research` 距今是否 > 35 天
+4. 如果任一过期 → 在回复开头用一行提醒用户：
+   ```
+   ⚠️ 巡检/调研过期提醒：上次巡检距今 N 天（> 10 天），上次调研距今 M 天（> 35 天）。要补一次吗？
+   ```
+5. 用户确认后执行补巡检/补调研；用户说"不用"就跳过
+6. 如果 MEMORY.md 不存在或没有时间戳字段 → 提醒用户"巡检系统还未初始化，要初始化吗？"
+
+**不做的情况**：
+- 当前任务是紧急 bug 修复 → 不打断，任务完成后再提醒
+- 当前会话已经在执行巡检/调研 → 不重复提醒
 
 **MEMORY.md 中需要维护的时间戳**（AI 每次执行巡检/调研后更新）：
 ```markdown
@@ -873,6 +903,37 @@ hermanlei-rendering          ← 渲染专属：配合 rendering-knowledge-index
 - Skill 自动路由表从核心 Skill 统一管理
 - 成长引擎留在核心 Skill，巡检范围扩大到所有子 Skill
 
+##### Skill 内容归属规则（跨 Skill 更新时必读）
+
+> **核心原则**：知识分散在多个 Skill 中（如 `hermanlei-conventions` 和 `scenecraft-agent`），
+> 需要明确每条内容该写哪里。**默认写项目专属文件，除非确认是通用知识。**
+
+**归属标签**（AI 每次建议更新 Skill 时必须自带）：
+
+- **[通用]** — 适用于所有项目、不依赖特定项目代码的通用经验
+  - 写入目标：`hermanlei-conventions/SKILL.md`（踩坑 → 7.8 节）或对应 references/
+  - 例：`[通用] ripgrep 搜中文文件不靠谱 → 加入 7.8 踩坑记录`
+  
+- **[项目专属]** — 仅与某个项目相关的知识（架构、团队成员、检查规则等）
+  - 写入目标：对应项目的 Skill（如 `scenecraft-agent/SKILL.md`）或 `hermanlei-conventions/references/{项目}-*.md`
+  - 例：`[项目专属] SceneCraft 团队成员寅杰/新选 → 加入 scenecraft-architecture.md`
+
+**三问判断法**：
+1. **换一个项目，这条经验还适用吗？** 是 → [通用]，否 → [项目专属]
+2. **这条经验依赖特定项目的代码/架构吗？** 是 → [项目专属]，否 → 可能是 [通用]
+3. **不确定？** → **默认 [项目专属]**（宁可多写一处，不要遗漏）
+
+**"更新 git" 时的行为**：
+- 自动跳过项目专属 Skill 文件（如 `scenecraft-agent/`），仅提交 [通用] 内容变更
+- 混合更新时，先分别写入对应位置，再只 commit [通用] 部分
+
+**建议更新格式**：
+```
+💡 建议更新 Skill：
+• [通用] XXX → 加入 hermanlei-conventions 的 YYY 位置
+• [项目专属] XXX → 加入 scenecraft-agent 的 YYY 位置
+```
+
 ---
 
 ### SceneCraft（场景工坊）
@@ -1009,6 +1070,15 @@ hermanlei-rendering          ← 渲染专属：配合 rendering-knowledge-index
 | 3 | `EditorUtility.SetDirty()` 忘记调 | SO/Asset 改动重启后丢失 | 修改 Asset 后立即调 `SetDirty` |
 | 4 | Unity 假 null（`is null` vs `== null`） | 空引用异常或逻辑错误 | Unity 对象统一用 `== null` |
 | 5 | 直接写有技术深度的工具（如减面工具），没查业界方案 | 交付的工具没法用，用户时间白费 | 先查参考建立基线再写代码（铁律第 7 条） |
+| 6 | ripgrep 搜含中文注释的 C# 文件返回 0 结果 | 误判方法/类不存在，做了错误决策 | SceneCraft 等中文注释多的源码文件，关键搜索用 `Select-String` 或 `read_file` 验证，不能只信 ripgrep |
+| 7 | 批量分析完 5 个主题后攒着没写入磁盘，用户说暂停后会话结束 | 分析结果全部丢失，需重新分析 | **做完一个就立刻写入磁盘**，不要攒着一起写。被中断时把未完成任务写入 MEMORY.md「待恢复任务」 |
+| 8 | `Lightmapping.lightingSettings` 在 null 时读取 | 抛 Exception（不是返回 null） | 必须 try-catch 包装：`try { return Lightmapping.lightingSettings; } catch { return null; }` |
+| 9 | `foreach` 遍历集合时在按钮回调里修改同一个集合 | `Collection was modified` 异常 | 用 `EditorApplication.delayCall` 延迟到下一帧执行修改操作 |
+| 10 | `LightingSettings.filtering` 属性不存在 | 编译错误 CS1061 | 正确属性名是 `filteringMode`（Unity API 名跟面板显示名不一致，改前先查文档） |
+| 11 | 只看 VSCode OmniSharp linter 确认"零错误"，不看 Unity Console | 花括号漏闭合 linter 没报但 Unity 编译失败，之后 2 小时改动全白忙 | **每次代码改动后必须提醒用户确认 Unity Console 无编译错误**。linter ≠ 编译器，大文件（5000+ 行）尤其不可信 |
+| 12 | 修 bug 时凭猜测改代码，不先看真实运行数据 | P4 "No Translation" 修了 3 轮才修好（每轮只理解问题一层） | **修 bug 前先加 Debug.Log 看真实数据**，确认问题本质后再设计方案。不凭猜测 |
+| 13 | 并行堆积多个未经 Unity 编译验证的代码改动 | 第 1 个改动编译失败，后续 4 个改动全部白做 | **一个改动编译确认后再做下一个**，不攒着一堆改完才验证 |
+| 14 | GUI 进程（Unity）调 p4.exe，默认 Code Page 936 (GBK) | reconcile 返回 296 条假阳性（正确是 9 条），中文路径文件 digest 全部算错 | **统一用 `cmd /c "chcp 65001 >nul 2>&1 && p4 ..."`** 包装所有 p4 调用，同时设 StandardOutputEncoding=UTF8。PowerShell 默认已是 65001 所以看不出问题，只有 GUI 进程会中招 |
 
 > **遇到新坑时，必须追加到此表。这是活文档。**
 
@@ -1125,6 +1195,7 @@ hermanlei-rendering          ← 渲染专属：配合 rendering-knowledge-index
 
 ## 参考文档
 
+- **Skill 架构指南**：`references/ARCHITECTURE.md` — Skill 整体架构地图（章节索引、修改规则、温度体系、快速决策树）。**首次接触此 Skill 的 AI/维护者必读，可替代通读 SKILL.md 全文**
 - **项目上下文**：`references/project-context.md` — 项目路径、版本历史、P4 集成决策等
 - **SceneCraft 架构速查**：`references/scenecraft-architecture.md` — 28 个 .cs 文件的完整架构文档（类声明、核心方法、字段、依赖关系、快速定位指南）。**修改 SceneCraft 代码前必读此文档**，避免遍历全部源码浪费 token
 - **SceneCraft 已知问题台账**：`references/scenecraft-known-issues.md` — 代码预审发现的所有问题（含严重等级、行号、修复建议、修复状态）。**改代码前查对应文件章节**，修好了标 ✅，发现新问题追加

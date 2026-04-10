@@ -84,6 +84,7 @@ references 目录下的文档分为四种类型，每种有不同的管理规则
 
 | 文档 | 类型 | 保鲜周期 | 说明 |
 |------|------|----------|------|
+| `ARCHITECTURE.md` | 🏗️ 架构速查 | 结构变更时 | Skill 整体架构指南：章节地图、修改规则、温度体系、快速决策树 |
 | `rendering-knowledge-index.md` | 📖 知识索引 | 每月 | Unity 渲染管线战略 + 全球渲染前沿技术图谱 |
 | `gamedev-knowledge-index.md` | 📖 知识索引 | 每月 | 游戏架构参考模式 + 移动端性能知识 + 竞品研究方向 |
 | `material-stylization-knowledge-index.md` | 📖 知识索引 | 每月 | SD 材质风格化工作流 + AI 材质生成 + 风格化 PBR 技术 |

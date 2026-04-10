@@ -1,6 +1,6 @@
 # SceneCraft（场景工坊）架构速查
 
-> **最后更新**：2026-03-30（新增维护归属章节）  
+> **最后更新**：2026-04-10（P4 chcp 65001 包装、GUID 查找器增强、APV BakingSet 检测、P4 断连检测、扫描目录持久化）  
 > **源码位置**：`G:\Project_15hb\client\unity\Assets\ArtOnly\SceneCraft\Editor\`  
 > **命名空间**：`SceneCraftKit`  
 > **文件数量**：28 个 .cs 文件  
@@ -201,9 +201,9 @@ void ShowDiffResult();                      // 展示差异结果
 
 **核心方法：**
 ```csharp
-string RunP4Command(string args);                    // 执行 p4 命令
+string RunP4Command(string args);                    // 执行 p4 命令（已含 chcp 65001 包装）
 string RunP4Command(string args, int timeoutMs);     // 带超时
-ProcessResult RunP4Process(string args);             // 底层 Process 封装
+ProcessResult RunP4Process(string args);             // 底层 Process 封装（cmd.exe + chcp 65001）
 void DetectP4Environment();                          // 环境自动探测
 string FindP4ExePath();                              // 多级回退查找 p4.exe
 void ScanP4Config();                                 // 读取 p4 set 配置
@@ -584,11 +584,11 @@ class SceneCraftReadme : EditorWindow {
 
 ### 4.1 P4SubmitChecker.cs — P4 提交预检工具
 
-**约 6874 行** | SceneCraft 套件中最大的单独工具
+**约 7000+ 行** | SceneCraft 套件中最大的单独工具
 
 **核心类：** `P4SubmitChecker : EditorWindow`
 
-**功能概述**：P4 提交前自动检查，包括文件命名规范、资源引用完整性、场景合法性、文件大小检查等。
+**功能概述**：P4 提交前自动检查，包括文件命名规范、资源引用完整性、场景合法性、文件大小检查等。另含版本管理页签功能：同步预览、冲突检测、已签出文件管理、假改动清理。
 
 **核心方法：**
 ```csharp
@@ -601,7 +601,63 @@ void CheckSceneValidity();                  // 场景合法性
 void CheckFileSize();                       // 文件大小检查
 void CheckMissingReferences();              // 缺失引用检查
 void GenerateReport();                      // 生成检查报告
+void ScanOpenedFiles();                     // 扫描已签出文件（p4 opened + diff -sr 检测假改动）
+void MarkUnchangedFiles();                  // 用 p4 diff -sr 标记内容未改的签出文件
+void RevertUnchangedFiles();                // 一键清理假改动（revert 内容未改的签出文件）
+void RevertSelectedOpenedFiles();           // 撤回勾选的已签出文件
+void ScanDirtyFiles();                      // 扫描本地脏文件（p4 reconcile -n，未签出但已修改）
+void CleanDirtyFiles();                     // 恢复选中脏文件到 depot 版本（p4 clean）
+// 2026-04-09 新增
+void PreCheckGUIDs();                       // GUID 预检：用 AssetDatabase.GUIDToAssetPath 瞬间查资源状态（存在/已删除/未知），不做全量搜索
+void SmartSetSearchScope();                 // 预检完成后根据资源类型自动设置搜索目录和文件类型（烘焙数据→scenes、脚本→全量等）
+string GuessShaderPropertyMeaning(string propName);  // Shader 属性名→中文含义映射（含项目自定义属性：TopCover/NRM/Rock/Dirt 系列）
+Dictionary<string,string> BuildMatGuidToSlotMap(string matPath);  // 纯文本解析 .mat YAML，建 GUID→Shader 属性名映射（不依赖 AssetDatabase）
+void CollectMatTextureSlots(string matPath);  // 读 .mat YAML 中所有贴图属性名
 ```
+
+**GUID 查找器增强（2026-04-09）：**
+- 预检机制：点击搜索前先做 .meta 反查（毫秒级），展示资源状态（存在/已删除/未知），避免无效全量搜索
+- 智能搜索范围：`SmartSetSearchScope` 根据预检结果自动推荐搜索目录和文件类型
+- 搜索范围 UI：折叠式 Foldout（默认收起一行摘要，展开后可编辑目录和文件类型 toggle）
+- `BuildGuidToAssetMap` 优化：从遍历 .meta 文件改为 `AssetDatabase.GUIDToAssetPath` API（毫秒级）
+- 材质 Missing 增强：解析 .mat YAML 提取 Shader 属性名，显示"GUID → 贴图(Texture) — Shader属性: _MainTex (颜色贴图)"
+- `GuessShaderPropertyMeaning`：项目自定义属性优先匹配（TopCover/NRM/Rock/Dirt 系列）
+
+**P4 断连检测（2026-04-09）：**
+- `ScanDirtyFiles` 使用带 `out warnings` 的 `RunP4Command` 重载
+- 检测 stderr 中的 "Fatal client error" / "session expired" / "No Translation"
+- 连接断开时弹窗提示用户重新登录（而非默默跳过）
+- "No Translation" 错误（P4 非 Unicode server + 特殊字符文件名）与真正的连接断开分开处理
+- 子目录分批重试机制：检测到 No Translation 且 output 为空时，展开为一级子目录分批 reconcile
+
+**扫描目录 EditorPrefs 持久化（2026-04-09）：**
+- `scanFolder` 从硬编码改为 EditorPrefs 加载（PREF key: `PrefabMaster_P4ScanFolder`）
+- 文本框修改和选择按钮修改后自动保存
+
+**美术正式扫描排除 ui 目录（2026-04-09）：**
+- `DIRTY_SCAN_ART_FORMAL` 从单路径 "Assets/formal/..." 拆为 7 个具体子目录（排除 ui）
+- 子目录列表：actor, deprecated, effect, epflow_timeline, item, scene_making, subtimeline
+
+**回滚不自动重新扫描（2026-04-09）：**
+- `CleanDirtyFiles()` 回滚后不再自动调 `ScanDirtyFiles`，改为清空列表 + `_dirtyNeedRescan` 标记 + HelpBox 提示手动刷新
+
+**P4 报告解析器修复（2026-04-09）：**
+- 修复 P4 trigger 报告中"问题文件:"粘在行末（而非独立成行）的解析失败
+- 新增 `nextLineIsProblemFile` 标志处理粘连格式
+- 提取 `AddGuidCheckFailedResult` 辅助方法
+
+**P4 chcp 65001 包装（2026-04-10）：**
+- `RunP4Command` 所有 p4 调用改为 `cmd /c "chcp 65001 >nul 2>&1 && p4 args..."`
+- 解决 GBK 代码页下 p4 对含中文路径文件 digest 计算错误导致 reconcile 假阳性（296 vs 9）
+- StandardOutputEncoding / StandardErrorEncoding 设为 UTF-8
+- CreateNoWindow 恢复为 true（不再闪黑窗口）
+- P4LoginWithPassword 的 stdin 密码透传不受影响
+
+**数据类（内部类）：**
+- `P4OpenedFileEntry` — 已签出文件条目（depotFile, action, changelist, localFile, fileName, selected, folderPath, isUnchanged）
+- `P4DirtyFileEntry` — 本地脏文件条目（localFile, depotFile, dirtyType, fileName, selected, folderPath）
+- `P4ConflictEntry` — 冲突文件条目
+- `P4ConflictFolderGroup` — 冲突文件按文件夹分组
 
 **主要逻辑分区：**
 - `Check Rules` — 检查规则定义
@@ -609,7 +665,9 @@ void GenerateReport();                      // 生成检查报告
 - `Scene Checks` — 场景级检查
 - `Reference Checks` — 引用完整性
 - `Report Generation` — 报告生成
-- `P4 Integration` — P4 changelist 操作
+- `P4 Integration` — P4 changelist 操作、已签出文件管理、假改动清理
+- `GUID Finder` — GUID 预检、智能搜索范围、材质属性解析
+- `P4 Connection` — 断连检测、No Translation 子目录重试
 - `UI` — 检查结果展示
 
 **依赖**：调用 `P4AssetHelper.GetP4ExePath()` 获取 p4.exe 路径。
@@ -635,7 +693,13 @@ void CheckDuplicateMaterials();             // 重复材质检查
 void CheckMeshComplexity();                 // 网格复杂度检查
 void CheckLightmapSettings();              // 光照贴图设置检查
 void GenerateAssetReport();                 // 生成资源报告
+string RunP4Command(string args);           // P4 命令执行（已含 chcp 65001 包装）
+string RunP4CommandWithInput(string args, string input);  // 带 stdin 输入的 P4 命令
 ```
+
+**P4 chcp 65001 包装（2026-04-10）：**
+- `RunP4Command` 和 `RunP4CommandWithInput` 均改为 cmd.exe 包装
+- StandardOutputEncoding / StandardErrorEncoding 设为 UTF-8
 
 **主要逻辑分区：**
 - `Scene Scan` — 场景扫描
@@ -646,6 +710,7 @@ void GenerateAssetReport();                 // 生成资源报告
 - `Lightmap Checks` — 光照贴图检查
 - `Report` — 报告生成与展示
 - `Auto Fix` — 自动修复功能
+- `P4 Integration` — P4 命令执行
 
 ---
 
@@ -780,7 +845,7 @@ void HandleP4Rename(string oldPath, string newPath);  // P4 rename 操作
 **核心方法：**
 ```csharp
 static string GetP4ExePath();                           // 获取 p4.exe 路径
-static ProcessResult RunP4(string args);                // 执行 p4 命令
+static ProcessResult RunP4(string args);                // 执行 p4 命令（已包含 chcp 65001 包装）
 static bool P4Edit(string filePath);                    // p4 edit
 static bool P4Add(string filePath);                     // p4 add
 static bool P4Delete(string filePath);                  // p4 delete
@@ -789,6 +854,11 @@ static bool P4Revert(string filePath);                  // p4 revert
 static string GetP4FileStat(string filePath);           // p4 fstat
 static bool IsFileInPerforce(string filePath);          // 判断文件是否在 P4 中
 ```
+
+**chcp 65001 包装（2026-04-10）：**
+- `RunP4()` 改为 `cmd /c "chcp 65001 >nul 2>&1 && p4 args..."` 包装
+- StandardOutputEncoding / StandardErrorEncoding 设为 UTF-8
+- 防止 GBK 代码页下 p4 对含中文路径的文件 digest 计算错误
 
 **被调用方**：`P4SubmitChecker`、`AssetLowercaseRenamer`、`SceneCraftWindow.P4.cs`
 
@@ -883,6 +953,9 @@ SceneCraft 套件中大部分模块由厉害了哥（hermanlei）维护，但以
 |----------|-----------|
 | P4 同步逻辑 | `Sync.cs` + `SyncUI.cs` + `SyncSafe.cs` |
 | P4 连接/登录 | `P4.cs` + `P4UI.cs` + `P4Login.cs` |
+| P4 chcp 65001 包装 | `P4AssetHelper.cs`（共享）+ `P4SubmitChecker.cs` + `SceneAssetChecker.cs` |
+| P4 断连检测 / No Translation | `P4SubmitChecker.cs` ScanDirtyFiles 区域 |
+| GUID 查找器 | `P4SubmitChecker.cs` GUID Finder 区域 |
 | Prefab 缩放 | `Scale.cs` + `ScaleUI.cs` |
 | LOD 管理 | `LOD.cs` + `DisLODGroupTool.cs` |
 | 颜色/样式 | `SceneCraftStyles.cs` |
