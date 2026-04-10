@@ -1024,10 +1024,67 @@ hermanlei-rendering          ← 渲染专属：配合 rendering-knowledge-index
 - 从用户输入获取的路径要 `Trim()` 并处理末尾多余的 `/` 或 `\`
 - 文件读写包在 `try-catch` 里，catch 中给用户人话提示（不是堆栈信息）
 
+**外部进程调用示例：**
+
+```csharp
+// ❌ 错误 — 没超时、没读 stderr、没检查退出码
+var p = Process.Start("p4", "reconcile -n ...");
+p.WaitForExit();
+string output = p.StandardOutput.ReadToEnd();
+
+// ✅ 正确 — 超时 + 重定向 + 退出码检查
+var psi = new ProcessStartInfo("p4", "reconcile -n ...")
+{
+    RedirectStandardOutput = true,
+    RedirectStandardError = true,
+    UseShellExecute = false,
+    CreateNoWindow = true
+};
+using var proc = Process.Start(psi);
+string stdout = proc.StandardOutput.ReadToEnd();
+string stderr = proc.StandardError.ReadToEnd();
+if (!proc.WaitForExit(30000)) // 30秒超时
+{
+    proc.Kill();
+    Debug.LogError("外部进程超时，已强制终止");
+    return;
+}
+if (proc.ExitCode != 0)
+    Debug.LogWarning($"进程退出码 {proc.ExitCode}: {stderr}");
+```
+
 **try-catch 原则：**
 - **不要大范围 try-catch 吞异常** — 只包裹可能出错的具体操作（IO、进程、网络）
 - catch 中必须做两件事：① 给用户看得懂的错误提示 ② `Debug.LogException(e)` 保留完整堆栈
 - **绝不** catch 后空处理（`catch { }`）
+
+**try-catch 示例：**
+
+```csharp
+// ❌ 错误 — 大范围 try-catch 吞掉所有异常
+try
+{
+    LoadConfig();
+    ParseData();
+    UpdateUI();
+    SaveResults();
+}
+catch (Exception e) { Debug.LogError(e.Message); }
+
+// ✅ 正确 — 只包裹可能出错的具体 IO 操作
+LoadConfig();
+ParseData();
+
+try { SaveResults(); }  // 只有文件 IO 需要 try-catch
+catch (IOException e)
+{
+    EditorUtility.DisplayDialog("保存失败", $"文件写入出错：{e.Message}", "确定");
+    Debug.LogException(e);  // 保留完整堆栈
+}
+// 验证：catch 块里必须同时有 ① 用户提示 ② LogException
+
+UpdateUI();
+```
 
 ### 7.6 注释 & 代码文档规范
 
@@ -1052,11 +1109,42 @@ hermanlei-rendering          ← 渲染专属：配合 rendering-knowledge-index
 > 以下规则适用于所有 Unity C# 代码，不限于编辑器工具。
 
 - **`GetComponent` 结果缓存** — 不要在 Update/OnGUI 中每帧调用 `GetComponent<>()`，在 Awake/OnEnable 中缓存
+
+```csharp
+// ❌ 错误 — 每帧调用 GetComponent
+void Update()
+{
+    var rb = GetComponent<Rigidbody>();  // 每帧 GC + 查找开销
+    rb.AddForce(Vector3.up);
+}
+
+// ✅ 正确 — Awake 中缓存
+private Rigidbody _rb;
+void Awake() => _rb = GetComponent<Rigidbody>();
+void Update() => _rb.AddForce(Vector3.up);
+```
+
 - **字符串比较用 const** — Tag、Layer、Animator 参数等不要用魔法字符串，提取为 `const` 或 `static readonly`
 - **`SerializeField` 优于 public** — 需要在 Inspector 暴露的字段用 `[SerializeField] private`，不要直接 public
 - **`EditorUtility.SetDirty()` 不能忘** — 通过脚本修改 ScriptableObject/Asset 后必须调，否则改动不保存
 - **避免 `Update()` 里做可以事件驱动的逻辑** — 能用事件/回调/协程的，不要每帧轮询
 - **`null` 检查注意 Unity 假 null** — Unity 重写了 `==` 运算符，`Destroy` 后的对象 `== null` 为 true 但 `is null` 为 false。统一用 `== null` 而非 `is null`
+
+```csharp
+// ❌ 错误 — C# 原生 null 检查，被 Destroy 后的对象骗过
+if (target is null) return;               // Destroy 后仍返回 false！
+if (ReferenceEquals(target, null)) return; // 同上
+
+// ✅ 正确 — Unity 重写的 == 运算符能正确识别 Destroyed 对象
+if (target == null) return;               // Destroy 后正确返回 true
+```
+
+| ❌ 不要用 | ✅ 统一用 | 原因 |
+|-----------|----------|------|
+| `obj is null` | `obj == null` | `is null` 绕过 Unity 的 `==` 重写 |
+| `ReferenceEquals(obj, null)` | `obj == null` | 同上，无法检测 Destroyed 状态 |
+| `obj is not null` | `obj != null` | 同理 |
+
 - **协程异常不会冒泡** — `StartCoroutine` 中的异常只会停止协程，不会抛到外层。关键协程要自己 try-catch
 
 ### 7.8 通用踩坑记录
@@ -1079,6 +1167,8 @@ hermanlei-rendering          ← 渲染专属：配合 rendering-knowledge-index
 | 12 | 修 bug 时凭猜测改代码，不先看真实运行数据 | P4 "No Translation" 修了 3 轮才修好（每轮只理解问题一层） | **修 bug 前先加 Debug.Log 看真实数据**，确认问题本质后再设计方案。不凭猜测 |
 | 13 | 并行堆积多个未经 Unity 编译验证的代码改动 | 第 1 个改动编译失败，后续 4 个改动全部白做 | **一个改动编译确认后再做下一个**，不攒着一堆改完才验证 |
 | 14 | GUI 进程（Unity）调 p4.exe，默认 Code Page 936 (GBK) | reconcile 返回 296 条假阳性（正确是 9 条），中文路径文件 digest 全部算错 | **统一用 `cmd /c "chcp 65001 >nul 2>&1 && p4 ..."`** 包装所有 p4 调用，同时设 StandardOutputEncoding=UTF8。PowerShell 默认已是 65001 所以看不出问题，只有 GUI 进程会中招 |
+| 15 | p4 2023.2 + chcp 65001 包装完全不兼容 | 所有 p4 命令 stdout 为空、exitCode=1，团队中用新版 p4 的同事 P4 功能全部失效 | **引入 DetectP4Version() 版本自动检测**：旧版(< 2020)走 chcp 包装，新版(≥ 2020)直接调用。不能简单去掉 chcp（旧版需要），也不能一律包 chcp（新版炸）。详见 pitfalls.md P4-3 |
+| 16 | `p4 login -s` 在新版 p4 中将结果输出到 stderr 而非 stdout | 工具只读 stdout → 误判为"未登录"，用户反复被要求输入密码 | **同时读取 stdout + stderr 合并判断**。p4 不同版本的输出位置不保证一致，所有 p4 命令结果判断都应同时检查 stdout 和 stderr。详见 pitfalls.md P4-4 |
 
 > **遇到新坑时，必须追加到此表。这是活文档。**
 
@@ -1169,6 +1259,15 @@ hermanlei-rendering          ← 渲染专属：配合 rendering-knowledge-index
 | 新的配置项 | 加到 `SceneCraftSettings.cs` | 新增一个路径配置 |
 | 多个工具共用的 P4 方法 | 加到 `P4AssetHelper.cs` | 新增 `P4Shelve()` |
 | 只有一个工具用的辅助方法 | 放在该工具自己的文件里 | `P4SubmitChecker` 内部的辅助方法 |
+
+### ⚠️ 铁律：新工具入口统一在 Hub 注册
+
+> **所有新增工具 / 独立工具的入口统一在 SceneCraftHub 的 `EnsureHubToolsRegistered()` 中注册卡片。**
+
+1. **绝不在 `Tools/SceneCraft/` 下注册子 MenuItem** — `Tools/SceneCraft` 是场景工坊主入口（快捷键 `%#p`），一旦有子菜单就会变成子菜单展开，导致主入口按钮失效
+2. 新工具在 `_hubTools.Add(...)` 中注册卡片（名称 + 描述 + 打开方法）
+3. `SceneCraft/` 顶级菜单下的 MenuItem（如场景效果切换、快速切换阶段）**不影响** `Tools/SceneCraft`，可以继续用
+4. 外部工具注册需 hermanlei 审核、author 必填、文件放 `External/` 子目录（详见 Hub.cs 底部注释）
 
 ### 8.3 详细开发细则（按需查阅）
 

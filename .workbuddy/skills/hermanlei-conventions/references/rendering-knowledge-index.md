@@ -3,7 +3,7 @@
 > **用途**：AI 在接到渲染相关任务时，先读此文档定位方向，再去搜索最新资料。
 > **维护规则**：每次调研渲染话题后更新此文档。每月巡检时检查链接有效性。
 > **保鲜周期**：每月
-> **最后更新**：2026-04-07
+> **最后更新**：2026-04-10
 
 ---
 
@@ -11,12 +11,20 @@
 
 | 管线 | 状态 | 适用场景 | 未来方向 |
 |------|------|----------|----------|
-| **URP** | ✅ 主力发展 | 所有游戏类型、所有平台 | 持续加新功能：实时 GI、SSR、物理光源、天空管理器 |
-| **HDRP** | ⚠️ 维护模式 | 高端主机/PC 项目 | 不加新功能，只修 bug + 支持 Switch 2（Unity 6.5） |
+| **URP** | ✅ 主力发展 | 所有游戏类型、所有平台 | **确认为唯一主力管线**（GDC 2026），HDRP 功能将逐步合并进 URP。SCGI 实时 GI、SSR、物理光源、天空管理器等持续加入 |
+| **HDRP** | ⚠️ 将合并进 URP | 高端主机/PC 项目 | GDC 2026 确认 HDRP 被淘汰/合并方向。当前仅修 bug + 支持 Switch 2（Unity 6.5） |
 | **Built-in** | ❌ 6.5 正式标记弃用 | 旧项目维护 | 支持到 2028 年底（Enterprise/Industry 到 2029），之后移除。教育资源和 Asset Store 默认转 URP |
 | **Custom SRP** | 🛠️ 自行维护 | EcoEngine 等自研管线 | Unity SRP API 持续可用。注意 6.5 移除旧版 Render Graph 编译器 |
 
-> **关键结论**：新项目一律用 URP。现有 EcoEngine 项目走 Custom SRP（注意 Render Graph 编译器变更）。不要启动新的 HDRP 项目。BiRP 弃用时间线已确认——实时服务项目应开始评估迁移。
+> **关键结论**（2026-04 更新）：Unity 已明确 URP 是唯一未来。HDRP 不只是"维护模式"，而是最终会合并进 URP。新项目一律用 URP。EcoEngine 走 Custom SRP 不受影响。
+
+### SCGI（Surface Caching Global Illumination）— 🆕 GDC 2026
+
+Unity 路线图中规划的**全新实时 GI 系统**，基于表面缓存技术，预计 6.5+。
+- 定位为替代 Enlighten 后续的实时 GI 方案
+- 具体实现细节尚未公开，仅在 GDC 2026 产品路线图视频中提及
+- APV（Adaptive Probe Volumes）是当前 Unity GI 方案，SCGI 可能是更进一步的迭代
+- **跟踪关键词**：`Unity SCGI surface caching global illumination`
 
 ---
 
