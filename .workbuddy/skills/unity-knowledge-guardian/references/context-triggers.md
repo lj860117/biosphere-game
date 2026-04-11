@@ -26,6 +26,7 @@
 | 文件名, 命名, 大小写 | — | 🟡 | Unity 项目所有 AI 生成文件名一律全小写（P4 大小写敏感） |
 | Skill, SKILL.md, 拆分, 交叉引用, references, 新增Skill, 修改Skill | — | 🟡 | 修改 Skill 文件后记得跑 skill-lint.py 验证一致性（每日 14:00 也会自动跑） |
 | 新功能, 调研, 之前做过, 有没有类似, 以前研究过, 参考, 知识索引 | — | 🟡 | 开发新功能前先查 `references/research-index.md`，看有没有之前调研过相关领域的成果 |
+| 过期, 清理, 升级Unity, 升级引擎, 版本升级, 迁移, 还有效吗, 还适用吗 | — | 🟡 | 引擎/技术栈变更后，跑一次 pitfalls.md + bug-tracker.md 记忆演化检查（knowledge-guardian 第五章） |
 
 ---
 

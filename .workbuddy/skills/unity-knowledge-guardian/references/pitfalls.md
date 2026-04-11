@@ -3,6 +3,7 @@
 > **维护者**：unity-knowledge-guardian Skill
 > **编号规则**：`领域缩写-序号`（如 APV-1），全局不重复
 > **规则**：只追加不删除。即使问题已修复，记录本身有历史价值。
+> **过期标注**：过时条目在标题末尾追加 `[已过期:原因]`，如 `[已过期:Unity 6.5 已修复]`。过期条目保留不删。
 > **最后更新**：2026-04-11
 > **数据源**：从 project-codebase-wiki/pitfalls.md 迁移 + hermanlei-conventions 7.8 节摘要
 
@@ -10,13 +11,13 @@
 
 ## 快速索引
 
-| 领域 | 条数 | 编号范围 | 关键词 |
-|------|------|----------|--------|
-| [APV](#apv-adaptive-probe-volumes) | 8 | APV-1~8 | 反射调用、EcoEngine、编辑模式、Scenario、BakingSet、Touchup Volume |
-| [P4/版本控制](#p4版本控制) | 4 | P4-1~4 | No Translation、GBK 代码页、chcp 65001、p4 版本检测、login -s stderr |
-| [编辑器工具](#编辑器工具) | 1 | TOOL-1 | VSCode linter、花括号闭合 |
-| [Shader](#shader) | 0 | — | _待积累_ |
-| [大世界/流式加载](#大世界流式加载) | 0 | — | _待积累_ |
+| 领域 | 条数 | 编号范围 | 活跃/过期 | 关键词 |
+|------|------|----------|-----------|--------|
+| [APV](#apv-adaptive-probe-volumes) | 8 | APV-1~8 | 8/0 | 反射调用、EcoEngine、编辑模式、Scenario、BakingSet、Touchup Volume |
+| [P4/版本控制](#p4版本控制) | 4 | P4-1~4 | 4/0 | No Translation、GBK 代码页、chcp 65001、p4 版本检测、login -s stderr |
+| [编辑器工具](#编辑器工具) | 1 | TOOL-1 | 1/0 | VSCode linter、花括号闭合 |
+| [Shader](#shader) | 0 | — | — | _待积累_ |
+| [大世界/流式加载](#大世界流式加载) | 0 | — | — | _待积累_ |
 
 ---
 
