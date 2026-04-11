@@ -71,17 +71,17 @@ hermanlei 当前的主要工作方向：
 
 ### 内容地图（做什么事读哪些章节）
 
-> **不需要每次全读 1200+ 行**。根据当前任务，只读相关章节即可。
+> **不需要每次全读**。根据当前任务，只读相关章节即可。拆分后，领域知识在子 Skill 中。
 
-| 你在做什么 | 必读 | 建议读 | 不需要读 |
-|-----------|------|--------|---------|
-| **写新 Unity 编辑器工具** | 零（闭环流程）、二（编辑器偏好）、三（接口设计） | 七（C# 编码规范）、八（SceneCraft：只需读🔴铁律 + 8.1/8.2，详细看 `references/scenecraft-dev-rules.md`） | 五（P4）、渲染知识索引 |
-| **重构/改老代码** | 一（重构铁律，🔴 必读！）、七（编码规范） | 零的④增量实施、八的🔴铁律（如果是 SceneCraft） | 二（编辑器偏好）、渲染知识索引 |
-| **渲染/Shader 开发** | 一（重构铁律）、七（编码规范） | `references/rendering-knowledge-index.md` | 二（编辑器偏好）、八（SceneCraft） |
-| **SD 材质 / 风格化材质** | 一（重构铁律）、七（编码规范） | `references/material-stylization-knowledge-index.md` | 二（编辑器偏好）、八（SceneCraft） |
-| **地形编辑 / PCG** | 一（重构铁律）、七（编码规范） | `references/terrain-pcg-knowledge-index.md` | 二（编辑器偏好）、八（SceneCraft） |
+| 你在做什么 | 必读 | 建议读 / 加载的子 Skill | 不需要读 |
+|-----------|------|------------------------|---------|
+| **写新 Unity 编辑器工具** | 零（闭环流程）、三（接口设计） | **加载 `scenecraft-dev`**、七（C# 编码规范） | 五（P4）|
+| **重构/改老代码** | 一（重构铁律，🔴 必读！）、七（编码规范） | 零的④增量实施、如果是 SceneCraft → **加载 `scenecraft-dev`** | 渲染知识 |
+| **渲染/Shader 开发** | 一（重构铁律）、七（编码规范） | **加载 `unity-rendering`** | SceneCraft 相关 |
+| **SD 材质 / 风格化材质** | 一（重构铁律）、七（编码规范） | **加载 `unity-rendering`** | SceneCraft 相关 |
+| **地形编辑 / PCG** | 一（重构铁律）、七（编码规范） | `references/terrain-pcg-knowledge-index.md` | 其他领域 |
 | **Git/版本管理操作** | 四（Git 规范） | 五（如果涉及 P4） | 其他所有 |
-| **做游戏（biosphere-game）** | 一（重构铁律）、七（编码规范 + 7.9 游戏特有规范） | `references/gamedev-knowledge-index.md` | 二（编辑器偏好）、八（SceneCraft） |
+| **做游戏（biosphere-game）** | 一（重构铁律）、七（编码规范 + 7.9 游戏特有规范） | `references/gamedev-knowledge-index.md` | 编辑器/渲染 |
 | **前沿调研/巡检** | Skill 成长引擎 | `references/README.md` | 编码相关章节 |
 | **聊天/讨论/设计** | 九（沟通风格） | 六（项目约定，需要知道项目路径时） | 编码相关章节 |
 
@@ -485,54 +485,10 @@ AI 在台账里给新问题定级时，按以下顺序判断：
 
 ## 二、Unity 编辑器工具开发偏好
 
-### UI/UX 原则
-
-| 原则 | 说明 |
-|------|------|
-| **文字优于图标** | UI 中使用文字标签，不用 emoji/图标。用户明确要求 emoji 时除外 |
-| **颜色要可区分** | 相邻状态的颜色必须有明显区分度，避免灰色和浅色混淆。需要特别注意：需关 Unity 的项目用紫色 `(0.7, 0.5, 1.0)` 而非灰色 |
-| **不在 OnGUI 执行阻塞操作** | 绝不在 `OnGUI()` / `OnInspectorGUI()` 中自动执行外部进程、网络请求或耗时命令。这类操作必须由用户点击按钮手动触发 |
-| **输入框可编辑+预设下拉** | 配置项（如服务器地址、路径）提供可编辑输入框 + ▼ 下拉预设菜单，兼顾灵活性和便利性 |
-| **错误重试不限次数** | 密码输入、连接重试等场景，错误后继续弹框让用户重试，只有用户点「取消」才退出。不要自动放弃 |
-| **颜色图例固定可见** | 列表上方的颜色图例条使用 ■ 方块 + 实际颜色 + 文字说明，固定不随滚动消失 |
-| **子节点继承父节点样式** | 树形结构中，子节点应继承父节点的颜色/样式标记（如 `parentIsArt` 参数传递） |
-| **耗时操作加提示** | 点击后需要等待的按钮，旁边加"点击后请耐心等待"文字提示 |
-| **首次操作加说明** | 首次使用的检测/连接按钮，附加详细说明文字，降低用户困惑 |
-
-### 代码组织原则
-
-- 初始状态使用特殊值（如 `-2` 表示"从未检测"），与正常状态值 `0`/`1` 区分
-- 环境变量检测结果要缓存（如 `_p4EnvScanned`），避免每帧重复执行
-- EditorPrefs 保存用户配置时，PREFS_PREFIX 保持旧前缀以向后兼容
-- 工具自身的文件在列表中自动过滤（如过滤 `/SceneCraft/` 路径）
-- 路径探测采用多级回退：缓存 → EditorPrefs → 内嵌 → PATH → 常见路径
-
-### 单文件工具的务实态度
-
-对于 Editor 工具类，如果功能内聚且团队只有少数人维护，**单文件大类是可接受的**（如 5000+ 行的 EditorWindow）。不要为了"架构正确"强行拆分导致维护成本增加。但要保持良好的 `#region` 分区和注释。
-
-### 编辑器 UI 技术选型（IMGUI vs UI Toolkit）
-
-| 场景 | 推荐 | 理由 |
-|------|------|------|
-| **维护现有工具**（SceneCraft 等） | IMGUI | 15000+ 行 IMGUI 代码，迁移成本远大于收益。IMGUI 不会被废弃 |
-| **从零开始的新工具** | **优先评估 UI Toolkit** | 数据绑定、UXML/USS 分离布局与逻辑、热重载样式，长期维护更省力 |
-| **快速原型 / 一次性小工具** | IMGUI | 上手快，不需要建 UXML/USS 文件，几十行搞定 |
-
-> **不强制迁移**。这是建议而非铁律。选哪个取决于工具的预期寿命和复杂度。
-> 如果新工具预期会长期维护且 UI 复杂（多页签、列表、拖拽），UI Toolkit 的投资会回本。
-> 如果只是写个小脚本弹个窗口，IMGUI 依然是最快的路。
-
-### 详细 UI 规则（按需查阅）
-
-> 以下详细规则已迁移到 `references/editor-ui-detailed-rules.md`，包含：
-> - UI 排版布局规则（Toolbar/HelpBox/Foldout/ScrollView/页签）
-> - 颜色编码系统（完整颜色表 + 历史教训）
-> - 分步引导 UI（Step Wizard）模式
-> - 列表/树形展示规则
-> - 连接/登录流程设计（零配置理念）
-> - 按钮交互模式（一键排除/内联下拉/耗时等待提示等）
-> - Workspace 选择 UI
+> **📦 已拆分到 `scenecraft-dev` Skill（2026-04-11）**
+> 完整的 UI/UX 原则、代码组织原则、IMGUI vs UI Toolkit 选型、详细 UI 规则等内容，
+> 已迁移到 `scenecraft-dev` Skill 的第二章。
+> 当任务涉及 Unity 编辑器工具开发时，路由表会自动加载该 Skill。
 
 ---
 
@@ -641,14 +597,24 @@ AI 在台账里给新问题定级时，按以下顺序判断：
 
 #### Skill 自动路由规则
 
-> AI 根据用户需求的领域关键词，**自动加载**对应 Skill，无需用户手动指定。
-> 多个 Skill 匹配时，按优先级加载（最多同时 2 个）。
-> 用户也可以直接说"用 XXX Skill"强制指定。
-> **路由表中没有覆盖的领域（标记「待补充」的行）**：必须用选择框询问用户"要不要搜索合适的 Skill"。用户选择搜 → 用 `find-skills` 搜索并推荐；用户选择不搜 → 用当前角色知识直接回答。**不得跳过询问自行判断。**
+> **🔴 强制执行**：读完本 Skill 后、开始执行用户任务前，必须按以下流程路由。
+> 这不是"建议"，是必须执行的步骤。跳过路由 = 违反规范。
+
+**路由执行流程（每次任务开始时）**：
+1. **关键词匹配**：将用户请求与下表的「触发关键词」列做匹配
+2. **命中子 Skill → 立即调用 `use_skill` 工具加载**：不要只"知道"有这个 Skill，必须实际调用 `use_skill` 工具把它加载进来。例如匹配到 `scenecraft-dev` → 执行 `use_skill("scenecraft-dev")`
+3. **多个匹配 → 最多同时加载 2 个**（按表中从上到下的优先级）
+4. **用户也可以直接说"用 XXX Skill"强制指定**
+5. **路由表中没有覆盖的领域（标记「待补充」的行）**：必须用选择框询问用户"要不要搜索合适的 Skill"。用户选择搜 → 用 `find-skills` 搜索并推荐；用户选择不搜 → 用当前角色知识直接回答。**不得跳过询问自行判断。**
+
+**⚠️ 常见错误**：AI 读了路由表但没实际调用 `use_skill`，导致子 Skill 的规范完全没生效。
+**正确做法**：匹配到子 Skill → 立刻 `use_skill` → 等加载完成 → 再开始执行任务。
 
 | 需求领域 | 触发关键词 | 推荐 Skill | 备注 |
 |----------|-----------|-----------|------|
-| **SceneCraft 操作/检查** | 查场景, 查资产, 查P4, 同步工坊, SceneCraft, 场景检查, 资产检查, P4提交, 新规则 | `scenecraft-agent` | 🆕 2026-04-02 新增，可叠加 `hermanlei-conventions` |
+| **SceneCraft 操作/检查** | 查场景, 查资产, 查P4, 同步工坊, 场景检查, 资产检查, P4提交, 新规则 | `scenecraft-agent` | 🆕 2026-04-02 新增，可叠加 `hermanlei-conventions` |
+| **SceneCraft 代码开发/审查** | SceneCraft 开发, 改 SceneCraft 代码, SceneCraft 审查, SceneCraft review, 看 SceneCraft 代码, SceneCraft 功能是否正常, 编辑器工具开发, IMGUI UI, EditorWindow 新功能, SceneCraft 重构 | `scenecraft-dev` | 🆕 2026-04-11 拆分，涉及看/改/审查 SceneCraft 源码时加载 |
+| **渲染 / Shader 开发** | Shader, 材质, 渲染管线, 光照, APV, LOD, TCRender, _NRMMap, SD, Substance Designer, 风格化材质 | `unity-rendering` | 🆕 2026-04-11 拆分，渲染+材质知识索引 |
 | Unity 编辑器工具 IMGUI | EditorWindow, Inspector, IMGUI, 编辑器工具, 自定义面板 | `unity-editor-imgui-design` | 可叠加 `unity-workflows` |
 | Unity 编辑器自动化 | 自动化, 批量操作, 菜单脚本 | `unity-workflows` | |
 | Unity 编辑器远程控制 | MCP, 远程控制, WebSocket, 编辑器自动化, 实时通信 | `unity-editor-toolkit` 或 `unity-mcp-orchestrator` | 🆕 2026-04-10 补入 |
@@ -663,8 +629,8 @@ AI 在台账里给新问题定级时，按以下顺序判断：
 | Unity 测试 | 单元测试, PlayMode, EditMode, Test Runner | `unity-test-runner` | |
 | Unity 关卡/场景设计 | 关卡设计, 地图布局, 场景搭建, 原型 | `level-design-patterns` | 可叠加 `unity-level-design` |
 | 游戏设计 / 策划 | 玩法, 机制, 数值, 策划, 系统设计 | `game-developer-skill` | |
-| Shader / 渲染 | Shader, 材质, 渲染管线, URP, HDRP, GI, 光照 | 先读 `references/rendering-knowledge-index.md` 定位方向，再搜索具体资料 | 有知识索引，可叠加 `shadergraph-editor`(visionOS) |
-| SD 材质 / 风格化材质 | Substance Designer, SD, 材质风格化, PBR 风格化, 手绘材质, 材质生成 | 先读 `references/material-stylization-knowledge-index.md` 定位方向 | 🆕 2026-03-30 新增 |
+| Shader / 渲染 | Shader, 材质, 渲染管线, URP, HDRP, GI, 光照 | `unity-rendering` | 🔄 2026-04-11 改为独立 Skill（原为 references 文件） |
+| SD 材质 / 风格化材质 | Substance Designer, SD, 材质风格化, PBR 风格化, 手绘材质, 材质生成 | `unity-rendering` | 🔄 2026-04-11 归入 unity-rendering |
 | 地形编辑 / PCG | 地形, Terrain, Heightmap, 程序化生成, PCG, 散布, Houdini, Biome, WFC | 先读 `references/terrain-pcg-knowledge-index.md` 定位方向 | 🆕 2026-03-30 新增 |
 | 2D / 3D 美术表现 | 美术风格, 动画, 粒子, VFX, 2D 美术 | _(待补充，遇到时用 find-skills 搜索)_ | |
 | 后端开发 | 服务器, API, 数据库, 网络, 后端 | _(待补充，遇到时用 find-skills 搜索)_ | |
@@ -889,12 +855,12 @@ AI 在台账里给新问题定级时，按以下顺序判断：
 | 5 | **用户活跃方向发生分化** | 同时维护 2+ 个技术栈差异大的项目（如 Unity + Web） | 不同栈的规则互相干扰，拆了各管各的 |
 | 6 | **加载时的 token 消耗影响正常工作** | AI 反馈上下文窗口不够 / 频繁截断 | 直接指标，必须减重 |
 
-**拆分方向参考**（到时候怎么拆）：
+**拆分方向参考**（当前状态 2026-04-11）：
 ```
-hermanlei-conventions        ← 核心：铁律 + 通用编码规范 + 成长引擎 + 元规范
-hermanlei-unity-tools        ← Unity 编辑器工具专属：闭环流程 + 二/三/八章 + SceneCraft references
-hermanlei-gamedev            ← 游戏开发专属：游戏架构规范 + biosphere-game 约定
-hermanlei-rendering          ← 渲染专属：配合 rendering-knowledge-index.md
+hermanlei-conventions        ← 核心：铁律 + 通用编码规范 + 成长引擎 + 元规范 + 路由表
+scenecraft-dev               ← ✅ 已拆分：编辑器工具偏好 + SceneCraft 专属规范 + 4 个 references
+unity-rendering              ← ✅ 已拆分：渲染知识索引 + 材质风格化索引 + TCRender/APV 要点
+hermanlei-gamedev            ← 预留：游戏架构规范 + biosphere-game 约定（需求驱动）
 ```
 
 **拆分时的不变量**（拆了不能丢的）：
@@ -1205,81 +1171,10 @@ if (target == null) return;               // Destroy 后正确返回 true
 
 ## 八、SceneCraft 专属规范（编辑器工具开发）
 
-> **以下规则仅在开发 SceneCraft（场景工坊）及类似 Unity 编辑器工具时适用。**
-> 开发小游戏等非工具项目时，遵守第七章通用规范即可，无需看本章。
-
-### ⚠️ 铁律：先读速查文档，禁止遍历源码
-
-> **这是 SceneCraft 开发的第一条规则，优先级最高。**
-
-1. **任何 SceneCraft 相关任务开始前，第一步必须读** `references/scenecraft-architecture.md`（架构速查文档）
-2. **通过速查文档定位到具体的 1~3 个文件**，然后只读这几个文件
-3. **绝对禁止** 用 `search_file` / `list_dir` 遍历 SceneCraft 全部 28 个 .cs 文件来"了解项目结构"——速查文档就是干这个的
-4. **新功能开发时**，先在速查文档中查"快速定位指南"确认代码放哪、改哪，再动手
-5. **速查文档过时了怎么办**？如果发现实际文件与文档不符，先完成当前任务，任务结束后更新速查文档
-
-违反此规则 = 浪费用户 token + 浪费时间。没有例外。
-
-### ⚠️ 铁律：改完代码必须同步文档
-
-> **用户经常忘记更新文档，所以这是 AI 的责任，每次改完代码后必须主动执行。**
-
-**触发条件**（满足任意一条就触发）：
-- 新增了 .cs 文件
-- 删除或重命名了 .cs 文件
-- 给现有类新增了重要的公共方法或字段
-- 修改了类的职责范围（比如把一个功能从 A 文件搬到 B 文件）
-- 新增了共享类 / 工具类
-- 新增了配置项、枚举、数据类型
-
-**必须做的事**：
-1. **更新架构速查文档** `references/scenecraft-architecture.md` — 加入新文件的类声明、核心方法、依赖关系；或更新已有文件的描述
-2. **如果涉及新的共享类或代码组织规则变化**，更新本 Skill 文档中的相关章节（8.1 共享类清单、8.2 新代码放哪里等）
-3. **主动问用户**："这次改动要不要更新到架构速查文档里？" — 即使你觉得不需要，也问一句，因为用户自己可能记不住
-
-**时机**：在当前任务的代码改动全部完成、验证通过后，作为收尾步骤执行。不要等到下次任务才想起来。
-
-### 8.1 共享类清单（新功能优先查这些）
-
-| 共享类 | 职责 | 什么时候用 |
-|--------|------|-----------|
-| `P4AssetHelper.cs` | 所有 P4 操作（edit/add/delete/rename/revert） | 任何 P4 相关功能 |
-| `SceneCraftStyles.cs` | 所有 UI 颜色和 GUIStyle | 任何 UI 绘制 |
-| `SceneCraftData.cs` | 所有数据类型（枚举/结构体/常量） | 新增数据类型 |
-| `SceneCraftSettings.cs` | 所有配置项读写（ScriptableObject） | 新增配置项 |
-
-### 8.2 新增代码放哪里
-
-| 场景 | 放哪 | 示例 |
-|------|------|------|
-| 主窗口的新页签/新功能 | 新建 `SceneCraftWindow.XXX.cs`（partial class） | 加个"资源统计"功能 → `SceneCraftWindow.Stats.cs` |
-| 独立弹窗工具 | 新建独立 `XXXWindow.cs` 文件 | 新的检查工具 → `TextureChecker.cs` |
-| 新的数据类型/枚举 | 加到 `SceneCraftData.cs` | 新增一个状态枚举 |
-| 新的 UI 样式/颜色 | 加到 `SceneCraftStyles.cs` | 新增一种高亮色 |
-| 新的配置项 | 加到 `SceneCraftSettings.cs` | 新增一个路径配置 |
-| 多个工具共用的 P4 方法 | 加到 `P4AssetHelper.cs` | 新增 `P4Shelve()` |
-| 只有一个工具用的辅助方法 | 放在该工具自己的文件里 | `P4SubmitChecker` 内部的辅助方法 |
-
-### ⚠️ 铁律：新工具入口统一在 Hub 注册
-
-> **所有新增工具 / 独立工具的入口统一在 SceneCraftHub 的 `EnsureHubToolsRegistered()` 中注册卡片。**
-
-1. **绝不在 `Tools/SceneCraft/` 下注册子 MenuItem** — `Tools/SceneCraft` 是场景工坊主入口（快捷键 `%#p`），一旦有子菜单就会变成子菜单展开，导致主入口按钮失效
-2. 新工具在 `_hubTools.Add(...)` 中注册卡片（名称 + 描述 + 打开方法）
-3. `SceneCraft/` 顶级菜单下的 MenuItem（如场景效果切换、快速切换阶段）**不影响** `Tools/SceneCraft`，可以继续用
-4. 外部工具注册需 hermanlei 审核、author 必填、文件放 `External/` 子目录（详见 Hub.cs 底部注释）
-
-### 8.3 详细开发细则（按需查阅）
-
-> 以下详细规则已迁移到 `references/scenecraft-dev-rules.md`，包含：
-> - 体量限制（partial ≤ 2000 行，独立工具 ≤ 3000 行）
-> - 编辑器 UI 错误展示规范
-> - #region 组织规则
-> - 修改代码的额外检查项
-> - 新功能 Checklist
-> - 代码预审工作流（L1/L2/L3 三层机制）
-> - 已知问题台账维护规则
-> - SceneCraft 专属踩坑记录
+> **📦 已拆分到 `scenecraft-dev` Skill（2026-04-11）**
+> SceneCraft 的铁律（先读速查文档、改完同步文档、Hub 注册）、共享类清单、
+> 新代码放哪里、开发细则等内容，已迁移到 `scenecraft-dev` Skill 的第三章。
+> 当任务涉及 SceneCraft 开发时，路由表会自动加载该 Skill。
 
 ---
 
@@ -1294,14 +1189,22 @@ if (target == null) return;               // Destroy 后正确返回 true
 
 ## 参考文档
 
-- **Skill 架构指南**：`references/ARCHITECTURE.md` — Skill 整体架构地图（章节索引、修改规则、温度体系、快速决策树）。**首次接触此 Skill 的 AI/维护者必读，可替代通读 SKILL.md 全文**
+### 本 Skill 保留的 references/
+- **Skill 架构指南**：`references/ARCHITECTURE.md` — Skill 整体架构地图。**首次接触此 Skill 的 AI/维护者必读**
 - **项目上下文**：`references/project-context.md` — 项目路径、版本历史、P4 集成决策等
-- **SceneCraft 架构速查**：`references/scenecraft-architecture.md` — 28 个 .cs 文件的完整架构文档（类声明、核心方法、字段、依赖关系、快速定位指南）。**修改 SceneCraft 代码前必读此文档**，避免遍历全部源码浪费 token
-- **SceneCraft 已知问题台账**：`references/scenecraft-known-issues.md` — 代码预审发现的所有问题（含严重等级、行号、修复建议、修复状态）。**改代码前查对应文件章节**，修好了标 ✅，发现新问题追加
-- **SceneCraft 开发细则**：`references/scenecraft-dev-rules.md` — 体量限制、#region 规则、代码预审工作流（L1/L2/L3）、新功能 Checklist、踩坑记录。**开发 SceneCraft 时按需查阅**
-- **编辑器 UI 详细规则**：`references/editor-ui-detailed-rules.md` — UI 排版、颜色编码、分步引导、列表规则、连接流程、按钮交互模式、闭环流程各步骤详细说明。**做编辑器工具 UI 时按需查阅**
-- **渲染前沿知识索引**：`references/rendering-knowledge-index.md` — Unity 渲染管线战略、全球前沿技术图谱（三个梯队）、移动端渲染特有知识、Shader 学习资源、知识保鲜策略。**接到渲染相关任务时先读此文档定位方向**
-- **材质风格化知识索引**：`references/material-stylization-knowledge-index.md` — Substance Designer 工作流规范、风格化 PBR 技术、AI 材质生成前沿、SD+Unity 集成方案。**接到材质/SD 相关任务时先读此文档**
-- **地形与 PCG 知识索引**：`references/terrain-pcg-knowledge-index.md` — Unity 地形系统、大世界地形管理、程序化内容生成（WFC/噪声/Biome）、Houdini 集成工作流。**接到地形编辑/PCG 相关任务时先读此文档**
-- **游戏开发知识索引**：`references/gamedev-knowledge-index.md` — SO 架构参考模式、反模式观察名单、移动端/小游戏性能知识、竞品研究方向。**接到游戏开发任务时先读此文档**
-- **references 目录管理规范**：`references/README.md` — 知识文档的分类规则、命名规范、文档头模板、生命周期管理。**新增 references 文档前必读此规范**
+- **地形与 PCG 知识索引**：`references/terrain-pcg-knowledge-index.md` — Unity 地形系统、PCG、Houdini 集成
+- **游戏开发知识索引**：`references/gamedev-knowledge-index.md` — SO 架构、游戏性能、竞品研究
+- **技术雷达**：`references/tech-radar.md` — 跨领域调研总索引（永久留在 conventions）
+- **references 目录管理规范**：`references/README.md` — 知识文档的分类规则、命名规范
+
+### 已迁移到子 Skill 的 references/（2026-04-11）
+> 以下文件已复制到对应子 Skill，conventions 中的副本将在确认无问题后删除。
+
+| 文件 | 迁移到 | 子 Skill |
+|------|--------|---------|
+| scenecraft-architecture.md | `scenecraft-dev/references/` | scenecraft-dev |
+| scenecraft-dev-rules.md | `scenecraft-dev/references/` | scenecraft-dev |
+| scenecraft-known-issues.md | `scenecraft-dev/references/` | scenecraft-dev |
+| editor-ui-detailed-rules.md | `scenecraft-dev/references/` | scenecraft-dev |
+| rendering-knowledge-index.md | `unity-rendering/references/` | unity-rendering |
+| material-stylization-knowledge-index.md | `unity-rendering/references/` | unity-rendering |
