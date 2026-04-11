@@ -4,8 +4,6 @@ Thumbs.db
 .vscode/
 .idea/
 
-# WorkBuddy internal data (keep skills tracked)
-.workbuddy/*
-!.workbuddy/skills/
-.workbuddy/skills/**/.workbuddy/
+# WorkBuddy internal data (ALL private — do not push)
+.workbuddy/
 .codebuddy/
